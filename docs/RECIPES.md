@@ -14,6 +14,7 @@ cleanroom duplicates
 cleanroom downloads
 cleanroom installers
 cleanroom nodes
+cleanroom venvs
 cleanroom apps
 cleanroom browsers
 cleanroom leftovers adobe
@@ -50,6 +51,7 @@ cleanroom duplicates --json ~/Documents
 cleanroom downloads --json
 cleanroom installers --json
 cleanroom nodes --json ~/Documents
+cleanroom venvs --json ~/Documents
 cleanroom apps --json
 cleanroom browsers --json
 cleanroom leftovers adobe --json
@@ -87,6 +89,8 @@ cleanroom report --output cleanroom-report.md
 `installers --json` emits old downloaded installer files in `~/Downloads` with age, modified date, path, size, and matching preview/apply commands.
 
 `nodes --json [PATH]` emits stale `node_modules` folders with age, size, and the matching preview/apply commands.
+
+`venvs --json [PATH]` emits stale Python virtualenv folders with age, size, `pyvenv.cfg` marker path, and the matching preview/apply commands.
 
 `apps --json [PATH]` emits app bundle sizes for `/Applications`, `~/Applications`, or a provided path. It is intentionally review-only and does not uninstall anything.
 
@@ -132,13 +136,22 @@ cleanroom clean --preset dev --apply
 cleanroom clean --preset dev --apply --trash
 ```
 
-Good for package stores, stale `node_modules`, and safe app caches.
+Good for package stores, stale `node_modules`, stale Python virtualenvs, and safe app caches.
 
 Inspect stale `node_modules` first:
 
 ```sh
 cleanroom nodes
 cleanroom nodes ~/Documents --days 45 --limit 30
+```
+
+Inspect stale Python virtualenvs first:
+
+```sh
+cleanroom venvs
+cleanroom venvs ~/Documents --days 45 --limit 30
+cleanroom clean --include-venv-stale --days 45
+cleanroom clean --apply --trash --include-venv-stale --days 45
 ```
 
 Inspect cache buckets first:
@@ -186,6 +199,7 @@ cleanroom duplicates ~/Documents --min-mb 100 --limit 20
 cleanroom downloads --days 30 --limit 50
 cleanroom installers --days 30 --limit 50
 cleanroom nodes ~/Documents --days 45 --limit 30
+cleanroom venvs ~/Documents --days 45 --limit 30
 ```
 
 Use this when macOS Storage reports a large Documents category. Review the output manually; cleanroom will not delete arbitrary personal files.

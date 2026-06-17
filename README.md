@@ -15,6 +15,7 @@ macOS Storage often labels hidden user folders as **Documents** or **System Data
 - Go, Python, SwiftPM, Maven, Composer, Ruby, uv, and Poetry toolchain caches
 - Docker Desktop, Colima, Lima, and Podman container storage
 - old `node_modules`
+- stale Python virtualenv folders
 - AI-agent recordings, scratch data, local memory, and generated workspaces
 - local AI model downloads and backends
 - Chrome/VS Code/Cursor cache folders
@@ -182,6 +183,14 @@ Review stale `node_modules` folders:
 cleanroom nodes
 cleanroom nodes ~/Documents --days 45 --limit 30
 cleanroom nodes --json
+```
+
+Review stale Python virtualenv folders:
+
+```sh
+cleanroom venvs
+cleanroom venvs ~/Documents --days 45 --limit 30
+cleanroom venvs --json
 ```
 
 List large installed apps for manual review:
@@ -365,7 +374,7 @@ Preset meanings:
 
 ```text
 safe  default rebuildable caches
-dev   safe + app caches + package/toolchain stores + stale node_modules
+dev   safe + app caches + package/toolchain stores + stale node_modules + stale virtualenvs
 deep  dev + heavy SDKs + snapshots + AI workspace data
 ```
 
@@ -385,6 +394,13 @@ Remove stale `node_modules` older than 45 days:
 
 ```sh
 cleanroom clean --apply --include-node-stale --days 45
+```
+
+Remove stale Python virtualenv folders older than 45 days:
+
+```sh
+cleanroom venvs --days 45
+cleanroom clean --apply --trash --include-venv-stale --days 45
 ```
 
 Clean old downloaded installers:
@@ -513,6 +529,8 @@ Config files use simple `key=value` lines and are never executed as shell.
 `installers` lists old `.dmg`, `.pkg`, `.mpkg`, `.xip`, `.ipsw`, and `.iso` files in `~/Downloads`. Cleanup is opt-in with `--include-installers`.
 
 `nodes` lists stale `node_modules` folders before you decide whether to run `cleanroom clean --include-node-stale --apply`.
+
+`venvs` lists stale Python virtualenv folders before you decide whether to run `cleanroom clean --include-venv-stale --apply`. It only treats folders with `pyvenv.cfg` as virtualenv cleanup candidates.
 
 `apps` lists `.app` bundle sizes from `/Applications` and `~/Applications`, or a path you provide. It never uninstalls apps.
 

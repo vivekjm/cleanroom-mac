@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.33.0"
+VERSION="0.34.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -20,6 +20,7 @@ EXCLUDES=()
 PATH_ARGS=()
 INCLUDE_DEV_HEAVY=0
 INCLUDE_NODE_STALE=0
+INCLUDE_VENV_STALE=0
 INCLUDE_GEMINI=0
 INCLUDE_LMSTUDIO=0
 INCLUDE_AI_WORKSPACES=0
@@ -53,6 +54,7 @@ Usage:
   cleanroom downloads [--days N] [--limit N] [--json]
   cleanroom installers [--days N] [--limit N] [--json]
   cleanroom nodes [PATH] [--days N] [--limit N] [--json]
+  cleanroom venvs [PATH] [--days N] [--limit N] [--json]
   cleanroom apps [PATH] [--limit N] [--json]
   cleanroom browsers [--json]
   cleanroom leftovers QUERY... [--limit N] [--json] [--apply --trash]
@@ -89,6 +91,7 @@ Actions:
   downloads            List old Downloads files for manual review.
   installers           List old downloaded installer files for review.
   nodes                List stale node_modules folders for review.
+  venvs                List stale Python virtualenv folders for review.
   apps                 List largest app bundles for review without uninstalling.
   browsers             Inventory browser profile and cache footprint.
   leftovers            Find app leftovers by search term. Apply requires --trash.
@@ -120,23 +123,26 @@ Options:
   --yes                Do not prompt before --apply cleanup.
   --verbose            Print every path touched.
   --json               Emit JSON for overview, scan, system-data, plan, large, duplicates,
-                       downloads, installers, nodes, apps, browsers, leftovers, startup,
+                       downloads, installers, nodes, venvs, apps, browsers, leftovers, startup,
                        trash, backups, xcode, caches, diagnostics, packages, toolchains,
                        containers, snapshots, doctor, protect, guard, or rules.
   --output PATH        Output path for report.
   --log PATH           Write apply audit log here. Default: ~/.local/state/cleanroom/runs/*.log.
   --config PATH        Load config file. Default: ~/.config/cleanroom/config.
   --exclude PATH       Never remove this path. Can be passed multiple times.
-  --days N             Age threshold for stale node_modules. Default: 30.
+  --days N             Age threshold for stale node_modules and virtualenvs. Default: 30.
   --limit N            Number of history entries or large files to show. Default: 20.
   --min-mb N           Minimum file size for large-file discovery. Default: 500.
   --preset NAME        Enable a useful group: safe, dev, deep.
                        safe: default rebuildable caches.
-                       dev: safe + app caches + package/toolchain stores + stale node_modules.
+                       dev: safe + app caches + package/toolchain stores + stale node_modules
+                            and stale virtualenvs.
                        deep: dev + heavy SDKs + snapshots + AI workspaces.
   --include-dev-heavy  Include heavier developer data:
                        Xcode device support, simulator app data, Android NDK/system images.
   --include-node-stale Remove node_modules older than --days from Desktop/Documents/Downloads.
+  --include-venv-stale Remove Python virtualenv folders older than --days from
+                       Desktop/Documents/Downloads when they contain pyvenv.cfg.
   --include-package-stores
                        Include rebuildable package stores like CocoaPods repos and pnpm store.
   --include-toolchains Include rebuildable language/toolchain caches like Go, pip, uv,
@@ -186,6 +192,9 @@ Examples:
   cleanroom nodes
   cleanroom nodes --days 45 --limit 30
   cleanroom nodes --json ~/Documents
+  cleanroom venvs
+  cleanroom venvs --days 45 --limit 30
+  cleanroom venvs --json ~/Documents
   cleanroom apps
   cleanroom apps --json /Applications
   cleanroom browsers
@@ -233,7 +242,7 @@ Examples:
   cleanroom clean --apply --include-app-caches
   cleanroom clean --include-user-trash
   cleanroom clean --apply --include-user-trash
-  cleanroom clean --apply --include-dev-heavy --include-node-stale --days 45
+  cleanroom clean --apply --include-dev-heavy --include-node-stale --include-venv-stale --days 45
 EOF
 }
 
@@ -344,6 +353,7 @@ load_config() {
       include_toolchains) truthy "$value" && INCLUDE_TOOLCHAINS=1 ;;
       include_diagnostics) truthy "$value" && INCLUDE_DIAGNOSTICS=1 ;;
       include_node_stale) truthy "$value" && INCLUDE_NODE_STALE=1 ;;
+      include_venv_stale) truthy "$value" && INCLUDE_VENV_STALE=1 ;;
       include_dev_heavy) truthy "$value" && INCLUDE_DEV_HEAVY=1 ;;
       include_snapshots) truthy "$value" && INCLUDE_SNAPSHOTS=1 ;;
       include_ai_workspaces) truthy "$value" && INCLUDE_AI_WORKSPACES=1 ;;
@@ -451,6 +461,20 @@ stale_node_kb() {
       kb="$(size_kb "$path")"
       total=$((total + kb))
     done < <(find "$root" -maxdepth 8 -type d -name node_modules -mtime +"$DAYS" -prune -print 2>/dev/null)
+  done
+  printf '%s\n' "$total"
+}
+
+stale_venv_kb() {
+  local total=0
+  local roots=("$HOME/Documents" "$HOME/Desktop" "$HOME/Downloads")
+  local root path kb
+  for root in "${roots[@]}"; do
+    [[ -d "$root" ]] || continue
+    while IFS= read -r -d '' path; do
+      kb="$(size_kb "$(dirname "$path")")"
+      total=$((total + kb))
+    done < <(find "$root" -maxdepth 9 -type f -name pyvenv.cfg -mtime +"$DAYS" -print0 2>/dev/null)
   done
   printf '%s\n' "$total"
 }
@@ -1069,6 +1093,23 @@ clean_node_stale() {
   return 0
 }
 
+clean_venv_stale() {
+  [[ "$INCLUDE_VENV_STALE" -eq 1 ]] || return 0
+  log "${BOLD}Stale Python virtualenvs older than ${DAYS} days${RESET}"
+  local roots=("$HOME/Documents" "$HOME/Desktop" "$HOME/Downloads")
+  local root marker path
+  for root in "${roots[@]}"; do
+    [[ -d "$root" ]] || continue
+    find "$root" -maxdepth 9 -type f -name pyvenv.cfg -mtime +"$DAYS" -print0 2>/dev/null |
+      while IFS= read -r -d '' marker; do
+        path="$(dirname "$marker")"
+        [[ -f "$path/pyvenv.cfg" ]] || continue
+        run_rm "$path"
+      done
+  done
+  return 0
+}
+
 clean_installers() {
   [[ "$INCLUDE_INSTALLERS" -eq 1 ]] || return 0
   log "${BOLD}Old downloaded installers older than ${DAYS} days${RESET}"
@@ -1481,6 +1522,86 @@ nodes() {
   done <<<"$rows"
   printf '\nPreview cleanup with: cleanroom clean --include-node-stale --days %s\n' "$DAYS"
   printf 'Apply cleanup with: cleanroom clean --apply --trash --include-node-stale --days %s\n' "$DAYS"
+}
+
+venv_roots() {
+  if [[ "${#PATH_ARGS[@]}" -gt 0 ]]; then
+    printf '%s\n' "$(expand_path "${PATH_ARGS[0]}")"
+  else
+    printf '%s\n' "$HOME/Documents"
+    printf '%s\n' "$HOME/Desktop"
+    printf '%s\n' "$HOME/Downloads"
+  fi
+}
+
+venv_rows() {
+  local now root marker path kb epoch age_days
+  now="$(date '+%s')"
+  while IFS= read -r root; do
+    [[ -d "$root" ]] || continue
+    find "$root" -maxdepth 9 -type f -name pyvenv.cfg -mtime +"$DAYS" -print0 2>/dev/null |
+      while IFS= read -r -d '' marker; do
+        path="$(dirname "$marker")"
+        [[ -f "$path/pyvenv.cfg" ]] || continue
+        kb="$(size_kb "$path")"
+        epoch="$(path_mtime_epoch "$marker")"
+        if [[ "$epoch" -gt 0 && "$now" -ge "$epoch" ]]; then
+          age_days=$(((now - epoch) / 86400))
+        else
+          age_days=0
+        fi
+        printf '%012d\t%s\t%s\t%s\t%s\n' "$kb" "$epoch" "$age_days" "$path" "$marker"
+      done
+  done < <(venv_roots) | sort -rn | head -n "$LIMIT"
+}
+
+venvs() {
+  local rows
+  rows="$(venv_rows)"
+
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '['
+    local first=1 kb epoch age_days path marker kb_num
+    while IFS=$'\t' read -r kb epoch age_days path marker; do
+      [[ -z "${path:-}" ]] && continue
+      kb_num="$(printf '%s\n' "$kb" | sed 's/^0*//; s/^$/0/')"
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '{"path":"%s","marker":"%s","size_kb":%s,"size":"%s","modified_epoch":%s,"age_days":%s,"preview_command":"%s","apply_command":"%s"}' \
+        "$(printf '%s' "$path" | json_escape)" \
+        "$(printf '%s' "$marker" | json_escape)" \
+        "$kb_num" \
+        "$(human_kb "${kb:-0}" | json_escape)" \
+        "${epoch:-0}" \
+        "${age_days:-0}" \
+        "$(printf 'cleanroom clean --include-venv-stale --days %s' "$DAYS" | json_escape)" \
+        "$(printf 'cleanroom clean --apply --trash --include-venv-stale --days %s' "$DAYS" | json_escape)"
+    done <<<"$rows"
+    printf ']\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}cleanroom stale Python virtualenvs${RESET}"
+  printf 'Review-only list. cleanroom only removes these with --include-venv-stale and --apply.\n'
+  printf 'Only folders containing pyvenv.cfg are considered virtualenv cleanup candidates.\n'
+  if [[ "${#PATH_ARGS[@]}" -gt 0 ]]; then
+    printf 'Path: %s\n' "$(expand_path "${PATH_ARGS[0]}")"
+  else
+    printf 'Paths: ~/Documents, ~/Desktop, ~/Downloads\n'
+  fi
+  printf 'Older than: %s days  Limit: %s\n\n' "$DAYS" "$LIMIT"
+  if [[ -z "$rows" ]]; then
+    printf 'No stale Python virtualenv folders found.\n'
+    return 0
+  fi
+  printf '%-10s %-9s %s\n' "size" "age" "path"
+  local kb epoch age_days path marker
+  while IFS=$'\t' read -r kb epoch age_days path marker; do
+    [[ -z "${path:-}" ]] && continue
+    printf '%-10s %4sd     %s\n' "$(human_kb "$kb")" "${age_days:-0}" "$path"
+  done <<<"$rows"
+  printf '\nPreview cleanup with: cleanroom clean --include-venv-stale --days %s\n' "$DAYS"
+  printf 'Apply cleanup with: cleanroom clean --apply --trash --include-venv-stale --days %s\n' "$DAYS"
 }
 
 duplicate_candidates() {
@@ -2636,6 +2757,7 @@ overview() {
   printf 'cleanroom system-data\n'
   printf 'cleanroom large ~/Documents --min-mb 250 --limit 50\n'
   printf 'cleanroom downloads --days 30 --limit 50\n'
+  printf 'cleanroom venvs --days 30 --limit 50\n'
   printf 'cleanroom trash\n'
   printf 'cleanroom startup\n'
   printf 'cleanroom packages\n'
@@ -2685,7 +2807,7 @@ snapshots() {
 }
 
 plan_rows() {
-  local safe package toolchain app installers node dev diagnostics ai_workspaces ai_models containers user_trash
+  local safe package toolchain app installers node venv dev diagnostics ai_workspaces ai_models containers user_trash
   safe="$(sum_existing_kb \
     "~/Library/Caches" "~/.cache" "~/.npm/_cacache" "~/.npm/_logs" "~/.npm/_npx" \
     "~/.yarn/cache" "~/.yarn/berry" "~/.gradle/caches" "~/.gradle/daemon" \
@@ -2697,6 +2819,7 @@ plan_rows() {
   app="$(app_cache_kb)"
   installers="$(installer_total_kb)"
   node="$(stale_node_kb)"
+  venv="$(stale_venv_kb)"
   dev="$(sum_existing_kb \
     "~/Library/Developer/Xcode/iOS DeviceSupport" "~/Library/Developer/Xcode/watchOS DeviceSupport" \
     "~/Library/Developer/Xcode/tvOS DeviceSupport" "~/Library/Android/sdk/ndk" \
@@ -2714,6 +2837,7 @@ plan_rows() {
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$package" "package-stores" "Package-manager stores" "cleanroom clean --include-package-stores" "cleanroom clean --apply --trash --include-package-stores" "Rebuildable package stores such as pnpm, CocoaPods, Cargo, and Gradle-related stores."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$toolchain" "toolchains" "Language toolchain caches" "cleanroom toolchains" "cleanroom clean --apply --trash --include-toolchains" "Rebuildable caches for Go, Python, SwiftPM, Maven, Composer, RubyGems, Bundler, uv, and Poetry."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$node" "node-stale" "Stale node_modules" "cleanroom clean --include-node-stale --days $DAYS" "cleanroom clean --apply --trash --include-node-stale --days $DAYS" "node_modules older than $DAYS days under Desktop, Documents, and Downloads."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$venv" "venv-stale" "Stale Python virtualenvs" "cleanroom venvs --days $DAYS" "cleanroom clean --apply --trash --include-venv-stale --days $DAYS" "Python virtualenv folders older than $DAYS days under Desktop, Documents, and Downloads."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$dev" "dev-heavy" "Heavy SDK and simulator artifacts" "cleanroom clean --include-dev-heavy" "cleanroom clean --apply --trash --include-dev-heavy" "Opt-in cleanup that may require re-downloading SDKs or resetting simulator app data."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$diagnostics" "diagnostics" "Old diagnostic reports" "cleanroom diagnostics" "cleanroom clean --apply --trash --include-diagnostics --days $DAYS" "Opt-in cleanup for user diagnostic reports and CrashReporter files older than $DAYS days."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$ai_workspaces" "ai-workspaces" "Generated AI workspace state" "cleanroom clean --include-ai-workspaces" "cleanroom clean --apply --trash --include-ai-workspaces" "Generated recordings, scratch, brain, implicit data, and conversation caches where known."
@@ -3086,7 +3210,7 @@ init_config() {
 # preset can be: safe, dev, deep
 preset=dev
 
-# stale node_modules threshold
+# stale node_modules and virtualenv threshold
 days=30
 
 # Optional categories
@@ -3095,6 +3219,7 @@ include_package_stores=true
 include_toolchains=true
 include_diagnostics=false
 include_node_stale=true
+include_venv_stale=false
 include_dev_heavy=false
 include_snapshots=false
 include_ai_workspaces=false
@@ -3133,6 +3258,7 @@ interactive() {
   ask_yes_no "Include old diagnostic reports older than ${DAYS} days?" && INCLUDE_DIAGNOSTICS=1
   ask_yes_no "Include old downloaded installers older than ${DAYS} days?" && INCLUDE_INSTALLERS=1
   ask_yes_no "Include stale node_modules older than ${DAYS} days?" && INCLUDE_NODE_STALE=1
+  ask_yes_no "Include stale Python virtualenvs older than ${DAYS} days?" && INCLUDE_VENV_STALE=1
   ask_yes_no "Include heavy SDK/simulator cleanup?" && INCLUDE_DEV_HEAVY=1
   ask_yes_no "Include local snapshot thinning?" && INCLUDE_SNAPSHOTS=1
   ask_yes_no "Include AI-agent workspace cleanup?" && INCLUDE_AI_WORKSPACES=1
@@ -3167,6 +3293,10 @@ Default safe cleanup:
 --include-node-stale:
   node_modules older than --days under Desktop/Documents/Downloads.
 
+--include-venv-stale:
+  Python virtualenv folders older than --days under Desktop/Documents/Downloads.
+  Only folders containing pyvenv.cfg are removed.
+
 --include-installers:
   Old downloaded installer files in ~/Downloads, such as .dmg, .pkg, .mpkg,
   .xip, .ipsw, and .iso files older than --days.
@@ -3197,7 +3327,7 @@ Default safe cleanup:
 
 Presets:
   safe  default cleanup only
-  dev   safe + app caches + package/toolchain stores + stale node_modules
+  dev   safe + app caches + package/toolchain stores + stale node_modules + stale virtualenvs
   deep  dev + heavy SDKs + snapshots + AI workspaces
 EOF
 }
@@ -3222,6 +3352,7 @@ clean() {
   clean_dev_heavy
   clean_installers
   clean_node_stale
+  clean_venv_stale
   clean_snapshots
   clean_ai_workspaces
   clean_ai_models
@@ -3242,12 +3373,14 @@ apply_preset() {
       INCLUDE_PACKAGE_STORES=1
       INCLUDE_TOOLCHAINS=1
       INCLUDE_NODE_STALE=1
+      INCLUDE_VENV_STALE=1
       ;;
     deep)
       INCLUDE_APP_CACHES=1
       INCLUDE_PACKAGE_STORES=1
       INCLUDE_TOOLCHAINS=1
       INCLUDE_NODE_STALE=1
+      INCLUDE_VENV_STALE=1
       INCLUDE_DEV_HEAVY=1
       INCLUDE_SNAPSHOTS=1
       INCLUDE_AI_WORKSPACES=1
@@ -3264,7 +3397,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  overview|scan|system-data|plan|large|duplicates|downloads|installers|nodes|apps|browsers|leftovers|backups|xcode|startup|trash|caches|diagnostics|packages|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
+  overview|scan|system-data|plan|large|duplicates|downloads|installers|nodes|venvs|virtualenvs|apps|browsers|leftovers|backups|xcode|startup|trash|caches|diagnostics|packages|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -3332,6 +3465,7 @@ while [[ "$#" -gt 0 ]]; do
       ;;
     --include-dev-heavy) INCLUDE_DEV_HEAVY=1 ;;
     --include-node-stale) INCLUDE_NODE_STALE=1 ;;
+    --include-venv-stale) INCLUDE_VENV_STALE=1 ;;
     --include-installers) INCLUDE_INSTALLERS=1 ;;
     --include-package-stores) INCLUDE_PACKAGE_STORES=1 ;;
     --include-toolchains) INCLUDE_TOOLCHAINS=1 ;;
@@ -3347,7 +3481,7 @@ while [[ "$#" -gt 0 ]]; do
     -h|--help) usage; exit 0 ;;
     -v|--version) echo "$VERSION"; exit 0 ;;
     *)
-      if [[ "$ACTION" == "guard" || "$ACTION" == "large" || "$ACTION" == "duplicates" || "$ACTION" == "nodes" || "$ACTION" == "apps" || "$ACTION" == "leftovers" ]]; then
+      if [[ "$ACTION" == "guard" || "$ACTION" == "large" || "$ACTION" == "duplicates" || "$ACTION" == "nodes" || "$ACTION" == "venvs" || "$ACTION" == "virtualenvs" || "$ACTION" == "apps" || "$ACTION" == "leftovers" ]]; then
         PATH_ARGS+=("$1")
       else
         die "Unknown option: $1"
@@ -3367,6 +3501,7 @@ case "$ACTION" in
   downloads) downloads ;;
   installers) installers ;;
   nodes) nodes ;;
+  venvs|virtualenvs) venvs ;;
   apps) apps ;;
   browsers) browsers ;;
   leftovers) leftovers ;;

@@ -51,7 +51,8 @@ mkdir -p \
   "$TEST_HOME/Applications/FakeBig.app/Contents/MacOS" \
   "$TEST_HOME/Downloads" \
   "$TEST_HOME/Documents/duplicates" \
-  "$TEST_HOME/Documents/example/node_modules"
+  "$TEST_HOME/Documents/example/node_modules" \
+  "$TEST_HOME/Documents/python-app/.venv/bin"
 
 printf 'cache\n' >"$TEST_HOME/Library/Caches/example.cache"
 printf 'go build\n' >"$TEST_HOME/Library/Caches/go-build/cache.bin"
@@ -87,7 +88,10 @@ printf 'adobe prefs\n' >"$TEST_HOME/Library/Preferences/com.cleanroomtestadobe.a
 printf 'keychain\n' >"$TEST_HOME/Library/Keychains/login.keychain-db"
 printf 'trashed\n' >"$TEST_HOME/.Trash/old-trash.txt"
 printf 'old dependency\n' >"$TEST_HOME/Documents/example/node_modules/package.txt"
+printf 'home = /usr/bin\n' >"$TEST_HOME/Documents/python-app/.venv/pyvenv.cfg"
+printf 'python shim\n' >"$TEST_HOME/Documents/python-app/.venv/bin/python"
 touch -t 202001010000 "$TEST_HOME/Documents/example/node_modules" "$TEST_HOME/Documents/example/node_modules/package.txt"
+touch -t 202001010000 "$TEST_HOME/Documents/python-app/.venv" "$TEST_HOME/Documents/python-app/.venv/pyvenv.cfg" "$TEST_HOME/Documents/python-app/.venv/bin/python"
 touch -t 202001010000 "$TEST_HOME/Library/DiagnosticReports/OldApp.crash" "$TEST_HOME/Library/Application Support/CrashReporter/OldApp.plist"
 cat >"$TEST_HOME/Library/LaunchAgents/com.example.cleanroom-test.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
@@ -132,6 +136,7 @@ bash -n "$BIN"
 "$BIN" help | grep 'safe macOS storage cleaner' >/dev/null
 "$BIN" categories | grep -- '--include-ai-models' >/dev/null
 "$BIN" categories | grep -- '--include-toolchains' >/dev/null
+"$BIN" categories | grep -- '--include-venv-stale' >/dev/null
 "$BIN" categories | grep -- '--trash' >/dev/null
 "$BIN" overview | grep 'cleanroom overview' >/dev/null
 overview_json="$(mktemp)"
@@ -158,6 +163,7 @@ python3 -m json.tool "$rules_json" >/dev/null
 grep 'ai-models' "$rules_json" >/dev/null
 grep 'old-diagnostics' "$rules_json" >/dev/null
 grep 'toolchain-caches' "$rules_json" >/dev/null
+grep 'stale-python-virtualenvs' "$rules_json" >/dev/null
 rm -f "$rules_json"
 "$BIN" plan | grep 'cleanroom plan' >/dev/null
 plan_json="$(mktemp)"
@@ -165,6 +171,7 @@ plan_json="$(mktemp)"
 python3 -m json.tool "$plan_json" >/dev/null
 grep 'cleanroom clean --apply --trash' "$plan_json" >/dev/null
 grep 'cleanroom clean --apply --trash --include-toolchains' "$plan_json" >/dev/null
+grep 'cleanroom clean --apply --trash --include-venv-stale --days 30' "$plan_json" >/dev/null
 grep 'cleanroom clean --apply --trash --include-containers' "$plan_json" >/dev/null
 grep 'cleanroom clean --apply --trash --include-diagnostics --days 30' "$plan_json" >/dev/null
 rm -f "$plan_json"
@@ -203,6 +210,13 @@ python3 -m json.tool "$nodes_json" >/dev/null
 grep 'node_modules' "$nodes_json" >/dev/null
 grep 'cleanroom clean --apply --trash --include-node-stale --days 30' "$nodes_json" >/dev/null
 rm -f "$nodes_json"
+"$BIN" venvs "$HOME/Documents" --days 30 --limit 5 | grep '.venv' >/dev/null
+venvs_json="$(mktemp)"
+"$BIN" venvs --json "$HOME/Documents" --days 30 --limit 5 > "$venvs_json"
+python3 -m json.tool "$venvs_json" >/dev/null
+grep 'pyvenv.cfg' "$venvs_json" >/dev/null
+grep 'cleanroom clean --apply --trash --include-venv-stale --days 30' "$venvs_json" >/dev/null
+rm -f "$venvs_json"
 "$BIN" apps "$HOME/Applications" --limit 5 | grep 'FakeBig' >/dev/null
 apps_json="$(mktemp)"
 "$BIN" apps --json "$HOME/Applications" --limit 5 > "$apps_json"
@@ -422,6 +436,14 @@ grep 'old-package.pkg' "$installer_log" >/dev/null
 test ! -e "$HOME/Downloads/old-package.pkg"
 find "$HOME/.Trash" -name old-package.pkg -print -quit | grep old-package.pkg >/dev/null
 rm -f "$installer_log"
+
+venv_log="$(mktemp)"
+rm -f "$venv_log"
+"$BIN" clean --include-venv-stale --days 30 --apply --trash --yes --log "$venv_log" >/dev/null 2>&1
+grep '.venv' "$venv_log" >/dev/null
+test ! -e "$HOME/Documents/python-app/.venv"
+find "$HOME/.Trash" -name .venv -print -quit | grep .venv >/dev/null
+rm -f "$venv_log"
 
 mkdir -p "$HOME/.npm/_cacache"
 printf 'cache again\n' >"$HOME/.npm/_cacache/example.cache"

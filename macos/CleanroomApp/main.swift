@@ -94,6 +94,7 @@ final class CleanroomAppDelegate: NSObject, NSApplicationDelegate {
         reviewRow.addArrangedSubview(button("Installers", action: #selector(installers)))
         reviewRow.addArrangedSubview(button("Duplicates", action: #selector(duplicates)))
         reviewRow.addArrangedSubview(button("Node Modules", action: #selector(nodes)))
+        reviewRow.addArrangedSubview(button("Virtualenvs", action: #selector(venvs)))
         reviewRow.addArrangedSubview(button("Apps", action: #selector(apps)))
         reviewRow.addArrangedSubview(button("Browsers", action: #selector(browsers)))
         reviewRow.addArrangedSubview(button("Leftovers", action: #selector(leftovers)))
@@ -241,6 +242,10 @@ final class CleanroomAppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func toolchains() {
         runCommand("toolchains", title: "Toolchains")
+    }
+
+    @objc private func venvs() {
+        runCommand("venvs", title: "Virtualenvs")
     }
 
     @objc private func containers() {
