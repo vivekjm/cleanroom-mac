@@ -12,8 +12,8 @@ macOS Storage often labels hidden user folders as **Documents** or **System Data
 - Android SDK NDK/system images
 - npm, Yarn, pnpm, Gradle, CocoaPods stores
 - old `node_modules`
-- Gemini/Antigravity recordings and scratch data
-- LM Studio model downloads
+- AI-agent recordings, scratch data, local memory, and generated workspaces
+- local AI model downloads and backends
 - Chrome/VS Code/Cursor cache folders
 
 `cleanroom` makes those visible and gives you a cautious way to clean them.
@@ -67,6 +67,22 @@ Apply safe cleanup:
 cleanroom clean --apply
 ```
 
+Use presets:
+
+```sh
+cleanroom clean --preset safe
+cleanroom clean --preset dev
+cleanroom clean --preset deep
+```
+
+Preset meanings:
+
+```text
+safe  default rebuildable caches
+dev   safe + app caches + package stores + stale node_modules
+deep  dev + heavy SDKs + snapshots + AI workspace data
+```
+
 Clean safe app cache folders without deleting browser profiles:
 
 ```sh
@@ -85,15 +101,36 @@ Remove stale `node_modules` older than 45 days:
 cleanroom clean --apply --include-node-stale --days 45
 ```
 
-Clean Gemini/Antigravity generated recordings/scratch/brain data:
+Clean rebuildable package-manager stores:
+
+```sh
+cleanroom clean --apply --include-package-stores
+```
+
+Clean generated AI-agent workspace data:
+
+```sh
+cleanroom clean --apply --include-ai-workspaces
+```
+
+Clean downloaded local AI models/backends:
+
+```sh
+cleanroom clean --apply --include-ai-models
+```
+
+Clean local container VM disks:
+
+```sh
+cleanroom clean --apply --include-containers
+```
+
+This can remove containers and local volumes.
+
+Backward-compatible aliases:
 
 ```sh
 cleanroom clean --apply --include-gemini
-```
-
-Clean LM Studio downloaded models/backends:
-
-```sh
 cleanroom clean --apply --include-lmstudio
 ```
 
@@ -105,11 +142,15 @@ cleanroom clean --apply --include-app-caches --include-dev-heavy --include-node-
 
 ## Notes
 
+More examples are in [docs/RECIPES.md](docs/RECIPES.md).
+
 `--include-dev-heavy` can remove simulator app state and Android SDK components that may need to be reinstalled later.
 
-`--include-gemini` removes generated Gemini/Antigravity state such as recordings, scratch folders, brain data, implicit data, and conversations.
+`--include-ai-workspaces` removes generated AI-agent state such as recordings, scratch folders, local brain/memory data, implicit data, and local conversation caches where known.
 
-`--include-lmstudio` removes downloaded models and backend extensions. LM Studio can download them again later.
+`--include-ai-models` removes downloaded local model files and backend extensions from known stores such as LM Studio, Ollama, Hugging Face cache, and similar caches. These can usually be downloaded again later, but they may be large.
+
+`--include-containers` removes local container VM disks for known runtimes such as Colima/Lima and Docker Desktop. This can remove local containers and volumes.
 
 ## License
 

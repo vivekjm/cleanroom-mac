@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.1.0"
+VERSION="0.2.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -11,6 +11,10 @@ INCLUDE_DEV_HEAVY=0
 INCLUDE_NODE_STALE=0
 INCLUDE_GEMINI=0
 INCLUDE_LMSTUDIO=0
+INCLUDE_AI_WORKSPACES=0
+INCLUDE_AI_MODELS=0
+INCLUDE_PACKAGE_STORES=0
+INCLUDE_CONTAINERS=0
 INCLUDE_APP_CACHES=0
 INCLUDE_SNAPSHOTS=0
 
@@ -38,14 +42,26 @@ Options:
   --yes                Do not prompt before --apply cleanup.
   --verbose            Print every path touched.
   --days N             Age threshold for stale node_modules. Default: 30.
+  --preset NAME        Enable a useful group: safe, dev, deep.
+                       safe: default rebuildable caches.
+                       dev: safe + app caches + package stores + stale node_modules.
+                       deep: dev + heavy SDKs + snapshots + AI workspaces.
   --include-dev-heavy  Include heavier developer data:
                        Xcode device support, simulator app data, Android NDK/system images.
   --include-node-stale Remove node_modules older than --days from Desktop/Documents/Downloads.
+  --include-package-stores
+                       Include rebuildable package stores like CocoaPods repos and pnpm store.
   --include-app-caches Include safe cache folders inside Google/Chrome, VS Code, Cursor, Slack, etc.
                        Does not remove profiles, passwords, cookies, bookmarks, or settings wholesale.
   --include-snapshots  Ask Time Machine to thin local snapshots.
-  --include-gemini     Remove Gemini/Antigravity recordings, scratch, brain, implicit, conversations.
-  --include-lmstudio   Remove LM Studio downloaded models and backend extensions.
+  --include-ai-workspaces
+                       Remove generated AI-agent workspace state: recordings, scratch, brain,
+                       implicit data, and local conversation caches where known.
+  --include-ai-models  Remove downloaded local AI models/backends from LM Studio, Ollama,
+                       Hugging Face cache, and similar known stores.
+  --include-containers Remove local container VM disks for Colima/Lima. This can remove containers.
+  --include-gemini     Alias for --include-ai-workspaces.
+  --include-lmstudio   Alias for --include-ai-models.
   -h, --help           Show help.
   -v, --version        Show version.
 
@@ -56,6 +72,7 @@ Safety:
 Examples:
   cleanroom scan
   cleanroom clean
+  cleanroom clean --preset dev
   cleanroom clean --apply --include-app-caches
   cleanroom clean --apply --include-dev-heavy --include-node-stale --days 45
 EOF
@@ -116,8 +133,10 @@ disk_line() {
 confirm_apply() {
   [[ "$APPLY" -eq 1 ]] || return 0
   [[ "$ASSUME_YES" -eq 1 ]] && return 0
-  warn "About to delete rebuildable cache/artifact files."
+  warn "About to delete selected cache/artifact files."
   warn "Protected data like browser passwords and Keychains is not deleted."
+  [[ "$INCLUDE_AI_MODELS" -eq 1 ]] && warn "AI model cleanup removes downloaded model files."
+  [[ "$INCLUDE_CONTAINERS" -eq 1 ]] && warn "Container cleanup can remove local container VM disks and volumes."
   printf 'Continue? Type "clean" to proceed: '
   local answer
   read -r answer
@@ -176,6 +195,18 @@ safe_clean() {
       print_size "~/Library/Caches/Homebrew"
     fi
   fi
+}
+
+clean_package_stores() {
+  [[ "$INCLUDE_PACKAGE_STORES" -eq 1 ]] || return 0
+  log "${BOLD}Package manager stores${RESET}"
+  run_rm "~/Library/pnpm/store"
+  run_rm "~/.pnpm-store"
+  run_rm "~/.cocoapods/repos"
+  run_rm "~/.gradle-tangibly-release/caches"
+  run_rm "~/.gradle-tangibly-release/wrapper"
+  run_rm "~/.gradle-tangibly-release/native"
+  run_rm "~/.cargo/registry/cache"
 }
 
 clean_logs() {
@@ -251,9 +282,9 @@ clean_snapshots() {
   fi
 }
 
-clean_gemini() {
-  [[ "$INCLUDE_GEMINI" -eq 1 ]] || return 0
-  log "${BOLD}Gemini / Antigravity generated data${RESET}"
+clean_ai_workspaces() {
+  [[ "$INCLUDE_AI_WORKSPACES" -eq 1 || "$INCLUDE_GEMINI" -eq 1 ]] || return 0
+  log "${BOLD}AI agent workspace data${RESET}"
   local roots=(antigravity antigravity-backup antigravity-ide)
   local root
   for root in "${roots[@]}"; do
@@ -261,15 +292,32 @@ clean_gemini() {
     run_rm "~/.gemini/$root/scratch"
     run_rm "~/.gemini/$root/brain"
     run_rm "~/.gemini/$root/implicit"
+    run_rm "~/.gemini/$root/conversations"
   done
+  run_rm "~/.gemini/antigravity-browser-profile/GraphiteDawnCache"
+  run_rm "~/.gemini/antigravity-browser-profile/GrShaderCache"
+  run_rm "~/.gemini/antigravity-browser-profile/ShaderCache"
 }
 
-clean_lmstudio() {
-  [[ "$INCLUDE_LMSTUDIO" -eq 1 ]] || return 0
-  log "${BOLD}LM Studio downloaded models/backends${RESET}"
+clean_ai_models() {
+  [[ "$INCLUDE_AI_MODELS" -eq 1 || "$INCLUDE_LMSTUDIO" -eq 1 ]] || return 0
+  log "${BOLD}Local AI models and backends${RESET}"
   run_rm "~/.lmstudio/models"
   run_rm "~/.lmstudio/extensions/backends"
   run_rm "~/.lmstudio/.internal/temp-downloads"
+  run_rm "~/.ollama/models"
+  run_rm "~/.cache/huggingface/hub"
+  run_rm "~/.cache/modelscope"
+  run_rm "~/.cache/torch/hub"
+  run_rm "~/.cache/whisper"
+}
+
+clean_containers() {
+  [[ "$INCLUDE_CONTAINERS" -eq 1 ]] || return 0
+  log "${BOLD}Container VM disks${RESET}"
+  run_rm "~/.colima"
+  run_rm "~/.lima"
+  run_rm "~/Library/Containers/com.docker.docker/Data/vms"
 }
 
 clean_node_stale() {
@@ -293,7 +341,8 @@ scan() {
   local paths=(
     "~/Library/Caches" "~/Library/Logs" "~/Library/Developer" "~/Library/Android"
     "~/Library/pnpm" "~/.npm" "~/.yarn" "~/.gradle" "~/.cache" "~/.gemini"
-    "~/.lmstudio" "~/.cocoapods" "~/.codex" "~/Library/Application Support"
+    "~/.lmstudio" "~/.ollama" "~/.cache/huggingface" "~/.cocoapods" "~/.colima"
+    "~/.lima" "~/.codex" "~/Library/Application Support"
     "~/Documents" "~/Desktop" "~/Downloads"
   )
   local path
@@ -317,14 +366,39 @@ clean() {
   disk_line
   safe_clean
   clean_logs
+  clean_package_stores
   clean_app_caches
   clean_dev_heavy
   clean_node_stale
   clean_snapshots
-  clean_gemini
-  clean_lmstudio
+  clean_ai_workspaces
+  clean_ai_models
+  clean_containers
   printf '\n%s\n' "${BOLD}After${RESET}"
   disk_line
+}
+
+apply_preset() {
+  case "$1" in
+    safe)
+      ;;
+    dev)
+      INCLUDE_APP_CACHES=1
+      INCLUDE_PACKAGE_STORES=1
+      INCLUDE_NODE_STALE=1
+      ;;
+    deep)
+      INCLUDE_APP_CACHES=1
+      INCLUDE_PACKAGE_STORES=1
+      INCLUDE_NODE_STALE=1
+      INCLUDE_DEV_HEAVY=1
+      INCLUDE_SNAPSHOTS=1
+      INCLUDE_AI_WORKSPACES=1
+      ;;
+    *)
+      die "Unknown preset: $1"
+      ;;
+  esac
 }
 
 if [[ "$#" -eq 0 ]]; then
@@ -344,6 +418,10 @@ while [[ "$#" -gt 0 ]]; do
     --apply) APPLY=1 ;;
     --yes) ASSUME_YES=1 ;;
     --verbose) VERBOSE=1 ;;
+    --preset)
+      shift
+      apply_preset "${1:-}"
+      ;;
     --days)
       shift
       [[ "${1:-}" =~ ^[0-9]+$ ]] || die "--days requires a number"
@@ -351,10 +429,14 @@ while [[ "$#" -gt 0 ]]; do
       ;;
     --include-dev-heavy) INCLUDE_DEV_HEAVY=1 ;;
     --include-node-stale) INCLUDE_NODE_STALE=1 ;;
+    --include-package-stores) INCLUDE_PACKAGE_STORES=1 ;;
     --include-app-caches) INCLUDE_APP_CACHES=1 ;;
     --include-snapshots) INCLUDE_SNAPSHOTS=1 ;;
-    --include-gemini) INCLUDE_GEMINI=1 ;;
-    --include-lmstudio) INCLUDE_LMSTUDIO=1 ;;
+    --include-ai-workspaces) INCLUDE_AI_WORKSPACES=1 ;;
+    --include-ai-models) INCLUDE_AI_MODELS=1 ;;
+    --include-containers) INCLUDE_CONTAINERS=1 ;;
+    --include-gemini) INCLUDE_GEMINI=1; INCLUDE_AI_WORKSPACES=1 ;;
+    --include-lmstudio) INCLUDE_LMSTUDIO=1; INCLUDE_AI_MODELS=1 ;;
     -h|--help) usage; exit 0 ;;
     -v|--version) echo "$VERSION"; exit 0 ;;
     *) die "Unknown option: $1" ;;
