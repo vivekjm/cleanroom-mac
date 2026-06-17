@@ -140,6 +140,13 @@ Check environment and safety assumptions:
 cleanroom doctor
 ```
 
+Audit protected personal data and app profile paths:
+
+```sh
+cleanroom protect
+cleanroom protect --json
+```
+
 See cleanup categories:
 
 ```sh
@@ -286,6 +293,8 @@ cleanroom restore --log ~/Desktop/cleanroom-run.log --apply
 More examples are in [docs/RECIPES.md](docs/RECIPES.md).
 
 Cleanup rules are cataloged in [data/cleanup-rules.tsv](data/cleanup-rules.tsv). `cleanroom rules --json` exposes the same catalog for wrappers and audits.
+
+Protected personal-state paths are cataloged in [data/protected-paths.tsv](data/protected-paths.tsv). `cleanroom protect --json` exposes detected browser profile, credential, Photos, Mail, iCloud, Messages, and Contacts paths that cleanroom will not remove wholesale.
 
 Config files use simple `key=value` lines and are never executed as shell.
 

@@ -15,12 +15,14 @@ install:
 	install -m 0644 completions/_cleanroom "$(ZSH_COMPLETION_DIR)/_cleanroom"
 	install -d "$(DATADIR)/data"
 	install -m 0644 data/cleanup-rules.tsv "$(DATADIR)/data/cleanup-rules.tsv"
+	install -m 0644 data/protected-paths.tsv "$(DATADIR)/data/protected-paths.tsv"
 
 uninstall:
 	rm -f "$(BINDIR)/cleanroom"
 	rm -f "$(MANDIR)/cleanroom.1"
 	rm -f "$(ZSH_COMPLETION_DIR)/_cleanroom"
 	rm -f "$(DATADIR)/data/cleanup-rules.tsv"
+	rm -f "$(DATADIR)/data/protected-paths.tsv"
 	rmdir "$(DATADIR)/data" "$(DATADIR)" 2>/dev/null || true
 
 lint:

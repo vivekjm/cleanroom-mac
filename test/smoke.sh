@@ -15,6 +15,7 @@ mkdir -p \
   "$TEST_HOME/Library/Logs" \
   "$TEST_HOME/Library/Developer/Xcode/DerivedData" \
   "$TEST_HOME/Library/Application Support/Google/Chrome/Default" \
+  "$TEST_HOME/Library/Keychains" \
   "$TEST_HOME/.npm/_cacache" \
   "$TEST_HOME/.cache" \
   "$TEST_HOME/.lmstudio/models" \
@@ -23,6 +24,8 @@ mkdir -p \
 printf 'cache\n' >"$TEST_HOME/Library/Caches/example.cache"
 printf 'log\n' >"$TEST_HOME/Library/Logs/example.log"
 printf 'model\n' >"$TEST_HOME/.lmstudio/models/example.gguf"
+printf 'login data\n' >"$TEST_HOME/Library/Application Support/Google/Chrome/Default/Login Data"
+printf 'keychain\n' >"$TEST_HOME/Library/Keychains/login.keychain-db"
 export HOME="$TEST_HOME"
 
 bash -n "$BIN"
@@ -44,6 +47,14 @@ python3 -m json.tool "$plan_json" >/dev/null
 grep 'cleanroom clean --apply --trash' "$plan_json" >/dev/null
 rm -f "$plan_json"
 "$BIN" doctor | grep 'cleanroom doctor' >/dev/null
+"$BIN" doctor | grep 'cleanroom protect' >/dev/null
+"$BIN" protect | grep 'chrome-login-data' >/dev/null
+protect_json="$(mktemp)"
+"$BIN" protect --json > "$protect_json"
+python3 -m json.tool "$protect_json" >/dev/null
+grep '"status":"present"' "$protect_json" >/dev/null
+grep 'chrome-login-data' "$protect_json" >/dev/null
+rm -f "$protect_json"
 "$BIN" history 2>&1 | grep 'No cleanroom history found' >/dev/null
 
 config_file="$(mktemp)"
@@ -55,10 +66,12 @@ grep '^preset=dev' "$config_file" >/dev/null
 report_stdout="$("$BIN" report)"
 grep '# cleanroom report' <<<"$report_stdout" >/dev/null
 grep 'Cleanup Candidates' <<<"$report_stdout" >/dev/null
+grep 'Protected Personal Data' <<<"$report_stdout" >/dev/null
 
 report_file="$(mktemp)"
 "$BIN" report --output "$report_file" >/dev/null
 grep '# cleanroom report' "$report_file" >/dev/null
+grep 'chrome-login-data' "$report_file" >/dev/null
 rm -f "$report_file"
 
 json_file="$(mktemp)"

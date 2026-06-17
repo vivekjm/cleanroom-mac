@@ -24,6 +24,7 @@ swiftc \
 cp "$ROOT/macos/CleanroomApp/Info.plist" "$CONTENTS/Info.plist"
 cp "$ROOT/bin/cleanroom" "$RESOURCES_DIR/bin/cleanroom"
 cp "$ROOT/data/cleanup-rules.tsv" "$RESOURCES_DIR/data/cleanup-rules.tsv"
+cp "$ROOT/data/protected-paths.tsv" "$RESOURCES_DIR/data/protected-paths.tsv"
 chmod +x "$MACOS_DIR/Cleanroom" "$RESOURCES_DIR/bin/cleanroom"
 
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$CONTENTS/Info.plist"

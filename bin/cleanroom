@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.9.0"
+VERSION="0.10.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -46,6 +46,7 @@ Usage:
   cleanroom restore [--log PATH] [--apply]
   cleanroom interactive [options]
   cleanroom doctor
+  cleanroom protect [--json]
   cleanroom rules [--json]
   cleanroom categories
   cleanroom init-config [--config PATH]
@@ -60,6 +61,7 @@ Actions:
   restore              Restore files moved by --trash from an apply log. Dry-run unless --apply.
   interactive          Choose cleanup categories in a guided prompt.
   doctor               Check platform, dependencies, permissions, and risky state.
+  protect              Audit protected personal data that cleanroom will not remove.
   rules                List cleanup rules, safety level, opt-in flag, and affected paths.
   categories           Explain cleanup categories and safety levels.
   init-config          Write a starter config file.
@@ -69,7 +71,7 @@ Options:
   --trash              Move deleted files to ~/.Trash/cleanroom-* instead of rm -rf.
   --yes                Do not prompt before --apply cleanup.
   --verbose            Print every path touched.
-  --json               Emit JSON for scan.
+  --json               Emit JSON for scan, plan, protect, or rules.
   --output PATH        Output path for report.
   --log PATH           Write apply audit log here. Default: ~/.local/state/cleanroom/runs/*.log.
   --config PATH        Load config file. Default: ~/.config/cleanroom/config.
@@ -110,6 +112,8 @@ Examples:
   cleanroom plan --json
   cleanroom report --output cleanroom-report.md
   cleanroom doctor
+  cleanroom protect
+  cleanroom protect --json
   cleanroom rules
   cleanroom rules --json
   cleanroom categories
@@ -163,6 +167,16 @@ rules_file() {
   root="$(repo_root)"
   if [[ -f "$root/data/cleanup-rules.tsv" ]]; then
     printf '%s\n' "$root/data/cleanup-rules.tsv"
+  else
+    printf '%s\n' ""
+  fi
+}
+
+protected_file() {
+  local root
+  root="$(repo_root)"
+  if [[ -f "$root/data/protected-paths.tsv" ]]; then
+    printf '%s\n' "$root/data/protected-paths.tsv"
   else
     printf '%s\n' ""
   fi
@@ -956,6 +970,26 @@ report_body() {
 
   printf '## Safety Notes\n\n'
   printf 'cleanroom does not delete browser profiles, password databases, Keychains, Photos, Mail, or iCloud Drive by default.\n'
+
+  local protected_catalog
+  protected_catalog="$(protected_file)"
+  if [[ -f "$protected_catalog" ]]; then
+    printf '\n## Protected Personal Data\n\n'
+    printf '| Status | Type | Size | ID | Path |\n| --- | --- | ---: | --- | --- |\n'
+    local id type protected_path reason expanded status protected_kb
+    tail -n +2 "$protected_catalog" | while IFS=$'\t' read -r id type protected_path reason; do
+      [[ -z "${id:-}" ]] && continue
+      expanded="$(expand_path "$protected_path")"
+      if [[ -e "$expanded" ]]; then
+        status="present"
+        protected_kb="$(size_kb "$expanded")"
+      else
+        status="missing"
+        protected_kb=0
+      fi
+      printf '| %s | %s | %s | `%s` | `%s` |\n' "$status" "$type" "$(human_kb "$protected_kb")" "$id" "$expanded"
+    done
+  fi
 }
 
 report() {
@@ -1000,6 +1034,57 @@ rules() {
   done
 }
 
+protect() {
+  local file id type path reason expanded status kb
+  file="$(protected_file)"
+  [[ -f "$file" ]] || die "Protected path catalog not found."
+
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '['
+    local first=1
+    tail -n +2 "$file" | while IFS=$'\t' read -r id type path reason; do
+      [[ -z "${id:-}" ]] && continue
+      expanded="$(expand_path "$path")"
+      if [[ -e "$expanded" ]]; then
+        status="present"
+        kb="$(size_kb "$expanded")"
+      else
+        status="missing"
+        kb=0
+      fi
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '{"id":"%s","type":"%s","path":"%s","status":"%s","size_kb":%s,"size":"%s","reason":"%s"}' \
+        "$(printf '%s' "$id" | json_escape)" \
+        "$(printf '%s' "$type" | json_escape)" \
+        "$(printf '%s' "$expanded" | json_escape)" \
+        "$status" \
+        "$kb" \
+        "$(human_kb "$kb" | json_escape)" \
+        "$(printf '%s' "$reason" | json_escape)"
+    done
+    printf ']\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}cleanroom protected data audit${RESET}"
+  printf 'These locations are treated as personal state and are not removed wholesale by cleanroom.\n\n'
+  printf '%-10s %-18s %-8s %-18s %s\n' "status" "type" "size" "id" "path"
+  tail -n +2 "$file" | while IFS=$'\t' read -r id type path reason; do
+    [[ -z "${id:-}" ]] && continue
+    expanded="$(expand_path "$path")"
+    if [[ -e "$expanded" ]]; then
+      status="present"
+      kb="$(size_kb "$expanded")"
+    else
+      status="missing"
+      kb=0
+    fi
+    printf '%-10s %-18s %-8s %-18s %s\n' "$status" "$type" "$(human_kb "$kb")" "$id" "$expanded"
+    printf '  %s\n' "$reason"
+  done
+}
+
 doctor() {
   log "${BOLD}cleanroom doctor${RESET}"
   printf '%-28s %s\n' "version" "$VERSION"
@@ -1032,6 +1117,7 @@ doctor() {
   fi
 
   printf '\n%s\n' "${BOLD}Protected data check${RESET}"
+  printf 'Run `cleanroom protect` for the full protected path audit.\n'
   local protected=(
     "$HOME/Library/Keychains"
     "$HOME/Library/Application Support/Google/Chrome"
@@ -1212,7 +1298,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  scan|plan|report|clean|history|restore|interactive|doctor|rules|categories|init-config|help)
+  scan|plan|report|clean|history|restore|interactive|doctor|protect|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -1299,6 +1385,7 @@ case "$ACTION" in
   restore) restore ;;
   interactive) interactive ;;
   doctor) doctor ;;
+  protect) protect ;;
   rules) rules ;;
   categories) categories ;;
   init-config) init_config ;;

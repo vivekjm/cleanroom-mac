@@ -1,0 +1,14 @@
+id	type	path	reason
+keychains	credentials	~/Library/Keychains	Contains login keychains, certificates, secure notes, and app secrets.
+chrome-profile	browser-profile	~/Library/Application Support/Google/Chrome	Contains Chrome profiles, saved-password databases, cookies, bookmarks, sessions, and extension state.
+chrome-login-data	browser-credentials	~/Library/Application Support/Google/Chrome/Default/Login Data	Chrome saved-password metadata. Password secrets may also depend on Keychain entries.
+brave-profile	browser-profile	~/Library/Application Support/BraveSoftware/Brave-Browser	Contains Brave profiles, saved-password databases, cookies, bookmarks, sessions, and extension state.
+edge-profile	browser-profile	~/Library/Application Support/Microsoft Edge	Contains Edge profiles, saved-password databases, cookies, bookmarks, sessions, and extension state.
+arc-profile	browser-profile	~/Library/Application Support/Arc	Contains Arc browser profiles, spaces, sessions, and browsing state.
+firefox-profile	browser-profile	~/Library/Application Support/Firefox	Contains Firefox profiles, logins, cookies, bookmarks, sessions, and extension state.
+safari-profile	browser-profile	~/Library/Safari	Contains Safari bookmarks, history, tabs, and browser state.
+photos-library	photos	~/Pictures/Photos Library.photoslibrary	Contains the user's Photos library and should only be managed through Photos or backups.
+mail	mail	~/Library/Mail	Contains local Mail data and account state.
+icloud-drive	cloud-documents	~/Library/Mobile Documents	Contains iCloud Drive and app cloud document state.
+messages	messages	~/Library/Messages	Contains Messages chats, attachments, and account state.
+contacts	contacts	~/Library/Application Support/AddressBook	Contains Contacts database and related state.

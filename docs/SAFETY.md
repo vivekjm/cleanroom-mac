@@ -42,7 +42,16 @@ cleanroom rules
 cleanroom rules --json
 ```
 
-Keep this catalog in sync with cleanup behavior so users and wrappers can inspect risk before running anything.
+Protected personal-state paths live in `data/protected-paths.tsv` and are visible through:
+
+```sh
+cleanroom protect
+cleanroom protect --json
+```
+
+Use this audit when reviewing browser profiles, saved-password-adjacent files, Keychains, Photos, Mail, iCloud Drive, Messages, Contacts, or any new app profile family. New cleanup rules should never remove these locations wholesale.
+
+Keep both catalogs in sync with cleanup behavior so users and wrappers can inspect risk before running anything.
 
 ## Excludes
 

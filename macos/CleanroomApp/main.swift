@@ -61,19 +61,33 @@ final class CleanroomAppDelegate: NSObject, NSApplicationDelegate {
         subtitle.font = NSFont.systemFont(ofSize: 13)
         subtitle.textColor = .secondaryLabelColor
 
-        let buttonRow = NSStackView()
-        buttonRow.orientation = .horizontal
-        buttonRow.spacing = 8
-        buttonRow.alignment = .centerY
+        let commandRows = NSStackView()
+        commandRows.orientation = .vertical
+        commandRows.spacing = 8
 
-        buttonRow.addArrangedSubview(button("Scan", action: #selector(scan)))
-        buttonRow.addArrangedSubview(button("Plan", action: #selector(plan)))
-        buttonRow.addArrangedSubview(button("Report to Desktop", action: #selector(report)))
-        buttonRow.addArrangedSubview(button("Dry Run Dev", action: #selector(dryRunDev)))
-        buttonRow.addArrangedSubview(button("History", action: #selector(history)))
-        buttonRow.addArrangedSubview(button("Rules", action: #selector(rules)))
-        buttonRow.addArrangedSubview(button("Copy Safe Apply", action: #selector(copySafeApplyCommand)))
-        buttonRow.addArrangedSubview(button("Copy Trash Dev Apply", action: #selector(copyTrashDevCommand)))
+        let inspectRow = NSStackView()
+        inspectRow.orientation = .horizontal
+        inspectRow.spacing = 8
+        inspectRow.alignment = .centerY
+
+        inspectRow.addArrangedSubview(button("Scan", action: #selector(scan)))
+        inspectRow.addArrangedSubview(button("Plan", action: #selector(plan)))
+        inspectRow.addArrangedSubview(button("Report to Desktop", action: #selector(report)))
+        inspectRow.addArrangedSubview(button("History", action: #selector(history)))
+        inspectRow.addArrangedSubview(button("Protected Data", action: #selector(protect)))
+        inspectRow.addArrangedSubview(button("Rules", action: #selector(rules)))
+
+        let actionRow = NSStackView()
+        actionRow.orientation = .horizontal
+        actionRow.spacing = 8
+        actionRow.alignment = .centerY
+
+        actionRow.addArrangedSubview(button("Dry Run Dev", action: #selector(dryRunDev)))
+        actionRow.addArrangedSubview(button("Copy Safe Apply", action: #selector(copySafeApplyCommand)))
+        actionRow.addArrangedSubview(button("Copy Trash Dev Apply", action: #selector(copyTrashDevCommand)))
+
+        commandRows.addArrangedSubview(inspectRow)
+        commandRows.addArrangedSubview(actionRow)
 
         statusLabel = NSTextField(labelWithString: "Ready")
         statusLabel.font = NSFont.monospacedSystemFont(ofSize: 12, weight: .regular)
@@ -93,7 +107,7 @@ final class CleanroomAppDelegate: NSObject, NSApplicationDelegate {
 
         root.addArrangedSubview(title)
         root.addArrangedSubview(subtitle)
-        root.addArrangedSubview(buttonRow)
+        root.addArrangedSubview(commandRows)
         root.addArrangedSubview(statusLabel)
         root.addArrangedSubview(scrollView)
 
@@ -138,6 +152,10 @@ final class CleanroomAppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func history() {
         runCommand("history", title: "History")
+    }
+
+    @objc private func protect() {
+        runCommand("protect", title: "Protected Data")
     }
 
     @objc private func rules() {

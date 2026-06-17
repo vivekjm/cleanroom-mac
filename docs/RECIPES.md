@@ -8,6 +8,7 @@ Common `cleanroom` workflows.
 cleanroom scan
 cleanroom plan
 cleanroom doctor
+cleanroom protect
 cleanroom categories
 cleanroom rules
 cleanroom init-config
@@ -21,6 +22,7 @@ cleanroom clean
 ```sh
 cleanroom scan --json
 cleanroom plan --json
+cleanroom protect --json
 cleanroom rules --json
 cleanroom report --output cleanroom-report.md
 ```
@@ -29,9 +31,11 @@ cleanroom report --output cleanroom-report.md
 
 `plan --json` emits ranked cleanup recommendations with estimated reclaim size, preview commands, and explicit apply commands.
 
+`protect --json` emits protected personal-state paths and whether they are present. This is useful for GUI wrappers and safety reviews before trying new cleanup rules.
+
 `rules --json` emits cleanup rule metadata, including safety level, default status, opt-in flag, paths, and description.
 
-`report` writes a Markdown summary with disk state, cleanup candidates, largest known cleanup locations, large-file hints from Spotlight, and safety notes. It is useful before asking for help because people can inspect what is taking space without deleting anything.
+`report` writes a Markdown summary with disk state, cleanup candidates, largest known cleanup locations, large-file hints from Spotlight, protected personal-data paths, and safety notes. It is useful before asking for help because people can inspect what is taking space without deleting anything.
 
 ## Developer Laptop
 
