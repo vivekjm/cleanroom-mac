@@ -117,6 +117,15 @@ apps_json="$(mktemp)"
 python3 -m json.tool "$apps_json" >/dev/null
 grep 'FakeBig' "$apps_json" >/dev/null
 rm -f "$apps_json"
+"$BIN" browsers | grep 'Google Chrome' >/dev/null
+"$BIN" browsers | grep 'protected' >/dev/null
+browsers_json="$(mktemp)"
+"$BIN" browsers --json > "$browsers_json"
+python3 -m json.tool "$browsers_json" >/dev/null
+grep 'Google Chrome' "$browsers_json" >/dev/null
+grep '"protected":true' "$browsers_json" >/dev/null
+grep 'cleanroom clean --apply --trash --include-app-caches' "$browsers_json" >/dev/null
+rm -f "$browsers_json"
 "$BIN" startup | grep 'com.example.cleanroom-test' >/dev/null
 startup_json="$(mktemp)"
 "$BIN" startup --json > "$startup_json"

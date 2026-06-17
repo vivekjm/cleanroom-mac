@@ -1,4 +1,4 @@
-.TH CLEANROOM 1 "June 2026" "cleanroom 0.23.0" "User Commands"
+.TH CLEANROOM 1 "June 2026" "cleanroom 0.24.0" "User Commands"
 .SH NAME
 cleanroom \- safe-by-default macOS storage cleaner
 .SH SYNOPSIS
@@ -25,6 +25,9 @@ cleanroom \- safe-by-default macOS storage cleaner
 .br
 .B cleanroom
 .RI "apps [path] [--limit n] [--json]"
+.br
+.B cleanroom
+.RI "browsers [--json]"
 .br
 .B cleanroom
 .RI "startup [--json]"
@@ -101,6 +104,10 @@ List stale node_modules folders for review without deleting anything.
 .TP
 .B apps
 List largest app bundles for review without uninstalling anything.
+.TP
+.B browsers
+Inventory browser profile and cache footprint without deleting profiles,
+passwords, cookies, bookmarks, sessions, or settings.
 .TP
 .B startup
 List LaunchAgents and LaunchDaemons for review without unloading or removing anything.
@@ -207,6 +214,7 @@ cleanroom duplicates ~/Documents --min-mb 100 --limit 20
 cleanroom downloads --days 30 --limit 50
 cleanroom nodes ~/Documents --days 45 --limit 30
 cleanroom apps --limit 30
+cleanroom browsers --json
 cleanroom startup --json
 cleanroom trash --json
 cleanroom caches --json

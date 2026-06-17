@@ -15,6 +15,7 @@ macOS Storage often labels hidden user folders as **Documents** or **System Data
 - AI-agent recordings, scratch data, local memory, and generated workspaces
 - local AI model downloads and backends
 - Chrome/VS Code/Cursor cache folders
+- browser profile and cache footprint
 
 `cleanroom` makes those visible and gives you a cautious way to clean them.
 
@@ -167,6 +168,13 @@ List large installed apps for manual review:
 cleanroom apps
 cleanroom apps --json /Applications
 cleanroom apps ~/Applications --limit 20
+```
+
+Review browser profile and cache footprint without touching profiles:
+
+```sh
+cleanroom browsers
+cleanroom browsers --json
 ```
 
 Review startup and background launch items:
@@ -427,6 +435,8 @@ Config files use simple `key=value` lines and are never executed as shell.
 `nodes` lists stale `node_modules` folders before you decide whether to run `cleanroom clean --include-node-stale --apply`.
 
 `apps` lists `.app` bundle sizes from `/Applications` and `~/Applications`, or a path you provide. It never uninstalls apps.
+
+`browsers` separates safe browser cache candidates from protected profile storage. It reports Chrome, Brave, Edge, Arc, Firefox, and Safari profile sizes, but cleanup commands still remove only cache folders and never profiles, passwords, cookies, bookmarks, or sessions.
 
 `startup` lists LaunchAgents and LaunchDaemons for review. It never unloads, disables, or removes startup items.
 

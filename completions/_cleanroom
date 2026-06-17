@@ -12,6 +12,7 @@ _cleanroom() {
     'downloads:List old Downloads files'
     'nodes:List stale node_modules folders'
     'apps:List large app bundles for review'
+    'browsers:Inventory browser profile and cache footprint'
     'startup:List LaunchAgents and LaunchDaemons'
     'trash:Inventory current user Trash'
     'caches:Inventory cache buckets'

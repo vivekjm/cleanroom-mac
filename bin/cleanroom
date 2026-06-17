@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.23.0"
+VERSION="0.24.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -49,6 +49,7 @@ Usage:
   cleanroom downloads [--days N] [--limit N] [--json]
   cleanroom nodes [PATH] [--days N] [--limit N] [--json]
   cleanroom apps [PATH] [--limit N] [--json]
+  cleanroom browsers [--json]
   cleanroom startup [--json]
   cleanroom trash [--json]
   cleanroom caches [--json]
@@ -76,6 +77,7 @@ Actions:
   downloads            List old Downloads files for manual review.
   nodes                List stale node_modules folders for review.
   apps                 List largest app bundles for review without uninstalling.
+  browsers             Inventory browser profile and cache footprint.
   startup              List LaunchAgents and LaunchDaemons for review.
   trash                Inventory current user Trash contents.
   caches               Inventory safe and opt-in cache buckets.
@@ -99,7 +101,8 @@ Options:
   --yes                Do not prompt before --apply cleanup.
   --verbose            Print every path touched.
   --json               Emit JSON for overview, scan, plan, large, duplicates, downloads, nodes, apps,
-                       startup, trash, caches, packages, snapshots, doctor, protect, guard, or rules.
+                       browsers, startup, trash, caches, packages, snapshots, doctor, protect,
+                       guard, or rules.
   --output PATH        Output path for report.
   --log PATH           Write apply audit log here. Default: ~/.local/state/cleanroom/runs/*.log.
   --config PATH        Load config file. Default: ~/.config/cleanroom/config.
@@ -154,6 +157,8 @@ Examples:
   cleanroom nodes --json ~/Documents
   cleanroom apps
   cleanroom apps --json /Applications
+  cleanroom browsers
+  cleanroom browsers --json
   cleanroom startup
   cleanroom startup --json
   cleanroom trash
@@ -356,6 +361,8 @@ sum_existing_kb() {
 app_cache_kb() {
   local roots=(
     "$HOME/Library/Application Support/Google"
+    "$HOME/Library/Application Support/Microsoft Edge"
+    "$HOME/Library/Application Support/Arc"
     "$HOME/Library/Application Support/Code"
     "$HOME/Library/Application Support/Cursor"
     "$HOME/Library/Application Support/Slack"
@@ -375,6 +382,16 @@ app_cache_kb() {
     total=$((total + ${found:-0}))
   done
   printf '%s\n' "$total"
+}
+
+cache_dir_kb_under() {
+  local root="$1"
+  [[ -d "$root" ]] || { printf '0\n'; return 0; }
+  find "$root" -type d \( \
+    -name 'Cache' -o -name 'Code Cache' -o -name 'GPUCache' -o -name 'DawnCache' \
+    -o -name 'ShaderCache' -o -name 'GrShaderCache' -o -name 'CachedData' \
+    -o -name 'Crashpad' \
+  \) -prune -exec du -sk {} + 2>/dev/null | awk '{total += $1} END {print total + 0}' || true
 }
 
 stale_node_kb() {
@@ -825,6 +842,8 @@ clean_app_caches() {
   log "${BOLD}App cache folders only${RESET}"
   local roots=(
     "$HOME/Library/Application Support/Google"
+    "$HOME/Library/Application Support/Microsoft Edge"
+    "$HOME/Library/Application Support/Arc"
     "$HOME/Library/Application Support/Code"
     "$HOME/Library/Application Support/Cursor"
     "$HOME/Library/Application Support/Slack"
@@ -846,11 +865,7 @@ clean_app_caches() {
         done || true
     else
       local total
-      total="$(find "$root" -type d \( \
-        -name 'Cache' -o -name 'Code Cache' -o -name 'GPUCache' -o -name 'DawnCache' \
-        -o -name 'ShaderCache' -o -name 'GrShaderCache' -o -name 'CachedData' \
-        -o -name 'Crashpad' \
-      \) -prune -exec du -sk {} + 2>/dev/null | awk '{total += $1} END {print total + 0}' || true)"
+      total="$(cache_dir_kb_under "$root")"
       [[ -n "$total" ]] || total=0
       printf 'would clean %8s  %s cache folders\n' "$(human_kb "$total")" "$root"
     fi
@@ -1372,6 +1387,107 @@ apps() {
   done <<<"$rows"
 }
 
+browser_specs() {
+  printf '%s\t%s\t%s\t%s\n' "chrome" "Google Chrome" "~/Library/Application Support/Google/Chrome" "Chromium profile is protected; only nested cache folders are cleanup candidates."
+  printf '%s\t%s\t%s\t%s\n' "brave" "Brave" "~/Library/Application Support/BraveSoftware/Brave-Browser" "Chromium profile is protected; only nested cache folders are cleanup candidates."
+  printf '%s\t%s\t%s\t%s\n' "edge" "Microsoft Edge" "~/Library/Application Support/Microsoft Edge" "Chromium profile is protected; only nested cache folders are cleanup candidates."
+  printf '%s\t%s\t%s\t%s\n' "arc" "Arc" "~/Library/Application Support/Arc" "Arc profile is protected; only nested cache folders are cleanup candidates."
+  printf '%s\t%s\t%s\t%s\n' "firefox" "Firefox" "~/Library/Application Support/Firefox" "Firefox profile is protected; cache data lives mostly under ~/Library/Caches and default safe cleanup handles it."
+  printf '%s\t%s\t%s\t%s\n' "safari" "Safari" "~/Library/Safari" "Safari profile is protected; cache data lives mostly under ~/Library/Caches and default safe cleanup handles it."
+}
+
+browser_cache_kb() {
+  local id="$1"
+  local profile="$2"
+  case "$id" in
+    firefox)
+      sum_existing_kb "~/Library/Caches/Firefox" "~/Library/Caches/org.mozilla.firefox"
+      ;;
+    safari)
+      sum_existing_kb "~/Library/Caches/com.apple.Safari" "~/Library/Caches/Safari" "~/Library/Containers/com.apple.Safari/Data/Library/Caches"
+      ;;
+    *)
+      cache_dir_kb_under "$profile"
+      ;;
+  esac
+}
+
+browser_preview_command() {
+  case "$1" in
+    firefox|safari) printf 'cleanroom clean' ;;
+    *) printf 'cleanroom clean --include-app-caches' ;;
+  esac
+}
+
+browser_apply_command() {
+  case "$1" in
+    firefox|safari) printf 'cleanroom clean --apply --trash' ;;
+    *) printf 'cleanroom clean --apply --trash --include-app-caches' ;;
+  esac
+}
+
+browser_rows() {
+  local id name profile_template notes profile profile_kb cache_kb protected_reason protected
+  while IFS=$'\t' read -r id name profile_template notes; do
+    [[ -z "${id:-}" ]] && continue
+    profile="$(expand_path "$profile_template")"
+    profile_kb="$(size_kb "$profile")"
+    cache_kb="$(browser_cache_kb "$id" "$profile")"
+    protected_reason="$(protected_removal_reason "$profile" || true)"
+    if [[ -n "$protected_reason" ]]; then
+      protected=true
+    else
+      protected=false
+    fi
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+      "$cache_kb" "$profile_kb" "$id" "$name" "$profile" "$protected" "$notes" "$protected_reason"
+  done < <(browser_specs) | sort -rn
+}
+
+browsers() {
+  local rows
+  rows="$(browser_rows)"
+
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '['
+    local first=1 cache_kb profile_kb id name profile protected notes protected_reason
+    while IFS=$'\t' read -r cache_kb profile_kb id name profile protected notes protected_reason; do
+      [[ -z "${id:-}" ]] && continue
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '{"id":"%s","name":"%s","profile_path":"%s","profile_present":%s,"profile_size_kb":%s,"profile_size":"%s","cache_size_kb":%s,"cache_size":"%s","protected":%s,"preview_command":"%s","apply_command":"%s","notes":"%s","protected_reason":"%s"}' \
+        "$(printf '%s' "$id" | json_escape)" \
+        "$(printf '%s' "$name" | json_escape)" \
+        "$(printf '%s' "$profile" | json_escape)" \
+        "$(if [[ -e "$profile" ]]; then echo true; else echo false; fi)" \
+        "${profile_kb:-0}" \
+        "$(human_kb "${profile_kb:-0}" | json_escape)" \
+        "${cache_kb:-0}" \
+        "$(human_kb "${cache_kb:-0}" | json_escape)" \
+        "$protected" \
+        "$(browser_preview_command "$id" | json_escape)" \
+        "$(browser_apply_command "$id" | json_escape)" \
+        "$(printf '%s' "$notes" | json_escape)" \
+        "$(printf '%s' "$protected_reason" | json_escape)"
+    done <<<"$rows"
+    printf ']\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}cleanroom browser storage${RESET}"
+  printf 'Review-only inventory. Browser profiles, passwords, cookies, bookmarks, sessions, and settings stay protected.\n\n'
+  printf '%-10s %-10s %-10s %-18s %s\n' "cache" "profile" "protected" "browser" "profile path"
+  local cache_kb profile_kb id name profile protected notes protected_reason
+  while IFS=$'\t' read -r cache_kb profile_kb id name profile protected notes protected_reason; do
+    [[ -z "${id:-}" ]] && continue
+    printf '%-10s %-10s %-10s %-18s %s\n' "$(human_kb "${cache_kb:-0}")" "$(human_kb "${profile_kb:-0}")" "$protected" "$name" "$profile"
+    printf '  %s\n' "$notes"
+    [[ -n "$protected_reason" ]] && printf '  protected: %s\n' "$protected_reason"
+    printf '  preview: %s\n' "$(browser_preview_command "$id")"
+    printf '  apply: %s\n' "$(browser_apply_command "$id")"
+  done <<<"$rows"
+}
+
 plist_value() {
   local file="$1"
   local key="$2"
@@ -1539,7 +1655,7 @@ cache_rows() {
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "xcode-derived-data" "default" "~/Library/Developer/Xcode/DerivedData" "cleanroom clean" "cleanroom clean --apply --trash" "Xcode build intermediates and indexes."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "simulator-caches" "default" "~/Library/Developer/CoreSimulator/Caches" "cleanroom clean" "cleanroom clean --apply --trash" "CoreSimulator rebuildable cache data."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "homebrew-cache" "default" "~/Library/Caches/Homebrew" "cleanroom clean" "cleanroom clean --apply --trash" "Homebrew download and build caches."
-  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "safe-app-caches" "app-caches" "known nested app cache folders" "cleanroom clean --include-app-caches" "cleanroom clean --apply --trash --include-app-caches" "Nested cache folders for apps such as Chrome, Brave, VS Code, Cursor, Slack, Comet, and Trae. Profiles, passwords, cookies, bookmarks, and settings stay protected."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "safe-app-caches" "app-caches" "known nested app cache folders" "cleanroom clean --include-app-caches" "cleanroom clean --apply --trash --include-app-caches" "Nested cache folders for apps such as Chrome, Brave, Edge, Arc, VS Code, Cursor, Slack, Comet, and Trae. Profiles, passwords, cookies, bookmarks, and settings stay protected."
 }
 
 paths_field_kb() {
@@ -2352,7 +2468,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  overview|scan|plan|large|duplicates|downloads|nodes|apps|startup|trash|caches|packages|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
+  overview|scan|plan|large|duplicates|downloads|nodes|apps|browsers|startup|trash|caches|packages|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -2451,6 +2567,7 @@ case "$ACTION" in
   downloads) downloads ;;
   nodes) nodes ;;
   apps) apps ;;
+  browsers) browsers ;;
   startup) startup ;;
   trash) trash ;;
   caches) caches ;;

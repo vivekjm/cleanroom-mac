@@ -13,6 +13,7 @@ cleanroom duplicates
 cleanroom downloads
 cleanroom nodes
 cleanroom apps
+cleanroom browsers
 cleanroom startup
 cleanroom trash
 cleanroom caches
@@ -40,6 +41,7 @@ cleanroom duplicates --json ~/Documents
 cleanroom downloads --json
 cleanroom nodes --json ~/Documents
 cleanroom apps --json
+cleanroom browsers --json
 cleanroom startup --json
 cleanroom trash --json
 cleanroom caches --json
@@ -67,6 +69,8 @@ cleanroom report --output cleanroom-report.md
 `nodes --json [PATH]` emits stale `node_modules` folders with age, size, and the matching preview/apply commands.
 
 `apps --json [PATH]` emits app bundle sizes for `/Applications`, `~/Applications`, or a provided path. It is intentionally review-only and does not uninstall anything.
+
+`browsers --json` emits browser profile size, cache size, protected status, and matching preview/apply commands. It is intentionally review-only and does not delete profiles, passwords, cookies, bookmarks, or sessions.
 
 `startup --json` emits LaunchAgents and LaunchDaemons with scope, type, status, label, program, and path. It is intentionally review-only and does not unload, disable, or remove anything.
 
@@ -138,6 +142,17 @@ cleanroom apps --json /Applications
 ```
 
 Review large app bundles manually. cleanroom does not uninstall apps because app removal can require vendor uninstallers, launch agents, helper tools, login items, and account-specific data.
+
+## Browser Storage
+
+```sh
+cleanroom browsers
+cleanroom browsers --json
+cleanroom clean --include-app-caches
+cleanroom clean --apply --trash --include-app-caches
+```
+
+Use this when browser storage is large but you need profiles, passwords, bookmarks, cookies, and sessions preserved. `browsers` shows both protected profile size and cache size; the cleanup command only targets known cache folders.
 
 ## Slow Startup / Background Items
 

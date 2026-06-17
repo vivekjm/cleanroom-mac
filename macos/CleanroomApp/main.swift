@@ -91,6 +91,7 @@ final class CleanroomAppDelegate: NSObject, NSApplicationDelegate {
         reviewRow.addArrangedSubview(button("Duplicates", action: #selector(duplicates)))
         reviewRow.addArrangedSubview(button("Node Modules", action: #selector(nodes)))
         reviewRow.addArrangedSubview(button("Apps", action: #selector(apps)))
+        reviewRow.addArrangedSubview(button("Browsers", action: #selector(browsers)))
         reviewRow.addArrangedSubview(button("Caches", action: #selector(caches)))
         reviewRow.addArrangedSubview(button("Packages", action: #selector(packages)))
         reviewRow.addArrangedSubview(button("Snapshots", action: #selector(snapshots)))
@@ -180,6 +181,10 @@ final class CleanroomAppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func apps() {
         runCommand("apps --limit 30", title: "Apps")
+    }
+
+    @objc private func browsers() {
+        runCommand("browsers", title: "Browsers")
     }
 
     @objc private func caches() {
