@@ -38,8 +38,9 @@ Run:
 
 ```sh
 make package
+make homebrew-formula
 ```
 
-This validates version consistency, runs tests, and writes a tarball plus SHA-256 file under `dist/`.
+This validates version consistency, runs tests, and writes a tarball, SHA-256 file, and generated Homebrew formula under `dist/`.
 
 See [docs/RELEASE.md](docs/RELEASE.md) for tagging and GitHub release steps.

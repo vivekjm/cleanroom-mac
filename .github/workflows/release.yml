@@ -14,10 +14,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Validate and package
-        run: make dist
+        run: make dist homebrew-formula
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:
           files: |
             dist/cleanroom-*.tar.gz
             dist/cleanroom-*.tar.gz.sha256
+            dist/Formula/cleanroom.rb

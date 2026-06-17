@@ -1,0 +1,18 @@
+class Cleanroom < Formula
+  desc "Safe-by-default macOS storage cleaner for developers and power users"
+  homepage "https://github.com/vivekjm/cleanroom-mac"
+  url "https://github.com/vivekjm/cleanroom-mac/releases/download/v@VERSION@/cleanroom-@VERSION@.tar.gz"
+  sha256 "@SHA256@"
+  license "MIT"
+
+  def install
+    bin.install "bin/cleanroom"
+    man1.install "man/cleanroom.1"
+    zsh_completion.install "completions/_cleanroom"
+  end
+
+  test do
+    assert_match version.to_s, shell_output("#{bin}/cleanroom --version")
+    assert_match "cleanroom doctor", shell_output("#{bin}/cleanroom doctor")
+  end
+end

@@ -30,6 +30,7 @@ copy_path "bin"
 copy_path "completions"
 copy_path "man"
 copy_path "docs"
+copy_path "homebrew"
 copy_path "scripts"
 copy_path "test"
 

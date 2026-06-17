@@ -3,7 +3,7 @@ BINDIR ?= $(PREFIX)/bin
 MANDIR ?= $(PREFIX)/share/man/man1
 ZSH_COMPLETION_DIR ?= $(PREFIX)/share/zsh/site-functions
 
-.PHONY: install uninstall test lint smoke package dist clean-dist check-version
+.PHONY: install uninstall test lint smoke package dist clean-dist check-version homebrew-formula
 
 install:
 	install -d "$(BINDIR)"
@@ -25,6 +25,7 @@ lint:
 	bash -n test/smoke.sh
 	bash -n scripts/check-version.sh
 	bash -n scripts/package.sh
+	bash -n scripts/render-homebrew-formula.sh
 	./scripts/check-version.sh
 
 smoke test: lint
@@ -32,6 +33,9 @@ smoke test: lint
 
 package dist: test
 	./scripts/package.sh
+
+homebrew-formula: package
+	./scripts/render-homebrew-formula.sh
 
 clean-dist:
 	rm -rf dist

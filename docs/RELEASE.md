@@ -1,6 +1,6 @@
 # Release Process
 
-This project releases a portable tarball for macOS users and package managers.
+This project releases a portable tarball and a generated Homebrew formula for macOS users and package managers.
 
 ## Prepare
 
@@ -10,7 +10,7 @@ This project releases a portable tarball for macOS users and package managers.
 4. Run:
 
 ```sh
-make dist
+make dist homebrew-formula
 ```
 
 ## Tag
@@ -21,12 +21,17 @@ git tag "v$version"
 git push origin "v$version"
 ```
 
-The GitHub release workflow builds `dist/cleanroom-$version.tar.gz` and its SHA-256 file.
+The GitHub release workflow builds:
+
+- `dist/cleanroom-$version.tar.gz`
+- `dist/cleanroom-$version.tar.gz.sha256`
+- `dist/Formula/cleanroom.rb`
 
 ## Manual Package
 
 ```sh
 make package
+make homebrew-formula
 ls dist
 ```
 
@@ -37,3 +42,13 @@ tar -xzf cleanroom-*.tar.gz
 cd cleanroom-*
 ./install.sh
 ```
+
+After the GitHub release artifact exists, test the generated formula locally:
+
+```sh
+brew install ./dist/Formula/cleanroom.rb
+cleanroom --version
+brew uninstall cleanroom
+```
+
+When publishing to a tap, copy `dist/Formula/cleanroom.rb` into that tap after the GitHub release artifact exists.

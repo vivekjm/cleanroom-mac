@@ -65,6 +65,13 @@ cd cleanroom-*
 ./install.sh
 ```
 
+Homebrew formula metadata is generated for releases. After a GitHub release exists:
+
+```sh
+make homebrew-formula
+brew install ./dist/Formula/cleanroom.rb
+```
+
 Uninstall:
 
 ```sh
@@ -83,6 +90,12 @@ Build a release archive:
 
 ```sh
 make package
+```
+
+Build release archive plus Homebrew formula:
+
+```sh
+make homebrew-formula
 ```
 
 ## Usage
@@ -263,7 +276,7 @@ Config files use simple `key=value` lines and are never executed as shell.
 
 `restore` only restores entries that were moved by `--trash` and still exist in the cleanroom Trash folder. It skips destinations that already exist.
 
-The project also ships `make install`, `make uninstall`, `make lint`, and `make test` targets for maintainers and package managers.
+The project also ships `make install`, `make uninstall`, `make lint`, `make test`, `make package`, and `make homebrew-formula` targets for maintainers and package managers.
 
 Release packaging is documented in [docs/RELEASE.md](docs/RELEASE.md).
 
