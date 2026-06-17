@@ -20,6 +20,7 @@ macOS Storage often labels hidden user folders as **Documents** or **System Data
 - local AI model downloads and backends
 - Chrome/VS Code/Cursor cache folders
 - browser profile and cache footprint
+- Photos, Music, TV, iMovie, GarageBand, and Logic library footprint
 - app leftovers after manual uninstalls
 - old logs, crash reports, and diagnostic reports
 - old downloaded installer files
@@ -36,6 +37,7 @@ By default, `cleanroom` does **not** delete:
 - Keychains
 - bookmarks, cookies, or full app profile folders
 - Photos libraries
+- Music, TV, iMovie, GarageBand, and Logic libraries
 - Mail
 - iCloud Drive
 - arbitrary files in Documents/Desktop/Downloads
@@ -199,6 +201,13 @@ List large installed apps for manual review:
 cleanroom apps
 cleanroom apps --json /Applications
 cleanroom apps ~/Applications --limit 20
+```
+
+Review protected media and creative libraries:
+
+```sh
+cleanroom libraries
+cleanroom libraries --json
 ```
 
 Review browser profile and cache footprint without touching profiles:
@@ -533,6 +542,8 @@ Config files use simple `key=value` lines and are never executed as shell.
 `venvs` lists stale Python virtualenv folders before you decide whether to run `cleanroom clean --include-venv-stale --apply`. It only treats folders with `pyvenv.cfg` as virtualenv cleanup candidates.
 
 `apps` lists `.app` bundle sizes from `/Applications` and `~/Applications`, or a path you provide. It never uninstalls apps.
+
+`libraries` inventories protected media and creative libraries such as Photos, Photo Booth, Music, iTunes, TV, iMovie, GarageBand, Logic, and Audio Music Apps. It is review-only and helps explain large Documents or media storage without deleting personal projects.
 
 `browsers` separates safe browser cache candidates from protected profile storage. It reports Chrome, Brave, Edge, Arc, Firefox, and Safari profile sizes, but cleanup commands still remove only cache folders and never profiles, passwords, cookies, bookmarks, or sessions.
 

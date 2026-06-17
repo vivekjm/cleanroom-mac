@@ -37,6 +37,10 @@ mkdir -p \
   "$TEST_HOME/Library/Caches/com.cleanroomtestadobe.acc" \
   "$TEST_HOME/Library/Preferences" \
   "$TEST_HOME/Library/Keychains" \
+  "$TEST_HOME/Pictures/Photos Library.photoslibrary" \
+  "$TEST_HOME/Music/Music Library.musiclibrary" \
+  "$TEST_HOME/Movies/iMovie Library.imovielibrary" \
+  "$TEST_HOME/Music/GarageBand" \
   "$TEST_HOME/.npm/_cacache" \
   "$TEST_HOME/Library/pnpm/store" \
   "$TEST_HOME/.cache" \
@@ -86,6 +90,10 @@ printf 'adobe support\n' >"$TEST_HOME/Library/Application Support/CleanroomTestA
 printf 'adobe cache\n' >"$TEST_HOME/Library/Caches/com.cleanroomtestadobe.acc/cache.bin"
 printf 'adobe prefs\n' >"$TEST_HOME/Library/Preferences/com.cleanroomtestadobe.acc.plist"
 printf 'keychain\n' >"$TEST_HOME/Library/Keychains/login.keychain-db"
+printf 'photo library\n' >"$TEST_HOME/Pictures/Photos Library.photoslibrary/database"
+printf 'music library\n' >"$TEST_HOME/Music/Music Library.musiclibrary/Library.musicdb"
+printf 'imovie library\n' >"$TEST_HOME/Movies/iMovie Library.imovielibrary/CurrentVersion.flexolibrary"
+printf 'garageband project\n' >"$TEST_HOME/Music/GarageBand/song.band"
 printf 'trashed\n' >"$TEST_HOME/.Trash/old-trash.txt"
 printf 'old dependency\n' >"$TEST_HOME/Documents/example/node_modules/package.txt"
 printf 'home = /usr/bin\n' >"$TEST_HOME/Documents/python-app/.venv/pyvenv.cfg"
@@ -153,6 +161,7 @@ system_data_json="$(mktemp)"
 "$BIN" system-data --json > "$system_data_json"
 python3 -m json.tool "$system_data_json" >/dev/null
 grep 'mobile-backups' "$system_data_json" >/dev/null
+grep 'media-libraries' "$system_data_json" >/dev/null
 grep '"category":"protected"' "$system_data_json" >/dev/null
 grep 'cleanroom containers' "$system_data_json" >/dev/null
 rm -f "$system_data_json"
@@ -223,6 +232,13 @@ apps_json="$(mktemp)"
 python3 -m json.tool "$apps_json" >/dev/null
 grep 'FakeBig' "$apps_json" >/dev/null
 rm -f "$apps_json"
+"$BIN" libraries | grep 'Photos Library' >/dev/null
+libraries_json="$(mktemp)"
+"$BIN" libraries --json > "$libraries_json"
+python3 -m json.tool "$libraries_json" >/dev/null
+grep 'iMovie Library' "$libraries_json" >/dev/null
+grep '"protected":true' "$libraries_json" >/dev/null
+rm -f "$libraries_json"
 "$BIN" browsers | grep 'Google Chrome' >/dev/null
 "$BIN" browsers | grep 'protected' >/dev/null
 browsers_json="$(mktemp)"
@@ -354,6 +370,7 @@ protect_json="$(mktemp)"
 python3 -m json.tool "$protect_json" >/dev/null
 grep '"status":"present"' "$protect_json" >/dev/null
 grep 'chrome-login-data' "$protect_json" >/dev/null
+grep 'imovie-library' "$protect_json" >/dev/null
 rm -f "$protect_json"
 "$BIN" guard "$HOME/Library/Application Support/Google/Chrome" | grep 'refused-protected' >/dev/null
 "$BIN" guard "$HOME/Library/Application Support/Google/Chrome/Default" | grep 'refused-protected' >/dev/null

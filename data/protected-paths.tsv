@@ -8,6 +8,15 @@ arc-profile	browser-profile	~/Library/Application Support/Arc	Contains Arc brows
 firefox-profile	browser-profile	~/Library/Application Support/Firefox	Contains Firefox profiles, logins, cookies, bookmarks, sessions, and extension state.
 safari-profile	browser-profile	~/Library/Safari	Contains Safari bookmarks, history, tabs, and browser state.
 photos-library	photos	~/Pictures/Photos Library.photoslibrary	Contains the user's Photos library and should only be managed through Photos or backups.
+photo-booth-library	photos	~/Pictures/Photo Booth Library	Contains Photo Booth captures and should only be managed manually after backup.
+music-library	media-library	~/Music/Music Library.musiclibrary	Contains the user's Music app library and should only be managed through Music or backups.
+itunes-media	media-library	~/Music/iTunes	Contains legacy iTunes media, libraries, and device-related data.
+tv-library	media-library	~/Movies/TV Library.tvlibrary	Contains the user's TV app library and downloads.
+imovie-library	media-library	~/Movies/iMovie Library.imovielibrary	Contains iMovie events, projects, and original video media.
+imovie-theater	media-library	~/Movies/iMovie Theater.theater	Contains iMovie Theater exports and media.
+garageband-library	media-library	~/Music/GarageBand	Contains GarageBand songs, recordings, and related assets.
+logic-library	media-library	~/Music/Logic	Contains Logic projects, recordings, and related assets.
+audio-music-apps	media-library	~/Music/Audio Music Apps	Contains loops, plug-ins, presets, and audio assets.
 mail	mail	~/Library/Mail	Contains local Mail data and account state.
 icloud-drive	cloud-documents	~/Library/Mobile Documents	Contains iCloud Drive and app cloud document state.
 messages	messages	~/Library/Messages	Contains Messages chats, attachments, and account state.

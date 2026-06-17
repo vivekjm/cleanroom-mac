@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.34.0"
+VERSION="0.35.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -56,6 +56,7 @@ Usage:
   cleanroom nodes [PATH] [--days N] [--limit N] [--json]
   cleanroom venvs [PATH] [--days N] [--limit N] [--json]
   cleanroom apps [PATH] [--limit N] [--json]
+  cleanroom libraries [--json]
   cleanroom browsers [--json]
   cleanroom leftovers QUERY... [--limit N] [--json] [--apply --trash]
   cleanroom backups [--json]
@@ -93,6 +94,7 @@ Actions:
   nodes                List stale node_modules folders for review.
   venvs                List stale Python virtualenv folders for review.
   apps                 List largest app bundles for review without uninstalling.
+  libraries            Inventory protected media and creative libraries.
   browsers             Inventory browser profile and cache footprint.
   leftovers            Find app leftovers by search term. Apply requires --trash.
   backups              Inventory local iPhone/iPad backups for review.
@@ -123,7 +125,7 @@ Options:
   --yes                Do not prompt before --apply cleanup.
   --verbose            Print every path touched.
   --json               Emit JSON for overview, scan, system-data, plan, large, duplicates,
-                       downloads, installers, nodes, venvs, apps, browsers, leftovers, startup,
+                       downloads, installers, nodes, venvs, apps, libraries, browsers, leftovers, startup,
                        trash, backups, xcode, caches, diagnostics, packages, toolchains,
                        containers, snapshots, doctor, protect, guard, or rules.
   --output PATH        Output path for report.
@@ -197,6 +199,8 @@ Examples:
   cleanroom venvs --json ~/Documents
   cleanroom apps
   cleanroom apps --json /Applications
+  cleanroom libraries
+  cleanroom libraries --json
   cleanroom browsers
   cleanroom browsers --json
   cleanroom leftovers adobe
@@ -1188,6 +1192,7 @@ system_data_rows() {
   printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "containers" "Container Storage" "~/.colima; ~/.lima; ~/.local/share/containers; ~/.local/share/podman; ~/Library/Containers/com.docker.docker/Data/vms" "high-impact" "cleanroom containers" "cleanroom clean --apply --trash --include-containers" "Docker Desktop, Colima, Lima, and Podman container storage."
   printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "diagnostics" "Logs and Diagnostics" "~/Library/Logs; ~/Library/DiagnosticReports; ~/Library/Application Support/CrashReporter" "low-risk" "cleanroom diagnostics" "cleanroom clean --apply --trash --include-diagnostics --days $DAYS" "User logs, diagnostic reports, and crash reports."
   printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "mobile-backups" "Device Backups" "~/Library/Application Support/MobileSync/Backup" "protected" "cleanroom backups" "manual review" "Local iPhone and iPad backups are protected because they may be the only copy of device data."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "media-libraries" "Media Libraries" "~/Pictures/Photos Library.photoslibrary; ~/Music/Music Library.musiclibrary; ~/Music/iTunes; ~/Movies/TV Library.tvlibrary; ~/Movies/iMovie Library.imovielibrary; ~/Music/GarageBand" "protected" "cleanroom libraries" "manual review" "Photos, Music, TV, iMovie, and GarageBand libraries are protected personal media."
   printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "group-containers" "Group Containers" "~/Library/Group Containers" "review" "cleanroom leftovers APPNAME" "manual review" "Shared app containers can hold account data and should be reviewed by app or vendor."
   printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "http-storages" "HTTPStorages" "~/Library/HTTPStorages" "review" "cleanroom leftovers APPNAME" "manual review" "Per-app HTTP storage and cookies. Review carefully; cleanroom does not remove this wholesale."
   printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "saved-state" "Saved Application State" "~/Library/Saved Application State" "review" "cleanroom leftovers APPNAME" "manual review" "Window/session state for apps. Usually small, but useful when investigating leftovers."
@@ -2052,6 +2057,62 @@ leftovers() {
   fi
 }
 
+library_rows() {
+  printf '%s\t%s\t%s\t%s\t%s\n' "photos" "Photos Library" "photos" "~/Pictures/Photos Library.photoslibrary" "Manage in Photos or move after making a verified backup."
+  printf '%s\t%s\t%s\t%s\t%s\n' "photo-booth" "Photo Booth Library" "photos" "~/Pictures/Photo Booth Library" "Manage in Photo Booth or Finder after backing up."
+  printf '%s\t%s\t%s\t%s\t%s\n' "music" "Music Library" "music" "~/Music/Music Library.musiclibrary" "Manage in Music app settings or move the library deliberately."
+  printf '%s\t%s\t%s\t%s\t%s\n' "itunes" "iTunes Media" "music" "~/Music/iTunes" "Legacy iTunes media and device backups can be large; review manually."
+  printf '%s\t%s\t%s\t%s\t%s\n' "tv" "TV Library" "video" "~/Movies/TV Library.tvlibrary" "Manage in the TV app or move after backing up."
+  printf '%s\t%s\t%s\t%s\t%s\n' "imovie" "iMovie Library" "video" "~/Movies/iMovie Library.imovielibrary" "Manage inside iMovie; deleting events/projects can remove original video."
+  printf '%s\t%s\t%s\t%s\t%s\n' "imovie-theater" "iMovie Theater" "video" "~/Movies/iMovie Theater.theater" "Review manually; it may contain exported movies."
+  printf '%s\t%s\t%s\t%s\t%s\n' "motion-templates" "Motion Templates" "video" "~/Movies/Motion Templates" "Review custom Final Cut/Motion templates before moving."
+  printf '%s\t%s\t%s\t%s\t%s\n' "garageband" "GarageBand" "audio" "~/Music/GarageBand" "GarageBand songs and assets are personal creative work."
+  printf '%s\t%s\t%s\t%s\t%s\n' "logic" "Logic" "audio" "~/Music/Logic" "Logic projects and samples are personal creative work."
+  printf '%s\t%s\t%s\t%s\t%s\n' "audio-music-apps" "Audio Music Apps" "audio" "~/Music/Audio Music Apps" "Loops, plug-ins, and audio assets; review before changing."
+}
+
+libraries() {
+  local rows
+  rows="$(library_rows)"
+
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '['
+    local first=1 id title kind path guidance expanded kb
+    while IFS=$'\t' read -r id title kind path guidance; do
+      [[ -z "${id:-}" ]] && continue
+      expanded="$(expand_path "$path")"
+      kb="$(size_kb "$expanded")"
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '{"id":"%s","title":"%s","kind":"%s","path":"%s","exists":%s,"size_kb":%s,"size":"%s","protected":true,"guidance":"%s"}' \
+        "$(printf '%s' "$id" | json_escape)" \
+        "$(printf '%s' "$title" | json_escape)" \
+        "$(printf '%s' "$kind" | json_escape)" \
+        "$(printf '%s' "$expanded" | json_escape)" \
+        "$(if [[ -e "$expanded" ]]; then echo true; else echo false; fi)" \
+        "$kb" \
+        "$(human_kb "$kb" | json_escape)" \
+        "$(printf '%s' "$guidance" | json_escape)"
+    done <<<"$rows"
+    printf ']\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}cleanroom protected media libraries${RESET}"
+  printf 'Review-only inventory. cleanroom does not delete Photos, Music, TV, iMovie, GarageBand, or Logic libraries.\n\n'
+  printf '%-10s %-8s %-24s %s\n' "size" "kind" "library" "path"
+  local id title kind path guidance expanded kb
+  while IFS=$'\t' read -r id title kind path guidance; do
+    [[ -z "${id:-}" ]] && continue
+    expanded="$(expand_path "$path")"
+    [[ -e "$expanded" ]] || continue
+    kb="$(size_kb "$expanded")"
+    printf '%-10s %-8s %-24s %s\n' "$(human_kb "$kb")" "$kind" "$title" "$expanded"
+    printf '  %s\n' "$guidance"
+  done <<<"$rows"
+  printf '\nUse this to explain large Documents/Media storage. Manage libraries in their owning apps or after verified backups.\n'
+}
+
 backup_value() {
   local file="$1"
   local key="$2"
@@ -2758,6 +2819,7 @@ overview() {
   printf 'cleanroom large ~/Documents --min-mb 250 --limit 50\n'
   printf 'cleanroom downloads --days 30 --limit 50\n'
   printf 'cleanroom venvs --days 30 --limit 50\n'
+  printf 'cleanroom libraries\n'
   printf 'cleanroom trash\n'
   printf 'cleanroom startup\n'
   printf 'cleanroom packages\n'
@@ -3397,7 +3459,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  overview|scan|system-data|plan|large|duplicates|downloads|installers|nodes|venvs|virtualenvs|apps|browsers|leftovers|backups|xcode|startup|trash|caches|diagnostics|packages|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
+  overview|scan|system-data|plan|large|duplicates|downloads|installers|nodes|venvs|virtualenvs|apps|libraries|browsers|leftovers|backups|xcode|startup|trash|caches|diagnostics|packages|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -3503,6 +3565,7 @@ case "$ACTION" in
   nodes) nodes ;;
   venvs|virtualenvs) venvs ;;
   apps) apps ;;
+  libraries) libraries ;;
   browsers) browsers ;;
   leftovers) leftovers ;;
   backups) backups ;;
