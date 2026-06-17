@@ -1,4 +1,4 @@
-.TH CLEANROOM 1 "June 2026" "cleanroom 0.37.0" "User Commands"
+.TH CLEANROOM 1 "June 2026" "cleanroom 0.38.0" "User Commands"
 .SH NAME
 cleanroom \- safe-by-default macOS storage cleaner
 .SH SYNOPSIS
@@ -40,6 +40,9 @@ cleanroom \- safe-by-default macOS storage cleaner
 .br
 .B cleanroom
 .RI "cloud [--json]"
+.br
+.B cleanroom
+.RI "personal [--json]"
 .br
 .B cleanroom
 .RI "browsers [--json]"
@@ -157,6 +160,10 @@ iMovie, GarageBand, and Logic without deleting anything.
 .B cloud
 Inventory protected cloud-sync folders such as iCloud Drive, CloudStorage,
 Dropbox, Google Drive, OneDrive, Box, and Sync without deleting anything.
+.TP
+.B personal
+Inventory protected Mail, Messages, Contacts, Calendars, Notes, Reminders,
+Voice Memos, and call-history data without deleting anything.
 .TP
 .B browsers
 Inventory browser profile and cache footprint without deleting profiles,
@@ -312,6 +319,7 @@ cleanroom venvs ~/Documents --days 45 --limit 30
 cleanroom apps --limit 30
 cleanroom libraries --json
 cleanroom cloud --json
+cleanroom personal --json
 cleanroom browsers --json
 cleanroom leftovers adobe --limit 50
 cleanroom leftovers adobe --apply --trash

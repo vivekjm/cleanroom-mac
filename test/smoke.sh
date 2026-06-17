@@ -35,10 +35,18 @@ mkdir -p \
   "$TEST_HOME/Library/Application Support/MobileSync/Backup/FakeDeviceBackup" \
   "$TEST_HOME/Library/Application Support/Google/Chrome/Default" \
   "$TEST_HOME/Library/Application Support/Google/Chrome/Default/Cache" \
+  "$TEST_HOME/Library/Application Support/AddressBook" \
+  "$TEST_HOME/Library/Application Support/CallHistoryDB" \
   "$TEST_HOME/Library/Application Support/CleanroomTestAdobe/Creative Cloud" \
   "$TEST_HOME/Library/Caches/com.cleanroomtestadobe.acc" \
   "$TEST_HOME/Library/Preferences" \
   "$TEST_HOME/Library/Keychains" \
+  "$TEST_HOME/Library/Mail" \
+  "$TEST_HOME/Library/Messages" \
+  "$TEST_HOME/Library/Calendars" \
+  "$TEST_HOME/Library/Group Containers/group.com.apple.notes" \
+  "$TEST_HOME/Library/Group Containers/group.com.apple.reminders" \
+  "$TEST_HOME/Library/Group Containers/group.com.apple.VoiceMemos.shared" \
   "$TEST_HOME/Library/Mobile Documents" \
   "$TEST_HOME/Library/CloudStorage/Dropbox-Test" \
   "$TEST_HOME/Dropbox" \
@@ -94,10 +102,18 @@ printf 'docker raw\n' >"$TEST_HOME/Library/Containers/com.docker.docker/Data/vms
 printf 'podman desktop\n' >"$TEST_HOME/Library/Containers/io.podman_desktop.PodmanDesktop/Data/state.db"
 printf 'login data\n' >"$TEST_HOME/Library/Application Support/Google/Chrome/Default/Login Data"
 printf 'browser cache\n' >"$TEST_HOME/Library/Application Support/Google/Chrome/Default/Cache/example.cache"
+printf 'contacts\n' >"$TEST_HOME/Library/Application Support/AddressBook/AddressBook-v22.abcddb"
+printf 'call history\n' >"$TEST_HOME/Library/Application Support/CallHistoryDB/CallHistory.storedata"
 printf 'adobe support\n' >"$TEST_HOME/Library/Application Support/CleanroomTestAdobe/Creative Cloud/state.db"
 printf 'adobe cache\n' >"$TEST_HOME/Library/Caches/com.cleanroomtestadobe.acc/cache.bin"
 printf 'adobe prefs\n' >"$TEST_HOME/Library/Preferences/com.cleanroomtestadobe.acc.plist"
 printf 'keychain\n' >"$TEST_HOME/Library/Keychains/login.keychain-db"
+printf 'mail\n' >"$TEST_HOME/Library/Mail/envelope-index"
+printf 'message\n' >"$TEST_HOME/Library/Messages/chat.db"
+printf 'calendar\n' >"$TEST_HOME/Library/Calendars/Calendar.sqlitedb"
+printf 'note\n' >"$TEST_HOME/Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"
+printf 'reminder\n' >"$TEST_HOME/Library/Group Containers/group.com.apple.reminders/Container.sqlite"
+printf 'voice memo\n' >"$TEST_HOME/Library/Group Containers/group.com.apple.VoiceMemos.shared/recording.m4a"
 printf 'icloud doc\n' >"$TEST_HOME/Library/Mobile Documents/document.txt"
 printf 'cloudstorage doc\n' >"$TEST_HOME/Library/CloudStorage/Dropbox-Test/document.txt"
 printf 'dropbox doc\n' >"$TEST_HOME/Dropbox/document.txt"
@@ -175,6 +191,7 @@ python3 -m json.tool "$system_data_json" >/dev/null
 grep 'mobile-backups' "$system_data_json" >/dev/null
 grep 'media-libraries' "$system_data_json" >/dev/null
 grep 'cloud-sync' "$system_data_json" >/dev/null
+grep 'personal-data' "$system_data_json" >/dev/null
 grep '"category":"protected"' "$system_data_json" >/dev/null
 grep 'cleanroom containers' "$system_data_json" >/dev/null
 rm -f "$system_data_json"
@@ -187,6 +204,7 @@ grep 'old-diagnostics' "$rules_json" >/dev/null
 grep 'toolchain-caches' "$rules_json" >/dev/null
 grep 'stale-python-virtualenvs' "$rules_json" >/dev/null
 grep 'cloud-inventory' "$rules_json" >/dev/null
+grep 'personal-inventory' "$rules_json" >/dev/null
 rm -f "$rules_json"
 "$BIN" plan | grep 'cleanroom plan' >/dev/null
 plan_json="$(mktemp)"
@@ -260,6 +278,13 @@ python3 -m json.tool "$cloud_json" >/dev/null
 grep 'cloudstorage' "$cloud_json" >/dev/null
 grep '"protected":true' "$cloud_json" >/dev/null
 rm -f "$cloud_json"
+"$BIN" personal | grep 'Messages' >/dev/null
+personal_json="$(mktemp)"
+"$BIN" personal --json > "$personal_json"
+python3 -m json.tool "$personal_json" >/dev/null
+grep 'Voice Memos' "$personal_json" >/dev/null
+grep '"protected":true' "$personal_json" >/dev/null
+rm -f "$personal_json"
 "$BIN" browsers | grep 'Google Chrome' >/dev/null
 "$BIN" browsers | grep 'protected' >/dev/null
 browsers_json="$(mktemp)"
@@ -401,6 +426,7 @@ grep '"status":"present"' "$protect_json" >/dev/null
 grep 'chrome-login-data' "$protect_json" >/dev/null
 grep 'imovie-library' "$protect_json" >/dev/null
 grep 'cloudstorage' "$protect_json" >/dev/null
+grep 'voice-memos' "$protect_json" >/dev/null
 rm -f "$protect_json"
 "$BIN" guard "$HOME/Library/Application Support/Google/Chrome" | grep 'refused-protected' >/dev/null
 "$BIN" guard "$HOME/Library/Application Support/Google/Chrome/Default" | grep 'refused-protected' >/dev/null
@@ -408,13 +434,15 @@ rm -f "$protect_json"
 "$BIN" guard "$HOME/Library/Application Support/Google/Chrome/Default/Cache" | grep 'allowed' >/dev/null
 "$BIN" guard "$HOME/Library/Application Support/MobileSync/Backup" | grep 'refused-protected' >/dev/null
 "$BIN" guard "$HOME/Library/CloudStorage" | grep 'refused-protected' >/dev/null
+"$BIN" guard "$HOME/Library/Messages" | grep 'refused-protected' >/dev/null
 guard_json="$(mktemp)"
-"$BIN" guard --json "$HOME/Library/Application Support/Google/Chrome" "$HOME/Library/Application Support/Google/Chrome/Default/Cache" "$HOME/Library/Application Support/MobileSync/Backup" "$HOME/Library/CloudStorage" > "$guard_json"
+"$BIN" guard --json "$HOME/Library/Application Support/Google/Chrome" "$HOME/Library/Application Support/Google/Chrome/Default/Cache" "$HOME/Library/Application Support/MobileSync/Backup" "$HOME/Library/CloudStorage" "$HOME/Library/Messages" > "$guard_json"
 python3 -m json.tool "$guard_json" >/dev/null
 grep '"status":"refused-protected"' "$guard_json" >/dev/null
 grep '"status":"allowed"' "$guard_json" >/dev/null
 grep 'MobileSync' "$guard_json" >/dev/null
 grep 'CloudStorage' "$guard_json" >/dev/null
+grep 'Messages' "$guard_json" >/dev/null
 rm -f "$guard_json"
 "$BIN" history 2>&1 | grep 'No cleanroom history found' >/dev/null
 

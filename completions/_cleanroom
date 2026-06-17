@@ -17,6 +17,7 @@ _cleanroom() {
     'apps:List large app bundles for review'
     'libraries:Inventory protected media and creative libraries'
     'cloud:Inventory protected cloud-sync storage'
+    'personal:Inventory protected personal app data'
     'browsers:Inventory browser profile and cache footprint'
     'leftovers:Find or trash app leftovers by search term'
     'backups:Inventory local iPhone/iPad backups'

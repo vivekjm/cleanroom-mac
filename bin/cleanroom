@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.37.0"
+VERSION="0.38.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -58,6 +58,7 @@ Usage:
   cleanroom apps [PATH] [--limit N] [--json]
   cleanroom libraries [--json]
   cleanroom cloud [--json]
+  cleanroom personal [--json]
   cleanroom browsers [--json]
   cleanroom leftovers QUERY... [--limit N] [--json] [--apply --trash]
   cleanroom backups [--json]
@@ -98,6 +99,7 @@ Actions:
   apps                 List largest app bundles for review without uninstalling.
   libraries            Inventory protected media and creative libraries.
   cloud                Inventory protected cloud-sync storage locations.
+  personal             Inventory protected Mail, Messages, Notes, and contacts data.
   browsers             Inventory browser profile and cache footprint.
   leftovers            Find app leftovers by search term. Apply requires --trash.
   backups              Inventory local iPhone/iPad backups for review.
@@ -129,7 +131,8 @@ Options:
   --yes                Do not prompt before --apply cleanup.
   --verbose            Print every path touched.
   --json               Emit JSON for overview, scan, system-data, plan, large, duplicates,
-                       downloads, installers, nodes, venvs, apps, libraries, cloud, browsers, leftovers, startup,
+                       downloads, installers, nodes, venvs, apps, libraries, cloud, personal,
+                       browsers, leftovers, startup,
                        trash, backups, xcode, caches, diagnostics, packages, homebrew, toolchains,
                        containers, snapshots, doctor, protect, guard, or rules.
   --output PATH        Output path for report.
@@ -207,6 +210,8 @@ Examples:
   cleanroom libraries --json
   cleanroom cloud
   cleanroom cloud --json
+  cleanroom personal
+  cleanroom personal --json
   cleanroom browsers
   cleanroom browsers --json
   cleanroom leftovers adobe
@@ -1202,6 +1207,7 @@ system_data_rows() {
   printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "mobile-backups" "Device Backups" "~/Library/Application Support/MobileSync/Backup" "protected" "cleanroom backups" "manual review" "Local iPhone and iPad backups are protected because they may be the only copy of device data."
   printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "media-libraries" "Media Libraries" "~/Pictures/Photos Library.photoslibrary; ~/Music/Music Library.musiclibrary; ~/Music/iTunes; ~/Movies/TV Library.tvlibrary; ~/Movies/iMovie Library.imovielibrary; ~/Music/GarageBand" "protected" "cleanroom libraries" "manual review" "Photos, Music, TV, iMovie, and GarageBand libraries are protected personal media."
   printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "cloud-sync" "Cloud Sync Storage" "~/Library/Mobile Documents; ~/Library/CloudStorage; ~/Dropbox; ~/Google Drive; ~/OneDrive; ~/Box" "protected" "cleanroom cloud" "manual review" "Cloud-synced folders can remove files remotely if changed locally, so cleanroom only inventories them."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "personal-data" "Personal App Data" "~/Library/Mail; ~/Library/Messages; ~/Library/Application Support/AddressBook; ~/Library/Calendars; ~/Library/Group Containers/group.com.apple.notes; ~/Library/Group Containers/group.com.apple.reminders; ~/Library/Group Containers/group.com.apple.VoiceMemos.shared" "protected" "cleanroom personal" "manual review" "Mail, Messages, Contacts, Calendars, Notes, Reminders, and Voice Memos are protected personal data."
   printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "group-containers" "Group Containers" "~/Library/Group Containers" "review" "cleanroom leftovers APPNAME" "manual review" "Shared app containers can hold account data and should be reviewed by app or vendor."
   printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "http-storages" "HTTPStorages" "~/Library/HTTPStorages" "review" "cleanroom leftovers APPNAME" "manual review" "Per-app HTTP storage and cookies. Review carefully; cleanroom does not remove this wholesale."
   printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "saved-state" "Saved Application State" "~/Library/Saved Application State" "review" "cleanroom leftovers APPNAME" "manual review" "Window/session state for apps. Usually small, but useful when investigating leftovers."
@@ -2174,6 +2180,59 @@ cloud() {
   printf '\nUse this to explain large Documents/iCloud/CloudStorage usage. Change files through the provider UI or after verified backups.\n'
 }
 
+personal_rows() {
+  printf '%s\t%s\t%s\t%s\t%s\n' "mail" "Mail" "mail" "~/Library/Mail" "Local mail downloads, indexes, and account data. Manage from Mail account settings."
+  printf '%s\t%s\t%s\t%s\t%s\n' "messages" "Messages" "messages" "~/Library/Messages" "Chats and attachments. Manage from Messages or backup before changing."
+  printf '%s\t%s\t%s\t%s\t%s\n' "contacts" "Contacts" "contacts" "~/Library/Application Support/AddressBook" "Contacts database and related state."
+  printf '%s\t%s\t%s\t%s\t%s\n' "calendars" "Calendars" "calendar" "~/Library/Calendars" "Calendar database, attachments, and sync state."
+  printf '%s\t%s\t%s\t%s\t%s\n' "notes" "Notes" "notes" "~/Library/Group Containers/group.com.apple.notes" "Notes database and attachments. Manage through Notes/iCloud settings."
+  printf '%s\t%s\t%s\t%s\t%s\n' "reminders" "Reminders" "reminders" "~/Library/Group Containers/group.com.apple.reminders" "Reminders database and sync state."
+  printf '%s\t%s\t%s\t%s\t%s\n' "voice-memos" "Voice Memos" "audio" "~/Library/Group Containers/group.com.apple.VoiceMemos.shared" "Voice recordings and app state."
+  printf '%s\t%s\t%s\t%s\t%s\n' "call-history" "Call History" "calls" "~/Library/Application Support/CallHistoryDB" "Continuity/FaceTime call history database."
+}
+
+personal() {
+  local rows
+  rows="$(personal_rows)"
+
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '['
+    local first=1 id title kind path guidance expanded kb
+    while IFS=$'\t' read -r id title kind path guidance; do
+      [[ -z "${id:-}" ]] && continue
+      expanded="$(expand_path "$path")"
+      kb="$(size_kb "$expanded")"
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '{"id":"%s","title":"%s","kind":"%s","path":"%s","exists":%s,"size_kb":%s,"size":"%s","protected":true,"guidance":"%s"}' \
+        "$(printf '%s' "$id" | json_escape)" \
+        "$(printf '%s' "$title" | json_escape)" \
+        "$(printf '%s' "$kind" | json_escape)" \
+        "$(printf '%s' "$expanded" | json_escape)" \
+        "$(if [[ -e "$expanded" ]]; then echo true; else echo false; fi)" \
+        "$kb" \
+        "$(human_kb "$kb" | json_escape)" \
+        "$(printf '%s' "$guidance" | json_escape)"
+    done <<<"$rows"
+    printf ']\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}cleanroom protected personal data${RESET}"
+  printf 'Review-only inventory. cleanroom does not delete Mail, Messages, Contacts, Calendar, Notes, Reminders, or Voice Memos data.\n\n'
+  printf '%-10s %-12s %-18s %s\n' "size" "kind" "app" "path"
+  local id title kind path guidance expanded kb
+  while IFS=$'\t' read -r id title kind path guidance; do
+    [[ -z "${id:-}" ]] && continue
+    expanded="$(expand_path "$path")"
+    [[ -e "$expanded" ]] || continue
+    kb="$(size_kb "$expanded")"
+    printf '%-10s %-12s %-18s %s\n' "$(human_kb "$kb")" "$kind" "$title" "$expanded"
+    printf '  %s\n' "$guidance"
+  done <<<"$rows"
+  printf '\nUse this to explain large Mail, Messages, Notes, or Contacts storage. Manage these from their owning apps or after verified backups.\n'
+}
+
 backup_value() {
   local file="$1"
   local key="$2"
@@ -2968,6 +3027,7 @@ overview() {
   printf 'cleanroom toolchains\n'
   printf 'cleanroom containers\n'
   printf 'cleanroom cloud\n'
+  printf 'cleanroom personal\n'
   printf 'cleanroom diagnostics\n'
   printf 'cleanroom protect\n'
 }
@@ -3602,7 +3662,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  overview|scan|system-data|plan|large|duplicates|downloads|installers|nodes|venvs|virtualenvs|apps|libraries|cloud|browsers|leftovers|backups|xcode|startup|trash|caches|diagnostics|packages|homebrew|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
+  overview|scan|system-data|plan|large|duplicates|downloads|installers|nodes|venvs|virtualenvs|apps|libraries|cloud|personal|browsers|leftovers|backups|xcode|startup|trash|caches|diagnostics|packages|homebrew|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -3710,6 +3770,7 @@ case "$ACTION" in
   apps) apps ;;
   libraries) libraries ;;
   cloud) cloud ;;
+  personal) personal ;;
   browsers) browsers ;;
   leftovers) leftovers ;;
   backups) backups ;;

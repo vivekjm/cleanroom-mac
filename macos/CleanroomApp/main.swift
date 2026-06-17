@@ -98,6 +98,7 @@ final class CleanroomAppDelegate: NSObject, NSApplicationDelegate {
         reviewRow.addArrangedSubview(button("Apps", action: #selector(apps)))
         reviewRow.addArrangedSubview(button("Libraries", action: #selector(libraries)))
         reviewRow.addArrangedSubview(button("Cloud", action: #selector(cloud)))
+        reviewRow.addArrangedSubview(button("Personal", action: #selector(personal)))
         reviewRow.addArrangedSubview(button("Browsers", action: #selector(browsers)))
         reviewRow.addArrangedSubview(button("Leftovers", action: #selector(leftovers)))
         reviewRow.addArrangedSubview(button("Caches", action: #selector(caches)))
@@ -209,6 +210,10 @@ final class CleanroomAppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func cloud() {
         runCommand("cloud", title: "Cloud")
+    }
+
+    @objc private func personal() {
+        runCommand("personal", title: "Personal")
     }
 
     @objc private func browsers() {
