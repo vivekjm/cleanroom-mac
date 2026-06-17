@@ -198,7 +198,7 @@ final class CleanroomAppDelegate: NSObject, NSApplicationDelegate {
     @objc private func leftovers() {
         let alert = NSAlert()
         alert.messageText = "Find app leftovers"
-        alert.informativeText = "Enter an app or vendor name. This only searches and previews matching files."
+        alert.informativeText = "Enter an app or vendor name. This previews matching files and shows the recoverable cleanup command."
         alert.addButton(withTitle: "Search")
         alert.addButton(withTitle: "Cancel")
 

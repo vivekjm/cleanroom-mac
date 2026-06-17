@@ -82,7 +82,7 @@ cleanroom report --output cleanroom-report.md
 
 `browsers --json` emits browser profile size, cache size, protected status, and matching preview/apply commands. It is intentionally review-only and does not delete profiles, passwords, cookies, bookmarks, or sessions.
 
-`leftovers --json QUERY...` emits matching app support, cache, preference, container, WebKit, log, and launch-item paths for manual review. It is intentionally review-only and does not delete anything.
+`leftovers --json QUERY...` emits matching app support, cache, preference, container, WebKit, log, and launch-item paths with guard status plus matching preview/apply commands. Normal text mode previews by default; `--apply --trash` moves matches into a recoverable cleanroom Trash folder and writes an apply log.
 
 `backups --json` emits local iPhone and iPad backup sizes and device metadata when available. It is intentionally review-only and protected.
 
@@ -182,10 +182,11 @@ Review large app bundles manually. cleanroom does not uninstall apps because app
 ```sh
 cleanroom leftovers adobe
 cleanroom leftovers "creative cloud" --limit 50
+cleanroom leftovers adobe --apply --trash
 cleanroom leftovers zoom --json
 ```
 
-Use this after uninstalling or removing a large app. It searches common macOS support, cache, preference, container, saved-state, WebKit, log, and launch-item locations by name. It does not delete matches; review them in Finder or use the vendor uninstaller when one exists.
+Use this after uninstalling or removing a large app. It searches common macOS support, cache, preference, container, saved-state, WebKit, log, and launch-item locations by name. Plain `leftovers` is a preview. Applied cleanup requires `--trash`, writes the normal cleanroom apply log, and can be restored with `cleanroom restore --log PATH --apply`. Use the vendor uninstaller when one exists, especially for apps with helper services or account-specific data.
 
 ## Browser Storage
 

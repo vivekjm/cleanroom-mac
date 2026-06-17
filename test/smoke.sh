@@ -173,7 +173,24 @@ python3 -m json.tool "$leftovers_json" >/dev/null
 grep '"queries"' "$leftovers_json" >/dev/null
 grep 'com.cleanroomtestadobe.acc' "$leftovers_json" >/dev/null
 grep '"category":"preferences"' "$leftovers_json" >/dev/null
+grep '"status":"allowed"' "$leftovers_json" >/dev/null
+grep 'cleanroom leftovers --apply --trash' "$leftovers_json" >/dev/null
 rm -f "$leftovers_json"
+if "$BIN" leftovers cleanroomtestadobe --apply --yes --limit 1 >/dev/null 2>&1; then
+  echo "leftovers apply without --trash should fail" >&2
+  exit 1
+fi
+leftover_log="$TEST_HOME/leftovers-apply.log"
+mkdir -p "$TEST_HOME/Library/Application Support/CleanroomRestoreLeftover"
+printf 'leftover support\n' >"$TEST_HOME/Library/Application Support/CleanroomRestoreLeftover/state.db"
+mkdir -p "$TEST_HOME/Library/Caches/com.cleanroomrestoreleftover"
+printf 'leftover cache\n' >"$TEST_HOME/Library/Caches/com.cleanroomrestoreleftover/cache.bin"
+"$BIN" leftovers cleanroomrestoreleftover --apply --trash --yes --limit 10 --log "$leftover_log" | grep 'leftovers summary' >/dev/null
+test ! -e "$TEST_HOME/Library/Application Support/CleanroomRestoreLeftover"
+test -f "$leftover_log"
+grep $'\ttrash\tok\t' "$leftover_log" >/dev/null
+"$BIN" restore --log "$leftover_log" --apply --yes >/dev/null
+test -e "$TEST_HOME/Library/Application Support/CleanroomRestoreLeftover"
 "$BIN" backups | grep 'Vivek Test iPhone' >/dev/null
 backups_json="$(mktemp)"
 "$BIN" backups --json > "$backups_json"

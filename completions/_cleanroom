@@ -14,7 +14,7 @@ _cleanroom() {
     'nodes:List stale node_modules folders'
     'apps:List large app bundles for review'
     'browsers:Inventory browser profile and cache footprint'
-    'leftovers:Find app leftovers by search term'
+    'leftovers:Find or trash app leftovers by search term'
     'backups:Inventory local iPhone/iPad backups'
     'xcode:Inventory Xcode and simulator storage'
     'startup:List LaunchAgents and LaunchDaemons'

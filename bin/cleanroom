@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.28.0"
+VERSION="0.29.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -52,7 +52,7 @@ Usage:
   cleanroom nodes [PATH] [--days N] [--limit N] [--json]
   cleanroom apps [PATH] [--limit N] [--json]
   cleanroom browsers [--json]
-  cleanroom leftovers QUERY... [--limit N] [--json]
+  cleanroom leftovers QUERY... [--limit N] [--json] [--apply --trash]
   cleanroom backups [--json]
   cleanroom xcode [--json]
   cleanroom startup [--json]
@@ -84,7 +84,7 @@ Actions:
   nodes                List stale node_modules folders for review.
   apps                 List largest app bundles for review without uninstalling.
   browsers             Inventory browser profile and cache footprint.
-  leftovers            Find app leftovers by search term for manual review.
+  leftovers            Find app leftovers by search term. Apply requires --trash.
   backups              Inventory local iPhone/iPad backups for review.
   xcode                Inventory Xcode build, archive, DeviceSupport, and simulator storage.
   startup              List LaunchAgents and LaunchDaemons for review.
@@ -173,6 +173,7 @@ Examples:
   cleanroom browsers
   cleanroom browsers --json
   cleanroom leftovers adobe
+  cleanroom leftovers adobe --apply --trash
   cleanroom leftovers zoom --json
   cleanroom backups
   cleanroom backups --json
@@ -482,6 +483,21 @@ disk_line() {
 
 json_escape() {
   sed 's/\\/\\\\/g; s/"/\\"/g'
+}
+
+shell_quote() {
+  printf '%q' "$1"
+}
+
+leftover_command() {
+  local base="$1"
+  local query
+  printf '%s' "$base"
+  for query in "${PATH_ARGS[@]}"; do
+    [[ -z "$query" ]] && continue
+    printf ' %s' "$(shell_quote "$query")"
+  done
+  printf ' --limit %s' "$LIMIT"
 }
 
 disk_json() {
@@ -1644,7 +1660,7 @@ leftover_roots() {
 
 leftover_rows() {
   [[ "${#PATH_ARGS[@]}" -gt 0 ]] || die "leftovers requires at least one search term"
-  local category root_template depth root path matched kb
+  local category root_template depth root path matched kb slash_count path_depth
   while IFS=$'\t' read -r category root_template depth; do
     root="$(expand_path "$root_template")"
     [[ -d "$root" ]] || continue
@@ -1652,9 +1668,11 @@ leftover_rows() {
       matched="$(leftover_match_query "$path" || true)"
       [[ -n "$matched" ]] || continue
       kb="$(size_kb "$path")"
-      printf '%012d\t%s\t%s\t%s\n' "$kb" "$category" "$matched" "$path"
+      slash_count="${path//[!\/]/}"
+      path_depth="${#slash_count}"
+      printf '%012d\t%06d\t%s\t%s\t%s\n' "$kb" "$path_depth" "$category" "$matched" "$path"
     done < <(find "$root" -mindepth 1 -maxdepth "$depth" \( -type d -o -type f \) -print0 2>/dev/null)
-  done < <(leftover_roots) | sort -rn | head -n "$LIMIT"
+  done < <(leftover_roots) | sort -t $'\t' -k1,1rn -k2,2n | head -n "$LIMIT" | cut -f1,3-
 }
 
 json_queries_array() {
@@ -1677,37 +1695,109 @@ leftovers() {
     printf '{"queries":'
     json_queries_array
     printf ',"items":['
-    local first=1 kb category matched path kb_num
+    local first=1 kb category matched path kb_num status reason line
     while IFS=$'\t' read -r kb category matched path; do
       [[ -z "${path:-}" ]] && continue
       kb_num="$(printf '%s\n' "$kb" | sed 's/^0*//; s/^$/0/')"
+      line="$(guard_status "$path")"
+      status="${line%%$'\t'*}"
+      reason="${line#*$'\t'}"
       [[ "$first" -eq 0 ]] && printf ','
       first=0
-      printf '{"path":"%s","category":"%s","matched_query":"%s","size_kb":%s,"size":"%s"}' \
+      printf '{"path":"%s","category":"%s","matched_query":"%s","size_kb":%s,"size":"%s","status":"%s","reason":"%s","preview_command":"%s","apply_command":"%s"}' \
         "$(printf '%s' "$path" | json_escape)" \
         "$(printf '%s' "$category" | json_escape)" \
         "$(printf '%s' "$matched" | json_escape)" \
         "$kb_num" \
-        "$(human_kb "${kb:-0}" | json_escape)"
+        "$(human_kb "${kb:-0}" | json_escape)" \
+        "$(printf '%s' "$status" | json_escape)" \
+        "$(printf '%s' "$reason" | json_escape)" \
+        "$(leftover_command "cleanroom leftovers" | json_escape)" \
+        "$(leftover_command "cleanroom leftovers --apply --trash" | json_escape)"
     done <<<"$rows"
     printf ']}\n'
     return 0
   fi
 
   printf '%s\n' "${BOLD}cleanroom app leftovers${RESET}"
-  printf 'Review-only search. cleanroom does not delete these files or folders.\n'
+  if [[ "$APPLY" -eq 1 ]]; then
+    [[ "$TRASH" -eq 1 ]] || die "leftovers apply requires --trash so matches can be restored from the apply log."
+    warn "Apply mode enabled for app leftovers."
+    warn "Trash mode required and enabled; matches move to ~/.Trash/cleanroom-$RUN_ID."
+    warn "Protected browser profiles, Keychains, backups, Photos, Mail, and broad Library folders are still refused."
+    [[ "$ASSUME_YES" -eq 1 ]] || {
+      printf 'Continue? Type "leftovers" to proceed: '
+      local answer
+      read -r answer
+      [[ "$answer" == "leftovers" ]] || die "Cancelled."
+    }
+    ensure_apply_log
+    warn "Apply log: $LOG_FILE"
+  else
+    printf 'Preview search. Pass --apply --trash to move matches to a recoverable Trash folder.\n'
+  fi
   printf 'Queries: %s  Limit: %s\n\n' "${PATH_ARGS[*]}" "$LIMIT"
   if [[ -z "$rows" ]]; then
     printf 'No matching leftovers found.\n'
     return 0
   fi
   printf '%-10s %-20s %-16s %s\n' "size" "category" "matched" "path"
-  local kb category matched path
+  local kb category matched path removed refused skipped status_line status reason selected skip_nested
+  local applied_leftover_roots=""
+  removed=0
+  refused=0
+  skipped=0
   while IFS=$'\t' read -r kb category matched path; do
     [[ -z "${path:-}" ]] && continue
-    printf '%-10s %-20s %-16s %s\n' "$(human_kb "$kb")" "$category" "$matched" "$path"
+    if [[ "$APPLY" -eq 1 ]]; then
+      if [[ ! -e "$path" ]]; then
+        skipped=$((skipped + 1))
+        continue
+      fi
+      skip_nested=0
+      if [[ -n "$applied_leftover_roots" ]]; then
+        while IFS= read -r selected; do
+          [[ -z "$selected" ]] && continue
+          if [[ "$path" == "$selected/"* ]]; then
+            skip_nested=1
+            break
+          fi
+        done <<<"$applied_leftover_roots"
+      fi
+      if [[ "$skip_nested" -eq 1 ]]; then
+        skipped=$((skipped + 1))
+        continue
+      fi
+      status_line="$(guard_status "$path")"
+      status="${status_line%%$'\t'*}"
+      reason="${status_line#*$'\t'}"
+      if [[ "$status" != "allowed" ]]; then
+        refused=$((refused + 1))
+        warn "refusing leftover: $path ($status: $reason)"
+        record_apply "leftover" "$status" "$kb" "$path" ""
+        continue
+      fi
+      if is_excluded "$path"; then
+        skipped=$((skipped + 1))
+        [[ "$VERBOSE" -eq 1 ]] && warn "skipping excluded leftover: $path"
+        continue
+      fi
+      printf '%-10s %-20s %-16s %s\n' "$(human_kb "$kb")" "$category" "$matched" "$path"
+      delete_path "$path"
+      applied_leftover_roots="${applied_leftover_roots}${path}"$'\n'
+      removed=$((removed + 1))
+    else
+      printf '%-10s %-20s %-16s %s\n' "$(human_kb "$kb")" "$category" "$matched" "$path"
+    fi
   done <<<"$rows"
-  printf '\nReview matches manually. Vendor uninstallers or app settings may be required for complete removal.\n'
+  if [[ "$APPLY" -eq 1 ]]; then
+    printf '\nleftovers summary: moved=%s refused=%s skipped=%s\n' "$removed" "$refused" "$skipped"
+    printf 'Restore with: cleanroom restore --log %s --apply\n' "$(shell_quote "$LOG_FILE")"
+  else
+    printf '\nPreview command: %s\n' "$(leftover_command "cleanroom leftovers")"
+    printf 'Recoverable cleanup: %s\n' "$(leftover_command "cleanroom leftovers --apply --trash")"
+    printf 'Vendor uninstallers or app settings may still be required for complete removal.\n'
+  fi
 }
 
 backup_value() {

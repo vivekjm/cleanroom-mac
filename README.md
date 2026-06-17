@@ -193,6 +193,7 @@ Find app leftovers by app or vendor name:
 
 ```sh
 cleanroom leftovers adobe
+cleanroom leftovers adobe --apply --trash
 cleanroom leftovers zoom --json
 ```
 
@@ -481,7 +482,7 @@ Config files use simple `key=value` lines and are never executed as shell.
 
 `browsers` separates safe browser cache candidates from protected profile storage. It reports Chrome, Brave, Edge, Arc, Firefox, and Safari profile sizes, but cleanup commands still remove only cache folders and never profiles, passwords, cookies, bookmarks, or sessions.
 
-`leftovers` searches common support, cache, preference, container, WebKit, log, and launch-item locations for an app or vendor name. It is review-only and never deletes matches, because complete app removal can require vendor uninstallers and account-specific cleanup.
+`leftovers` searches common support, cache, preference, container, WebKit, log, and launch-item locations for an app or vendor name. By default it previews only. If you explicitly pass `--apply --trash`, matches move into a cleanroom Trash folder and are recorded in the apply log so `cleanroom restore --log PATH --apply` can put them back. Protected browser profiles, Keychains, device backups, Photos, Mail, iCloud Drive, and broad Library folders are still refused.
 
 `backups` inventories local iPhone and iPad backups under MobileSync. It is review-only and protected because those backups may be the only copy of device data.
 
