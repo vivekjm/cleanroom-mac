@@ -45,6 +45,13 @@ bash -n "$BIN"
 "$BIN" help | grep 'safe macOS storage cleaner' >/dev/null
 "$BIN" categories | grep -- '--include-ai-models' >/dev/null
 "$BIN" categories | grep -- '--trash' >/dev/null
+"$BIN" overview | grep 'cleanroom overview' >/dev/null
+overview_json="$(mktemp)"
+"$BIN" overview --json > "$overview_json"
+python3 -m json.tool "$overview_json" >/dev/null
+grep '"summary"' "$overview_json" >/dev/null
+grep '"recommendations"' "$overview_json" >/dev/null
+rm -f "$overview_json"
 "$BIN" rules | grep 'safe-app-caches' >/dev/null
 rules_json="$(mktemp)"
 "$BIN" rules --json > "$rules_json"

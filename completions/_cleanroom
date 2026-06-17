@@ -4,6 +4,7 @@ _cleanroom() {
   local -a commands options
 
   commands=(
+    'overview:Show read-only storage dashboard'
     'scan:Show disk usage and cleanup candidates'
     'plan:Rank cleanup opportunities'
     'large:List large files for review'

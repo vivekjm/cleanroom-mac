@@ -1,7 +1,10 @@
-.TH CLEANROOM 1 "June 2026" "cleanroom 0.16.0" "User Commands"
+.TH CLEANROOM 1 "June 2026" "cleanroom 0.17.0" "User Commands"
 .SH NAME
 cleanroom \- safe-by-default macOS storage cleaner
 .SH SYNOPSIS
+.B cleanroom
+.RI "overview [--json]"
+.br
 .B cleanroom
 .RI "scan [options]"
 .br
@@ -56,6 +59,9 @@ before deleting files.
 By default it does not delete browser profiles, saved password databases,
 Keychains, Photos libraries, Mail, iCloud Drive, or arbitrary personal files.
 .SH COMMANDS
+.TP
+.B overview
+Show a read-only storage dashboard with disk state, summaries, and next steps.
 .TP
 .B scan
 Show disk usage, cleanup candidates, largest home folders, and large files.
@@ -157,6 +163,7 @@ Remove downloaded local AI model stores.
 Remove local container VM disks. This can remove containers and volumes.
 .SH EXAMPLES
 .nf
+cleanroom overview
 cleanroom scan
 cleanroom plan --json
 cleanroom large ~/Documents --min-mb 250 --limit 30

@@ -75,6 +75,7 @@ final class CleanroomAppDelegate: NSObject, NSApplicationDelegate {
         reviewRow.spacing = 8
         reviewRow.alignment = .centerY
 
+        inspectRow.addArrangedSubview(button("Overview", action: #selector(overview)))
         inspectRow.addArrangedSubview(button("Scan", action: #selector(scan)))
         inspectRow.addArrangedSubview(button("Plan", action: #selector(plan)))
         inspectRow.addArrangedSubview(button("Report to Desktop", action: #selector(report)))
@@ -142,6 +143,10 @@ final class CleanroomAppDelegate: NSObject, NSApplicationDelegate {
         control.bezelStyle = .rounded
         control.controlSize = .large
         return control
+    }
+
+    @objc private func overview() {
+        runCommand("overview", title: "Overview")
     }
 
     @objc private func scan() {

@@ -5,6 +5,7 @@ Common `cleanroom` workflows.
 ## Start Here
 
 ```sh
+cleanroom overview
 cleanroom scan
 cleanroom plan
 cleanroom large
@@ -26,6 +27,7 @@ cleanroom clean
 ## Automation / Reporting
 
 ```sh
+cleanroom overview --json
 cleanroom scan --json
 cleanroom plan --json
 cleanroom large --json ~/Documents
@@ -38,6 +40,8 @@ cleanroom guard --json ~/Library/Application\ Support/Google/Chrome
 cleanroom rules --json
 cleanroom report --output cleanroom-report.md
 ```
+
+`overview --json` emits a compact dashboard with disk state, summary counts, and top cleanup recommendations.
 
 `scan --json` emits disk and candidate sizes as JSON for wrappers, dashboards, or future GUI frontends.
 

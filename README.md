@@ -109,6 +109,13 @@ The app wrapper is ad-hoc signed for local builds. It is not Developer ID notari
 
 ## Usage
 
+Get a read-only dashboard:
+
+```sh
+cleanroom overview
+cleanroom overview --json
+```
+
 Scan:
 
 ```sh
@@ -356,6 +363,8 @@ Config files use simple `key=value` lines and are never executed as shell.
 `--trash` applies to paths that `cleanroom` removes directly. System commands delegated to macOS or developer tools, such as Time Machine snapshot thinning or simulator reset, may still be irreversible.
 
 `restore` only restores entries that were moved by `--trash` and still exist in the cleanroom Trash folder. It skips destinations that already exist.
+
+`overview` summarizes disk state, top recommendations, package-store size, protected-data presence, snapshots, app bundle count, and useful next commands without deleting anything.
 
 `plan` estimates cleanup opportunities and prints copyable dry-run commands plus explicit apply commands. It does not delete anything.
 

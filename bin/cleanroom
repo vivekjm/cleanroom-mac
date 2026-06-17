@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.16.0"
+VERSION="0.17.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -40,6 +40,7 @@ usage() {
 cleanroom - safe macOS storage cleaner
 
 Usage:
+  cleanroom overview [--json]
   cleanroom scan [options]
   cleanroom plan [--json]
   cleanroom large [PATH] [--min-mb N] [--limit N] [--json]
@@ -61,6 +62,7 @@ Usage:
   cleanroom help
 
 Actions:
+  overview             Show a read-only storage dashboard and next steps.
   scan                 Show disk usage and likely cleanup candidates.
   plan                 Rank safe cleanup opportunities and show copyable commands.
   large                List largest files for review without deleting anything.
@@ -85,8 +87,8 @@ Options:
   --trash              Move deleted files to ~/.Trash/cleanroom-* instead of rm -rf.
   --yes                Do not prompt before --apply cleanup.
   --verbose            Print every path touched.
-  --json               Emit JSON for scan, plan, large, duplicates, apps, packages,
-                       snapshots, protect, guard, or rules.
+  --json               Emit JSON for overview, scan, plan, large, duplicates, apps,
+                       packages, snapshots, protect, guard, or rules.
   --output PATH        Output path for report.
   --log PATH           Write apply audit log here. Default: ~/.local/state/cleanroom/runs/*.log.
   --config PATH        Load config file. Default: ~/.config/cleanroom/config.
@@ -122,6 +124,8 @@ Safety:
   Mail, iCloud Drive, or app profile folders by default.
 
 Examples:
+  cleanroom overview
+  cleanroom overview --json
   cleanroom scan
   cleanroom scan --json
   cleanroom plan
@@ -1208,6 +1212,16 @@ packages() {
   done <<<"$rows"
 }
 
+package_total_kb() {
+  local id manager paths category preview apply total=0 kb
+  while IFS=$'\t' read -r id manager paths category preview apply; do
+    [[ -z "${id:-}" ]] && continue
+    kb="$(paths_field_kb "$paths")"
+    total=$((total + kb))
+  done < <(package_rows)
+  printf '%s\n' "$total"
+}
+
 snapshot_rows() {
   command -v tmutil >/dev/null 2>&1 || return 0
   tmutil listlocalsnapshots / 2>/dev/null |
@@ -1219,6 +1233,93 @@ snapshot_rows() {
       date_part="${name#com.apple.TimeMachine.}"
       printf '%s\t%s\n' "$name" "$date_part"
     done
+}
+
+snapshot_count() {
+  snapshot_rows | awk 'END {print NR + 0}'
+}
+
+protected_present_count() {
+  local file id type path reason expanded count=0
+  file="$(protected_file)"
+  [[ -f "$file" ]] || { printf '0\n'; return 0; }
+  while IFS=$'\t' read -r id type path reason; do
+    [[ -z "${id:-}" ]] && continue
+    expanded="$(expand_path "$path")"
+    [[ -e "$expanded" ]] && count=$((count + 1))
+  done < <(tail -n +2 "$file")
+  printf '%s\n' "$count"
+}
+
+app_bundle_count() {
+  local total=0 root count
+  while IFS= read -r root; do
+    [[ -d "$root" ]] || continue
+    count="$(app_rows "$root" | awk 'END {print NR + 0}')"
+    total=$((total + count))
+  done < <(app_roots)
+  printf '%s\n' "$total"
+}
+
+overview() {
+  local plan_rows_sorted package_total protected_count snapshots app_count
+  plan_rows_sorted="$(plan_rows | sort -rn | head -5)"
+  package_total="$(package_total_kb)"
+  protected_count="$(protected_present_count)"
+  snapshots="$(snapshot_count)"
+  app_count="$(app_bundle_count)"
+
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '{'
+    disk_json
+    printf ',"summary":{"package_store_kb":%s,"package_store":"%s","protected_present":%s,"snapshot_count":%s,"app_bundle_count":%s}' \
+      "$package_total" \
+      "$(human_kb "$package_total" | json_escape)" \
+      "$protected_count" \
+      "$snapshots" \
+      "$app_count"
+    printf ',"recommendations":['
+    local first=1 kb id title preview_command apply_command description
+    while IFS=$'\t' read -r kb id title preview_command apply_command description; do
+      [[ -z "${id:-}" ]] && continue
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '{"id":"%s","title":"%s","estimate_kb":%s,"estimate":"%s","preview_command":"%s","apply_command":"%s"}' \
+        "$(printf '%s' "$id" | json_escape)" \
+        "$(printf '%s' "$title" | json_escape)" \
+        "${kb:-0}" \
+        "$(human_kb "${kb:-0}" | json_escape)" \
+        "$(printf '%s' "$preview_command" | json_escape)" \
+        "$(printf '%s' "$apply_command" | json_escape)"
+    done <<<"$plan_rows_sorted"
+    printf ']}'
+    printf '\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}cleanroom overview${RESET}"
+  printf 'Read-only dashboard. Nothing is deleted.\n\n'
+  printf '%s\n' "${BOLD}Disk${RESET}"
+  disk_line
+  printf '\n%s\n' "${BOLD}Summary${RESET}"
+  printf '%-24s %s\n' "package stores" "$(human_kb "$package_total")"
+  printf '%-24s %s\n' "protected paths present" "$protected_count"
+  printf '%-24s %s\n' "local snapshots" "$snapshots"
+  printf '%-24s %s\n' "app bundles" "$app_count"
+
+  printf '\n%s\n' "${BOLD}Top cleanup recommendations${RESET}"
+  printf '%-10s %-18s %-32s %s\n' "estimate" "id" "title" "preview command"
+  local kb id title preview_command apply_command description
+  while IFS=$'\t' read -r kb id title preview_command apply_command description; do
+    [[ -z "${id:-}" ]] && continue
+    printf '%-10s %-18s %-32s %s\n' "$(human_kb "${kb:-0}")" "$id" "$title" "$preview_command"
+  done <<<"$plan_rows_sorted"
+
+  printf '\n%s\n' "${BOLD}Useful next commands${RESET}"
+  printf 'cleanroom plan\n'
+  printf 'cleanroom large ~/Documents --min-mb 250 --limit 50\n'
+  printf 'cleanroom packages\n'
+  printf 'cleanroom protect\n'
 }
 
 snapshots() {
@@ -1765,7 +1866,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  scan|plan|large|duplicates|apps|packages|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
+  overview|scan|plan|large|duplicates|apps|packages|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -1855,6 +1956,7 @@ while [[ "$#" -gt 0 ]]; do
 done
 
 case "$ACTION" in
+  overview) overview ;;
   scan) scan ;;
   plan) plan ;;
   large) large ;;
