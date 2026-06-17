@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.35.0"
+VERSION="0.36.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -66,6 +66,7 @@ Usage:
   cleanroom caches [--json]
   cleanroom diagnostics [--json]
   cleanroom packages [--json]
+  cleanroom homebrew [--json]
   cleanroom toolchains [--json]
   cleanroom containers [--json]
   cleanroom snapshots [--json]
@@ -104,6 +105,7 @@ Actions:
   caches               Inventory safe and opt-in cache buckets.
   diagnostics          Inventory user logs and diagnostic reports.
   packages             Inventory package-manager caches and stores.
+  homebrew             Inventory Homebrew cache, Cellar, Caskroom, and logs.
   toolchains           Inventory language/toolchain caches and stores.
   containers           Inventory local container VM disks and image stores.
   snapshots            List local Time Machine snapshots for review.
@@ -126,7 +128,7 @@ Options:
   --verbose            Print every path touched.
   --json               Emit JSON for overview, scan, system-data, plan, large, duplicates,
                        downloads, installers, nodes, venvs, apps, libraries, browsers, leftovers, startup,
-                       trash, backups, xcode, caches, diagnostics, packages, toolchains,
+                       trash, backups, xcode, caches, diagnostics, packages, homebrew, toolchains,
                        containers, snapshots, doctor, protect, guard, or rules.
   --output PATH        Output path for report.
   --log PATH           Write apply audit log here. Default: ~/.local/state/cleanroom/runs/*.log.
@@ -220,6 +222,8 @@ Examples:
   cleanroom diagnostics --json
   cleanroom packages
   cleanroom packages --json
+  cleanroom homebrew
+  cleanroom homebrew --json
   cleanroom toolchains
   cleanroom toolchains --json
   cleanroom containers
@@ -2588,6 +2592,86 @@ packages() {
   done <<<"$rows"
 }
 
+homebrew_rows() {
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "homebrew-cache" "cache" "~/Library/Caches/Homebrew" "cleanroom clean" "cleanroom clean --apply --trash" "Downloaded bottles, source archives, and build cache. Rebuildable."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "homebrew-logs" "logs" "~/Library/Logs/Homebrew" "cleanroom clean" "cleanroom clean --apply --trash" "Homebrew build logs. Usually safe to remove when old."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "homebrew-cellar-arm" "cellar" "/opt/homebrew/Cellar" "brew cleanup -n" "brew cleanup" "Installed formula versions on Apple Silicon Homebrew. Use brew cleanup to remove old versions."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "homebrew-cellar-intel" "cellar" "/usr/local/Cellar" "brew cleanup -n" "brew cleanup" "Installed formula versions on Intel Homebrew. Use brew cleanup to remove old versions."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "homebrew-caskroom-arm" "casks" "/opt/homebrew/Caskroom" "brew cleanup -n" "brew cleanup" "Homebrew Cask app/download staging data."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "homebrew-caskroom-intel" "casks" "/usr/local/Caskroom" "brew cleanup -n" "brew cleanup" "Homebrew Cask app/download staging data."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "homebrew-var-arm" "services" "/opt/homebrew/var" "manual review" "manual review" "Databases, service state, and runtime data for installed formulae. Review carefully."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "homebrew-var-intel" "services" "/usr/local/var" "manual review" "manual review" "Databases, service state, and runtime data for installed formulae. Review carefully."
+}
+
+homebrew_counts_json_fields() {
+  local formulae=0 casks=0 prefix=""
+  if command -v brew >/dev/null 2>&1; then
+    formulae="$(brew list --formula 2>/dev/null | awk 'END {print NR + 0}')"
+    casks="$(brew list --cask 2>/dev/null | awk 'END {print NR + 0}')"
+    prefix="$(brew --prefix 2>/dev/null || true)"
+  fi
+  printf '"installed_formulae":%s,"installed_casks":%s,"active_prefix":"%s"' \
+    "${formulae:-0}" \
+    "${casks:-0}" \
+    "$(printf '%s' "$prefix" | json_escape)"
+}
+
+homebrew() {
+  local rows
+  rows="$(homebrew_rows)"
+
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '{'
+    homebrew_counts_json_fields
+    printf ',"buckets":['
+    local first=1 id category path preview apply description expanded kb
+    while IFS=$'\t' read -r id category path preview apply description; do
+      [[ -z "${id:-}" ]] && continue
+      expanded="$(expand_path "$path")"
+      kb="$(size_kb "$expanded")"
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '{"id":"%s","category":"%s","path":"%s","exists":%s,"size_kb":%s,"size":"%s","preview_command":"%s","apply_command":"%s","description":"%s"}' \
+        "$(printf '%s' "$id" | json_escape)" \
+        "$(printf '%s' "$category" | json_escape)" \
+        "$(printf '%s' "$expanded" | json_escape)" \
+        "$(if [[ -e "$expanded" ]]; then echo true; else echo false; fi)" \
+        "$kb" \
+        "$(human_kb "$kb" | json_escape)" \
+        "$(printf '%s' "$preview" | json_escape)" \
+        "$(printf '%s' "$apply" | json_escape)" \
+        "$(printf '%s' "$description" | json_escape)"
+    done <<<"$rows"
+    printf ']}'
+    printf '\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}cleanroom Homebrew storage${RESET}"
+  printf 'Review-only inventory. cleanroom only clears Homebrew cache through the normal safe clean flow.\n\n'
+  if command -v brew >/dev/null 2>&1; then
+    printf '%-20s %s\n' "active prefix" "$(brew --prefix 2>/dev/null || true)"
+    printf '%-20s %s\n' "formulae" "$(brew list --formula 2>/dev/null | awk 'END {print NR + 0}')"
+    printf '%-20s %s\n\n' "casks" "$(brew list --cask 2>/dev/null | awk 'END {print NR + 0}')"
+  else
+    printf 'brew command not found. Filesystem buckets are still shown when present.\n\n'
+  fi
+
+  printf '%-10s %-22s %-10s %s\n' "size" "id" "category" "path"
+  local id category path preview apply description expanded kb
+  while IFS=$'\t' read -r id category path preview apply description; do
+    [[ -z "${id:-}" ]] && continue
+    expanded="$(expand_path "$path")"
+    [[ -e "$expanded" ]] || continue
+    kb="$(size_kb "$expanded")"
+    printf '%-10s %-22s %-10s %s\n' "$(human_kb "$kb")" "$id" "$category" "$expanded"
+    printf '  preview: %s\n' "$preview"
+    printf '  apply: %s\n' "$apply"
+    printf '  %s\n' "$description"
+  done <<<"$rows"
+  printf '\nUse `brew cleanup -n` for Homebrew-native dry-run details. Use `cleanroom clean --apply --trash` for cache cleanup through cleanroom.\n'
+}
+
 toolchains() {
   local rows
   rows="$(toolchain_rows)"
@@ -2823,6 +2907,7 @@ overview() {
   printf 'cleanroom trash\n'
   printf 'cleanroom startup\n'
   printf 'cleanroom packages\n'
+  printf 'cleanroom homebrew\n'
   printf 'cleanroom toolchains\n'
   printf 'cleanroom containers\n'
   printf 'cleanroom diagnostics\n'
@@ -3459,7 +3544,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  overview|scan|system-data|plan|large|duplicates|downloads|installers|nodes|venvs|virtualenvs|apps|libraries|browsers|leftovers|backups|xcode|startup|trash|caches|diagnostics|packages|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
+  overview|scan|system-data|plan|large|duplicates|downloads|installers|nodes|venvs|virtualenvs|apps|libraries|browsers|leftovers|backups|xcode|startup|trash|caches|diagnostics|packages|homebrew|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -3575,6 +3660,7 @@ case "$ACTION" in
   caches) caches ;;
   diagnostics) diagnostics ;;
   packages) packages ;;
+  homebrew) homebrew ;;
   toolchains) toolchains ;;
   containers) containers ;;
   snapshots) snapshots ;;

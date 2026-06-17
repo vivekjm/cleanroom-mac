@@ -26,6 +26,7 @@ cleanroom trash
 cleanroom caches
 cleanroom diagnostics
 cleanroom packages
+cleanroom homebrew
 cleanroom toolchains
 cleanroom containers
 cleanroom snapshots
@@ -64,6 +65,7 @@ cleanroom trash --json
 cleanroom caches --json
 cleanroom diagnostics --json
 cleanroom packages --json
+cleanroom homebrew --json
 cleanroom toolchains --json
 cleanroom containers --json
 cleanroom snapshots --json
@@ -115,6 +117,8 @@ cleanroom report --output cleanroom-report.md
 `diagnostics --json` emits user log, diagnostic report, and CrashReporter sizes with matching preview/apply commands.
 
 `packages --json` emits package-manager store sizes and matching preview/apply commands.
+
+`homebrew --json` emits Homebrew cache, log, Cellar, Caskroom, and service/runtime bucket sizes plus installed formula/cask counts when `brew` is available.
 
 `toolchains --json` emits rebuildable language/toolchain cache sizes with matching preview/apply commands.
 
@@ -176,6 +180,7 @@ Inspect package stores first:
 
 ```sh
 cleanroom packages
+cleanroom homebrew
 cleanroom clean --include-package-stores
 ```
 

@@ -25,6 +25,7 @@ _cleanroom() {
     'caches:Inventory cache buckets'
     'diagnostics:Inventory logs and diagnostic reports'
     'packages:Inventory package-manager stores'
+    'homebrew:Inventory Homebrew cache, Cellar, Caskroom, and logs'
     'toolchains:Inventory language/toolchain caches'
     'containers:Inventory container VM disks and stores'
     'snapshots:List local Time Machine snapshots'

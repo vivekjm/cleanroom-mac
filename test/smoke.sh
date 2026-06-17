@@ -20,6 +20,8 @@ mkdir -p \
   "$TEST_HOME/Library/Caches/org.swift.swiftpm" \
   "$TEST_HOME/.m2/repository" \
   "$TEST_HOME/Library/Caches/composer" \
+  "$TEST_HOME/Library/Caches/Homebrew" \
+  "$TEST_HOME/Library/Logs/Homebrew" \
   "$TEST_HOME/.bundle/cache" \
   "$TEST_HOME/Library/DiagnosticReports" \
   "$TEST_HOME/Library/Application Support/CrashReporter" \
@@ -67,6 +69,8 @@ printf 'poetry cache\n' >"$TEST_HOME/Library/Caches/pypoetry/pkg.cache"
 printf 'swiftpm cache\n' >"$TEST_HOME/Library/Caches/org.swift.swiftpm/pkg.cache"
 printf 'maven cache\n' >"$TEST_HOME/.m2/repository/artifact.jar"
 printf 'composer cache\n' >"$TEST_HOME/Library/Caches/composer/pkg.zip"
+printf 'brew cache\n' >"$TEST_HOME/Library/Caches/Homebrew/bottle.tar.gz"
+printf 'brew log\n' >"$TEST_HOME/Library/Logs/Homebrew/build.log"
 printf 'bundler cache\n' >"$TEST_HOME/.bundle/cache/gem.gem"
 printf 'diagnostic\n' >"$TEST_HOME/Library/DiagnosticReports/OldApp.crash"
 printf 'crash reporter\n' >"$TEST_HOME/Library/Application Support/CrashReporter/OldApp.plist"
@@ -306,8 +310,16 @@ packages_json="$(mktemp)"
 "$BIN" packages --json > "$packages_json"
 python3 -m json.tool "$packages_json" >/dev/null
 grep 'pnpm-store' "$packages_json" >/dev/null
+grep 'homebrew-cache' "$packages_json" >/dev/null
 grep 'cleanroom clean --apply --trash --include-package-stores' "$packages_json" >/dev/null
 rm -f "$packages_json"
+"$BIN" homebrew | grep 'homebrew-cache' >/dev/null
+homebrew_json="$(mktemp)"
+"$BIN" homebrew --json > "$homebrew_json"
+python3 -m json.tool "$homebrew_json" >/dev/null
+grep '"installed_formulae"' "$homebrew_json" >/dev/null
+grep 'homebrew-logs' "$homebrew_json" >/dev/null
+rm -f "$homebrew_json"
 "$BIN" toolchains | grep 'go-build-cache' >/dev/null
 toolchains_json="$(mktemp)"
 "$BIN" toolchains --json > "$toolchains_json"

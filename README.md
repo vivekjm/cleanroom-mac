@@ -12,6 +12,7 @@ macOS Storage often labels hidden user folders as **Documents** or **System Data
 - Xcode Archives and DeviceSupport
 - Android SDK NDK/system images
 - npm, Yarn, pnpm, Gradle, CocoaPods stores
+- Homebrew caches, Cellar, Caskroom, logs, and service data
 - Go, Python, SwiftPM, Maven, Composer, Ruby, uv, and Poetry toolchain caches
 - Docker Desktop, Colima, Lima, and Podman container storage
 - old `node_modules`
@@ -208,6 +209,13 @@ Review protected media and creative libraries:
 ```sh
 cleanroom libraries
 cleanroom libraries --json
+```
+
+Review Homebrew storage:
+
+```sh
+cleanroom homebrew
+cleanroom homebrew --json
 ```
 
 Review browser profile and cache footprint without touching profiles:
@@ -558,6 +566,8 @@ Config files use simple `key=value` lines and are never executed as shell.
 `trash` inventories current `~/.Trash` contents. `--include-user-trash` empties Trash only when explicitly requested, and it is intentionally not included in presets.
 
 `packages` inventories npm, Yarn, pnpm, Gradle, CocoaPods, Cargo, and Homebrew stores with preview/apply commands for matching cleanup categories.
+
+`homebrew` inventories Homebrew cache, logs, Cellar, Caskroom, and service/runtime folders. It is review-only and points to `brew cleanup -n` for Homebrew-native dry-run detail.
 
 `toolchains` inventories rebuildable language/toolchain caches for Go, pip, uv, Poetry, SwiftPM, Maven, Composer, RubyGems, and Bundler. Cleanup is opt-in with `cleanroom clean --include-toolchains`, and `--trash` keeps removals restorable through the normal apply log.
 
