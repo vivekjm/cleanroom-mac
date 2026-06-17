@@ -1,6 +1,6 @@
 # Release Process
 
-This project releases a portable tarball and a generated Homebrew formula for macOS users and package managers.
+This project releases a portable tarball, a generated Homebrew formula, and a lightweight macOS app wrapper for macOS users and package managers.
 
 ## Prepare
 
@@ -10,7 +10,7 @@ This project releases a portable tarball and a generated Homebrew formula for ma
 4. Run:
 
 ```sh
-make dist homebrew-formula
+make dist homebrew-formula macos-app
 ```
 
 ## Tag
@@ -26,12 +26,15 @@ The GitHub release workflow builds:
 - `dist/cleanroom-$version.tar.gz`
 - `dist/cleanroom-$version.tar.gz.sha256`
 - `dist/Formula/cleanroom.rb`
+- `dist/Cleanroom.app.zip`
+- `dist/Cleanroom.app.zip.sha256`
 
 ## Manual Package
 
 ```sh
 make package
 make homebrew-formula
+make macos-app
 ls dist
 ```
 
@@ -52,3 +55,7 @@ brew uninstall cleanroom
 ```
 
 When publishing to a tap, copy `dist/Formula/cleanroom.rb` into that tap after the GitHub release artifact exists.
+
+The app wrapper is intentionally conservative. It runs scan/report/dry-run/history actions and copies explicit apply commands, but it does not provide one-click destructive cleanup.
+
+Local app builds are ad-hoc signed. A notarized public app release requires a Developer ID certificate and Apple notarization outside this repository's default CI path.

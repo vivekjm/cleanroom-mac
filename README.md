@@ -98,6 +98,15 @@ Build release archive plus Homebrew formula:
 make homebrew-formula
 ```
 
+Build the lightweight macOS app wrapper:
+
+```sh
+make macos-app
+open dist/Cleanroom.app
+```
+
+The app wrapper is ad-hoc signed for local builds. It is not Developer ID notarized unless a maintainer signs and notarizes a release build.
+
 ## Usage
 
 Scan:
@@ -276,7 +285,7 @@ Config files use simple `key=value` lines and are never executed as shell.
 
 `restore` only restores entries that were moved by `--trash` and still exist in the cleanroom Trash folder. It skips destinations that already exist.
 
-The project also ships `make install`, `make uninstall`, `make lint`, `make test`, `make package`, and `make homebrew-formula` targets for maintainers and package managers.
+The project also ships `make install`, `make uninstall`, `make lint`, `make test`, `make package`, `make homebrew-formula`, and `make macos-app` targets for maintainers and package managers.
 
 Release packaging is documented in [docs/RELEASE.md](docs/RELEASE.md).
 

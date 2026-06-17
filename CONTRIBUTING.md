@@ -39,8 +39,9 @@ Run:
 ```sh
 make package
 make homebrew-formula
+make macos-app
 ```
 
-This validates version consistency, runs tests, and writes a tarball, SHA-256 file, and generated Homebrew formula under `dist/`.
+This validates version consistency, runs tests, and writes a tarball, SHA-256 file, generated Homebrew formula, and macOS app archive under `dist/`.
 
 See [docs/RELEASE.md](docs/RELEASE.md) for tagging and GitHub release steps.

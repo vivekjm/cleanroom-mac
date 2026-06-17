@@ -16,3 +16,5 @@ jobs:
         run: make package
       - name: Render Homebrew formula
         run: make homebrew-formula
+      - name: Build macOS app
+        run: make macos-app

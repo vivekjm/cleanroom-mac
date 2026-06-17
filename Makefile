@@ -3,7 +3,7 @@ BINDIR ?= $(PREFIX)/bin
 MANDIR ?= $(PREFIX)/share/man/man1
 ZSH_COMPLETION_DIR ?= $(PREFIX)/share/zsh/site-functions
 
-.PHONY: install uninstall test lint smoke package dist clean-dist check-version homebrew-formula
+.PHONY: install uninstall test lint smoke package dist clean-dist check-version homebrew-formula macos-app
 
 install:
 	install -d "$(BINDIR)"
@@ -26,6 +26,7 @@ lint:
 	bash -n scripts/check-version.sh
 	bash -n scripts/package.sh
 	bash -n scripts/render-homebrew-formula.sh
+	bash -n scripts/build-macos-app.sh
 	./scripts/check-version.sh
 
 smoke test: lint
@@ -36,6 +37,9 @@ package dist: test
 
 homebrew-formula: package
 	./scripts/render-homebrew-formula.sh
+
+macos-app: test
+	./scripts/build-macos-app.sh
 
 clean-dist:
 	rm -rf dist
