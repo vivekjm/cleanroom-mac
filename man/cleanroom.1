@@ -1,4 +1,4 @@
-.TH CLEANROOM 1 "June 2026" "cleanroom 0.14.0" "User Commands"
+.TH CLEANROOM 1 "June 2026" "cleanroom 0.15.0" "User Commands"
 .SH NAME
 cleanroom \- safe-by-default macOS storage cleaner
 .SH SYNOPSIS
@@ -16,6 +16,9 @@ cleanroom \- safe-by-default macOS storage cleaner
 .br
 .B cleanroom
 .RI "apps [path] [--limit n] [--json]"
+.br
+.B cleanroom
+.RI "packages [--json]"
 .br
 .B cleanroom
 .RI "report [--output path]"
@@ -65,6 +68,9 @@ Find exact duplicate files for review without deleting anything.
 .TP
 .B apps
 List largest app bundles for review without uninstalling anything.
+.TP
+.B packages
+Inventory package-manager caches and stores with preview/apply commands.
 .TP
 .B report
 Generate a Markdown cleanup report.
@@ -150,6 +156,7 @@ cleanroom plan --json
 cleanroom large ~/Documents --min-mb 250 --limit 30
 cleanroom duplicates ~/Documents --min-mb 100 --limit 20
 cleanroom apps --limit 30
+cleanroom packages --json
 cleanroom report --output cleanroom-report.md
 cleanroom clean --preset dev
 cleanroom clean --preset dev --apply --trash

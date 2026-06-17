@@ -18,6 +18,7 @@ mkdir -p \
   "$TEST_HOME/Library/Application Support/Google/Chrome/Default/Cache" \
   "$TEST_HOME/Library/Keychains" \
   "$TEST_HOME/.npm/_cacache" \
+  "$TEST_HOME/Library/pnpm/store" \
   "$TEST_HOME/.cache" \
   "$TEST_HOME/.lmstudio/models" \
   "$TEST_HOME/Applications/FakeBig.app/Contents/MacOS" \
@@ -26,6 +27,7 @@ mkdir -p \
   "$TEST_HOME/Documents/example/node_modules"
 
 printf 'cache\n' >"$TEST_HOME/Library/Caches/example.cache"
+printf 'pnpm\n' >"$TEST_HOME/Library/pnpm/store/example"
 printf 'log\n' >"$TEST_HOME/Library/Logs/example.log"
 printf 'model\n' >"$TEST_HOME/.lmstudio/models/example.gguf"
 printf 'login data\n' >"$TEST_HOME/Library/Application Support/Google/Chrome/Default/Login Data"
@@ -75,6 +77,13 @@ apps_json="$(mktemp)"
 python3 -m json.tool "$apps_json" >/dev/null
 grep 'FakeBig' "$apps_json" >/dev/null
 rm -f "$apps_json"
+"$BIN" packages | grep 'pnpm-store' >/dev/null
+packages_json="$(mktemp)"
+"$BIN" packages --json > "$packages_json"
+python3 -m json.tool "$packages_json" >/dev/null
+grep 'pnpm-store' "$packages_json" >/dev/null
+grep 'cleanroom clean --apply --trash --include-package-stores' "$packages_json" >/dev/null
+rm -f "$packages_json"
 "$BIN" doctor | grep 'cleanroom doctor' >/dev/null
 "$BIN" doctor | grep 'cleanroom protect' >/dev/null
 "$BIN" protect | grep 'chrome-login-data' >/dev/null

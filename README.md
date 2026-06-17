@@ -146,6 +146,13 @@ cleanroom apps --json /Applications
 cleanroom apps ~/Applications --limit 20
 ```
 
+Inventory package-manager caches and stores:
+
+```sh
+cleanroom packages
+cleanroom packages --json
+```
+
 Machine-readable scan:
 
 ```sh
@@ -350,6 +357,8 @@ Config files use simple `key=value` lines and are never executed as shell.
 `duplicates` hashes files above `--min-mb`, groups exact matches, estimates possible reclaim, and never deletes anything.
 
 `apps` lists `.app` bundle sizes from `/Applications` and `~/Applications`, or a path you provide. It never uninstalls apps.
+
+`packages` inventories npm, Yarn, pnpm, Gradle, CocoaPods, Cargo, and Homebrew stores with preview/apply commands for matching cleanup categories.
 
 The project also ships `make install`, `make uninstall`, `make lint`, `make test`, `make package`, `make homebrew-formula`, and `make macos-app` targets for maintainers and package managers.
 

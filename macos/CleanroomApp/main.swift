@@ -75,6 +75,7 @@ final class CleanroomAppDelegate: NSObject, NSApplicationDelegate {
         inspectRow.addArrangedSubview(button("Large Files", action: #selector(largeFiles)))
         inspectRow.addArrangedSubview(button("Duplicates", action: #selector(duplicates)))
         inspectRow.addArrangedSubview(button("Apps", action: #selector(apps)))
+        inspectRow.addArrangedSubview(button("Packages", action: #selector(packages)))
         inspectRow.addArrangedSubview(button("Report to Desktop", action: #selector(report)))
         inspectRow.addArrangedSubview(button("History", action: #selector(history)))
         inspectRow.addArrangedSubview(button("Protected Data", action: #selector(protect)))
@@ -153,6 +154,10 @@ final class CleanroomAppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func apps() {
         runCommand("apps --limit 30", title: "Apps")
+    }
+
+    @objc private func packages() {
+        runCommand("packages", title: "Packages")
     }
 
     @objc private func report() {

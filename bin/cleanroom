@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.14.0"
+VERSION="0.15.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -45,6 +45,7 @@ Usage:
   cleanroom large [PATH] [--min-mb N] [--limit N] [--json]
   cleanroom duplicates [PATH] [--min-mb N] [--limit N] [--json]
   cleanroom apps [PATH] [--limit N] [--json]
+  cleanroom packages [--json]
   cleanroom report [--output PATH]
   cleanroom clean [options]
   cleanroom history [--limit N]
@@ -64,6 +65,7 @@ Actions:
   large                List largest files for review without deleting anything.
   duplicates           Find exact duplicate files for review without deleting anything.
   apps                 List largest app bundles for review without uninstalling.
+  packages             Inventory package-manager caches and stores.
   report               Write a Markdown cleanup report. Prints to stdout by default.
   clean                Clean safe rebuildable caches. Dry-run unless --apply is passed.
   history              List recent apply logs.
@@ -81,7 +83,8 @@ Options:
   --trash              Move deleted files to ~/.Trash/cleanroom-* instead of rm -rf.
   --yes                Do not prompt before --apply cleanup.
   --verbose            Print every path touched.
-  --json               Emit JSON for scan, plan, large, duplicates, apps, protect, guard, or rules.
+  --json               Emit JSON for scan, plan, large, duplicates, apps, packages,
+                       protect, guard, or rules.
   --output PATH        Output path for report.
   --log PATH           Write apply audit log here. Default: ~/.local/state/cleanroom/runs/*.log.
   --config PATH        Load config file. Default: ~/.config/cleanroom/config.
@@ -127,6 +130,8 @@ Examples:
   cleanroom duplicates --json ~/Downloads
   cleanroom apps
   cleanroom apps --json /Applications
+  cleanroom packages
+  cleanroom packages --json
   cleanroom report --output cleanroom-report.md
   cleanroom doctor
   cleanroom protect
@@ -1137,6 +1142,68 @@ apps() {
   done <<<"$rows"
 }
 
+package_rows() {
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "npm-cache" "npm" "~/.npm/_cacache; ~/.npm/_logs; ~/.npm/_npx" "default" "cleanroom clean" "cleanroom clean --apply --trash"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "yarn-cache" "yarn" "~/.yarn/cache; ~/.yarn/berry" "default" "cleanroom clean" "cleanroom clean --apply --trash"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "pnpm-store" "pnpm" "~/Library/pnpm/store; ~/.pnpm-store" "package-stores" "cleanroom clean --include-package-stores" "cleanroom clean --apply --trash --include-package-stores"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "gradle-cache" "gradle" "~/.gradle/caches; ~/.gradle/daemon; ~/.gradle/native; ~/.gradle/workers; ~/.gradle-tangibly-release/caches; ~/.gradle-tangibly-release/wrapper; ~/.gradle-tangibly-release/native" "package-stores" "cleanroom clean --include-package-stores" "cleanroom clean --apply --trash --include-package-stores"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "cocoapods-repos" "cocoapods" "~/.cocoapods/repos" "package-stores" "cleanroom clean --include-package-stores" "cleanroom clean --apply --trash --include-package-stores"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "cargo-cache" "cargo" "~/.cargo/registry/cache" "package-stores" "cleanroom clean --include-package-stores" "cleanroom clean --apply --trash --include-package-stores"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "homebrew-cache" "homebrew" "~/Library/Caches/Homebrew" "default" "cleanroom clean" "cleanroom clean --apply --trash"
+}
+
+paths_field_kb() {
+  local field="$1"
+  local total=0 path kb
+  while IFS= read -r path; do
+    path="${path#"${path%%[![:space:]]*}"}"
+    path="${path%"${path##*[![:space:]]}"}"
+    [[ -z "$path" ]] && continue
+    kb="$(size_kb "$path")"
+    total=$((total + kb))
+  done < <(printf '%s\n' "$field" | tr ';' '\n')
+  printf '%s\n' "$total"
+}
+
+packages() {
+  local rows
+  rows="$(package_rows)"
+
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '['
+    local first=1 id manager paths category preview apply kb
+    while IFS=$'\t' read -r id manager paths category preview apply; do
+      [[ -z "${id:-}" ]] && continue
+      kb="$(paths_field_kb "$paths")"
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '{"id":"%s","manager":"%s","paths":"%s","category":"%s","size_kb":%s,"size":"%s","preview_command":"%s","apply_command":"%s"}' \
+        "$(printf '%s' "$id" | json_escape)" \
+        "$(printf '%s' "$manager" | json_escape)" \
+        "$(printf '%s' "$paths" | json_escape)" \
+        "$(printf '%s' "$category" | json_escape)" \
+        "$kb" \
+        "$(human_kb "$kb" | json_escape)" \
+        "$(printf '%s' "$preview" | json_escape)" \
+        "$(printf '%s' "$apply" | json_escape)"
+    done <<<"$rows"
+    printf ']\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}cleanroom package stores${RESET}"
+  printf 'Review-only inventory. Use the preview command before applying cleanup.\n\n'
+  printf '%-10s %-18s %-14s %-10s %s\n' "size" "id" "manager" "category" "preview command"
+  local id manager paths category preview apply kb
+  while IFS=$'\t' read -r id manager paths category preview apply; do
+    [[ -z "${id:-}" ]] && continue
+    kb="$(paths_field_kb "$paths")"
+    printf '%-10s %-18s %-14s %-10s %s\n' "$(human_kb "$kb")" "$id" "$manager" "$category" "$preview"
+    printf '  apply: %s\n' "$apply"
+    printf '  paths: %s\n' "$paths"
+  done <<<"$rows"
+}
+
 plan_rows() {
   local safe package app node dev ai_workspaces ai_models containers
   safe="$(sum_existing_kb \
@@ -1642,7 +1709,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  scan|plan|large|duplicates|apps|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
+  scan|plan|large|duplicates|apps|packages|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -1737,6 +1804,7 @@ case "$ACTION" in
   large) large ;;
   duplicates) duplicates ;;
   apps) apps ;;
+  packages) packages ;;
   report) report ;;
   clean) clean ;;
   history) history ;;

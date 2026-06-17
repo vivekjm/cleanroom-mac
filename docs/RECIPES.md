@@ -10,6 +10,7 @@ cleanroom plan
 cleanroom large
 cleanroom duplicates
 cleanroom apps
+cleanroom packages
 cleanroom doctor
 cleanroom protect
 cleanroom guard ~/Library/Application\ Support/Google/Chrome
@@ -29,6 +30,7 @@ cleanroom plan --json
 cleanroom large --json ~/Documents
 cleanroom duplicates --json ~/Documents
 cleanroom apps --json
+cleanroom packages --json
 cleanroom protect --json
 cleanroom guard --json ~/Library/Application\ Support/Google/Chrome
 cleanroom rules --json
@@ -44,6 +46,8 @@ cleanroom report --output cleanroom-report.md
 `duplicates --json [PATH]` emits exact duplicate groups with SHA-256 hashes, paths, and estimated possible reclaim. It is intentionally review-only and does not delete anything.
 
 `apps --json [PATH]` emits app bundle sizes for `/Applications`, `~/Applications`, or a provided path. It is intentionally review-only and does not uninstall anything.
+
+`packages --json` emits package-manager store sizes and matching preview/apply commands.
 
 `protect --json` emits protected personal-state paths and whether they are present. This is useful for GUI wrappers and safety reviews before trying new cleanup rules.
 
@@ -62,6 +66,13 @@ cleanroom clean --preset dev --apply --trash
 ```
 
 Good for package stores, stale `node_modules`, and safe app caches.
+
+Inspect package stores first:
+
+```sh
+cleanroom packages
+cleanroom clean --include-package-stores
+```
 
 ## Documents Storage
 
