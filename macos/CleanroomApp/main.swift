@@ -86,6 +86,7 @@ final class CleanroomAppDelegate: NSObject, NSApplicationDelegate {
 
         reviewRow.addArrangedSubview(button("Large Files", action: #selector(largeFiles)))
         reviewRow.addArrangedSubview(button("Duplicates", action: #selector(duplicates)))
+        reviewRow.addArrangedSubview(button("Node Modules", action: #selector(nodes)))
         reviewRow.addArrangedSubview(button("Apps", action: #selector(apps)))
         reviewRow.addArrangedSubview(button("Caches", action: #selector(caches)))
         reviewRow.addArrangedSubview(button("Packages", action: #selector(packages)))
@@ -164,6 +165,10 @@ final class CleanroomAppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func duplicates() {
         runCommand("duplicates --limit 20 --min-mb 100", title: "Duplicates")
+    }
+
+    @objc private func nodes() {
+        runCommand("nodes --limit 30 --days 30", title: "Node Modules")
     }
 
     @objc private func apps() {

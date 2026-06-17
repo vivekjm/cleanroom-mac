@@ -10,6 +10,7 @@ cleanroom scan
 cleanroom plan
 cleanroom large
 cleanroom duplicates
+cleanroom nodes
 cleanroom apps
 cleanroom caches
 cleanroom packages
@@ -33,6 +34,7 @@ cleanroom scan --json
 cleanroom plan --json
 cleanroom large --json ~/Documents
 cleanroom duplicates --json ~/Documents
+cleanroom nodes --json ~/Documents
 cleanroom apps --json
 cleanroom caches --json
 cleanroom packages --json
@@ -53,6 +55,8 @@ cleanroom report --output cleanroom-report.md
 `large --json [PATH]` emits large files above `--min-mb` for review. It is intentionally review-only and does not delete anything.
 
 `duplicates --json [PATH]` emits exact duplicate groups with SHA-256 hashes, paths, and estimated possible reclaim. It is intentionally review-only and does not delete anything.
+
+`nodes --json [PATH]` emits stale `node_modules` folders with age, size, and the matching preview/apply commands.
 
 `apps --json [PATH]` emits app bundle sizes for `/Applications`, `~/Applications`, or a provided path. It is intentionally review-only and does not uninstall anything.
 
@@ -82,6 +86,13 @@ cleanroom clean --preset dev --apply --trash
 
 Good for package stores, stale `node_modules`, and safe app caches.
 
+Inspect stale `node_modules` first:
+
+```sh
+cleanroom nodes
+cleanroom nodes ~/Documents --days 45 --limit 30
+```
+
 Inspect cache buckets first:
 
 ```sh
@@ -101,6 +112,7 @@ cleanroom clean --include-package-stores
 cleanroom large ~/Documents --min-mb 250 --limit 50
 cleanroom large ~/Downloads --min-mb 100 --limit 50
 cleanroom duplicates ~/Documents --min-mb 100 --limit 20
+cleanroom nodes ~/Documents --days 45 --limit 30
 ```
 
 Use this when macOS Storage reports a large Documents category. Review the output manually; cleanroom will not delete arbitrary personal files.

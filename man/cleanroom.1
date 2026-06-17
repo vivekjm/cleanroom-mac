@@ -1,4 +1,4 @@
-.TH CLEANROOM 1 "June 2026" "cleanroom 0.19.0" "User Commands"
+.TH CLEANROOM 1 "June 2026" "cleanroom 0.20.0" "User Commands"
 .SH NAME
 cleanroom \- safe-by-default macOS storage cleaner
 .SH SYNOPSIS
@@ -16,6 +16,9 @@ cleanroom \- safe-by-default macOS storage cleaner
 .br
 .B cleanroom
 .RI "duplicates [path] [--min-mb n] [--limit n] [--json]"
+.br
+.B cleanroom
+.RI "nodes [path] [--days n] [--limit n] [--json]"
 .br
 .B cleanroom
 .RI "apps [path] [--limit n] [--json]"
@@ -80,6 +83,9 @@ List large files for review without deleting anything.
 .TP
 .B duplicates
 Find exact duplicate files for review without deleting anything.
+.TP
+.B nodes
+List stale node_modules folders for review without deleting anything.
 .TP
 .B apps
 List largest app bundles for review without uninstalling anything.
@@ -177,6 +183,7 @@ cleanroom scan
 cleanroom plan --json
 cleanroom large ~/Documents --min-mb 250 --limit 30
 cleanroom duplicates ~/Documents --min-mb 100 --limit 20
+cleanroom nodes ~/Documents --days 45 --limit 30
 cleanroom apps --limit 30
 cleanroom caches --json
 cleanroom packages --json

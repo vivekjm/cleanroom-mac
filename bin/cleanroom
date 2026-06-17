@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.19.0"
+VERSION="0.20.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -45,6 +45,7 @@ Usage:
   cleanroom plan [--json]
   cleanroom large [PATH] [--min-mb N] [--limit N] [--json]
   cleanroom duplicates [PATH] [--min-mb N] [--limit N] [--json]
+  cleanroom nodes [PATH] [--days N] [--limit N] [--json]
   cleanroom apps [PATH] [--limit N] [--json]
   cleanroom caches [--json]
   cleanroom packages [--json]
@@ -68,6 +69,7 @@ Actions:
   plan                 Rank safe cleanup opportunities and show copyable commands.
   large                List largest files for review without deleting anything.
   duplicates           Find exact duplicate files for review without deleting anything.
+  nodes                List stale node_modules folders for review.
   apps                 List largest app bundles for review without uninstalling.
   caches               Inventory safe and opt-in cache buckets.
   packages             Inventory package-manager caches and stores.
@@ -89,7 +91,7 @@ Options:
   --trash              Move deleted files to ~/.Trash/cleanroom-* instead of rm -rf.
   --yes                Do not prompt before --apply cleanup.
   --verbose            Print every path touched.
-  --json               Emit JSON for overview, scan, plan, large, duplicates, apps,
+  --json               Emit JSON for overview, scan, plan, large, duplicates, nodes, apps,
                        caches, packages, snapshots, doctor, protect, guard, or rules.
   --output PATH        Output path for report.
   --log PATH           Write apply audit log here. Default: ~/.local/state/cleanroom/runs/*.log.
@@ -136,6 +138,9 @@ Examples:
   cleanroom large --json ~/Downloads
   cleanroom duplicates ~/Documents --min-mb 100
   cleanroom duplicates --json ~/Downloads
+  cleanroom nodes
+  cleanroom nodes --days 45 --limit 30
+  cleanroom nodes --json ~/Documents
   cleanroom apps
   cleanroom apps --json /Applications
   cleanroom caches
@@ -982,6 +987,89 @@ large() {
     [[ -z "${path:-}" ]] && continue
     printf '%8s  %s\n' "$(human_kb "$kb")" "$path"
   done <<<"$rows"
+}
+
+path_mtime_epoch() {
+  local path="$1" epoch
+  epoch="$(stat -f '%m' "$path" 2>/dev/null || stat -c '%Y' "$path" 2>/dev/null || true)"
+  [[ "$epoch" =~ ^[0-9]+$ ]] || epoch=0
+  printf '%s\n' "$epoch"
+}
+
+node_roots() {
+  if [[ "${#PATH_ARGS[@]}" -gt 0 ]]; then
+    printf '%s\n' "$(expand_path "${PATH_ARGS[0]}")"
+  else
+    printf '%s\n' "$HOME/Documents"
+    printf '%s\n' "$HOME/Desktop"
+    printf '%s\n' "$HOME/Downloads"
+  fi
+}
+
+node_rows() {
+  local now root path kb epoch age_days
+  now="$(date '+%s')"
+  while IFS= read -r root; do
+    [[ -d "$root" ]] || continue
+    find "$root" -maxdepth 8 -type d -name node_modules -mtime +"$DAYS" -prune -print0 2>/dev/null |
+      while IFS= read -r -d '' path; do
+        kb="$(size_kb "$path")"
+        epoch="$(path_mtime_epoch "$path")"
+        if [[ "$epoch" -gt 0 && "$now" -ge "$epoch" ]]; then
+          age_days=$(((now - epoch) / 86400))
+        else
+          age_days=0
+        fi
+        printf '%012d\t%s\t%s\t%s\n' "$kb" "$epoch" "$age_days" "$path"
+      done
+  done < <(node_roots) | sort -rn | head -n "$LIMIT"
+}
+
+nodes() {
+  local rows
+  rows="$(node_rows)"
+
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '['
+    local first=1 kb epoch age_days path kb_num
+    while IFS=$'\t' read -r kb epoch age_days path; do
+      [[ -z "${path:-}" ]] && continue
+      kb_num="$(printf '%s\n' "$kb" | sed 's/^0*//; s/^$/0/')"
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '{"path":"%s","size_kb":%s,"size":"%s","modified_epoch":%s,"age_days":%s,"preview_command":"%s","apply_command":"%s"}' \
+        "$(printf '%s' "$path" | json_escape)" \
+        "$kb_num" \
+        "$(human_kb "${kb:-0}" | json_escape)" \
+        "${epoch:-0}" \
+        "${age_days:-0}" \
+        "$(printf 'cleanroom clean --include-node-stale --days %s' "$DAYS" | json_escape)" \
+        "$(printf 'cleanroom clean --apply --trash --include-node-stale --days %s' "$DAYS" | json_escape)"
+    done <<<"$rows"
+    printf ']\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}cleanroom stale node_modules${RESET}"
+  printf 'Review-only list. cleanroom only removes these with --include-node-stale and --apply.\n'
+  if [[ "${#PATH_ARGS[@]}" -gt 0 ]]; then
+    printf 'Path: %s\n' "$(expand_path "${PATH_ARGS[0]}")"
+  else
+    printf 'Paths: ~/Documents, ~/Desktop, ~/Downloads\n'
+  fi
+  printf 'Older than: %s days  Limit: %s\n\n' "$DAYS" "$LIMIT"
+  if [[ -z "$rows" ]]; then
+    printf 'No stale node_modules folders found.\n'
+    return 0
+  fi
+  printf '%-10s %-9s %s\n' "size" "age" "path"
+  local kb epoch age_days path
+  while IFS=$'\t' read -r kb epoch age_days path; do
+    [[ -z "${path:-}" ]] && continue
+    printf '%-10s %4sd     %s\n' "$(human_kb "$kb")" "${age_days:-0}" "$path"
+  done <<<"$rows"
+  printf '\nPreview cleanup with: cleanroom clean --include-node-stale --days %s\n' "$DAYS"
+  printf 'Apply cleanup with: cleanroom clean --apply --trash --include-node-stale --days %s\n' "$DAYS"
 }
 
 duplicate_candidates() {
@@ -1971,7 +2059,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  overview|scan|plan|large|duplicates|apps|caches|packages|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
+  overview|scan|plan|large|duplicates|nodes|apps|caches|packages|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -2050,7 +2138,7 @@ while [[ "$#" -gt 0 ]]; do
     -h|--help) usage; exit 0 ;;
     -v|--version) echo "$VERSION"; exit 0 ;;
     *)
-      if [[ "$ACTION" == "guard" || "$ACTION" == "large" || "$ACTION" == "duplicates" || "$ACTION" == "apps" ]]; then
+      if [[ "$ACTION" == "guard" || "$ACTION" == "large" || "$ACTION" == "duplicates" || "$ACTION" == "nodes" || "$ACTION" == "apps" ]]; then
         PATH_ARGS+=("$1")
       else
         die "Unknown option: $1"
@@ -2066,6 +2154,7 @@ case "$ACTION" in
   plan) plan ;;
   large) large ;;
   duplicates) duplicates ;;
+  nodes) nodes ;;
   apps) apps ;;
   caches) caches ;;
   packages) packages ;;

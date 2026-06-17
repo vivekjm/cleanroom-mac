@@ -33,6 +33,8 @@ printf 'model\n' >"$TEST_HOME/.lmstudio/models/example.gguf"
 printf 'login data\n' >"$TEST_HOME/Library/Application Support/Google/Chrome/Default/Login Data"
 printf 'browser cache\n' >"$TEST_HOME/Library/Application Support/Google/Chrome/Default/Cache/example.cache"
 printf 'keychain\n' >"$TEST_HOME/Library/Keychains/login.keychain-db"
+printf 'old dependency\n' >"$TEST_HOME/Documents/example/node_modules/package.txt"
+touch -t 202001010000 "$TEST_HOME/Documents/example/node_modules" "$TEST_HOME/Documents/example/node_modules/package.txt"
 dd if=/dev/zero of="$TEST_HOME/Downloads/big-test.bin" bs=1024 count=2048 >/dev/null 2>&1
 dd if=/dev/zero of="$TEST_HOME/Documents/duplicates/copy-a.bin" bs=1024 count=2048 >/dev/null 2>&1
 cp "$TEST_HOME/Documents/duplicates/copy-a.bin" "$TEST_HOME/Documents/duplicates/copy-b.bin"
@@ -78,6 +80,13 @@ python3 -m json.tool "$duplicates_json" >/dev/null
 grep 'potential_reclaim_kb' "$duplicates_json" >/dev/null
 grep 'copy-b.bin' "$duplicates_json" >/dev/null
 rm -f "$duplicates_json"
+"$BIN" nodes "$HOME/Documents" --days 30 --limit 5 | grep 'node_modules' >/dev/null
+nodes_json="$(mktemp)"
+"$BIN" nodes --json "$HOME/Documents" --days 30 --limit 5 > "$nodes_json"
+python3 -m json.tool "$nodes_json" >/dev/null
+grep 'node_modules' "$nodes_json" >/dev/null
+grep 'cleanroom clean --apply --trash --include-node-stale --days 30' "$nodes_json" >/dev/null
+rm -f "$nodes_json"
 "$BIN" apps "$HOME/Applications" --limit 5 | grep 'FakeBig' >/dev/null
 apps_json="$(mktemp)"
 "$BIN" apps --json "$HOME/Applications" --limit 5 > "$apps_json"

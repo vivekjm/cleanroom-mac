@@ -9,6 +9,7 @@ _cleanroom() {
     'plan:Rank cleanup opportunities'
     'large:List large files for review'
     'duplicates:Find exact duplicate files for review'
+    'nodes:List stale node_modules folders'
     'apps:List large app bundles for review'
     'caches:Inventory cache buckets'
     'packages:Inventory package-manager stores'
