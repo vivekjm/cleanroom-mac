@@ -1,4 +1,4 @@
-.TH CLEANROOM 1 "June 2026" "cleanroom 0.30.0" "User Commands"
+.TH CLEANROOM 1 "June 2026" "cleanroom 0.31.0" "User Commands"
 .SH NAME
 cleanroom \- safe-by-default macOS storage cleaner
 .SH SYNOPSIS
@@ -55,6 +55,9 @@ cleanroom \- safe-by-default macOS storage cleaner
 .br
 .B cleanroom
 .RI "toolchains [--json]"
+.br
+.B cleanroom
+.RI "containers [--json]"
 .br
 .B cleanroom
 .RI "snapshots [--json]"
@@ -156,6 +159,10 @@ Inventory package-manager caches and stores with preview/apply commands.
 Inventory language and toolchain caches such as Go, pip, uv, SwiftPM, Maven,
 Composer, RubyGems, and Bundler.
 .TP
+.B containers
+Inventory local container VM disks and image stores for Docker Desktop, Colima,
+Lima, and Podman. Cleanup is high-impact and opt-in.
+.TP
 .B snapshots
 List local Time Machine snapshots for review.
 .TP
@@ -235,7 +242,8 @@ Remove generated AI-agent workspace data.
 Remove downloaded local AI model stores.
 .TP
 .B --include-containers
-Remove local container VM disks. This can remove containers and volumes.
+Remove local container VM disks and image stores. This can remove containers,
+images, and volumes.
 .TP
 .B --include-user-trash
 Empty ~/.Trash during apply. This is irreversible.
@@ -263,6 +271,7 @@ cleanroom trash --json
 cleanroom caches --json
 cleanroom packages --json
 cleanroom toolchains --json
+cleanroom containers --json
 cleanroom snapshots --json
 cleanroom report --output cleanroom-report.md
 cleanroom doctor --json

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.30.0"
+VERSION="0.31.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -61,6 +61,7 @@ Usage:
   cleanroom caches [--json]
   cleanroom packages [--json]
   cleanroom toolchains [--json]
+  cleanroom containers [--json]
   cleanroom snapshots [--json]
   cleanroom report [--output PATH]
   cleanroom clean [options]
@@ -94,6 +95,7 @@ Actions:
   caches               Inventory safe and opt-in cache buckets.
   packages             Inventory package-manager caches and stores.
   toolchains           Inventory language/toolchain caches and stores.
+  containers           Inventory local container VM disks and image stores.
   snapshots            List local Time Machine snapshots for review.
   report               Write a Markdown cleanup report. Prints to stdout by default.
   clean                Clean safe rebuildable caches. Dry-run unless --apply is passed.
@@ -114,8 +116,8 @@ Options:
   --verbose            Print every path touched.
   --json               Emit JSON for overview, scan, plan, large, duplicates, downloads,
                        installers, nodes, apps, browsers, leftovers, startup, trash,
-                       backups, xcode, caches, packages, toolchains, snapshots, doctor,
-                       protect, guard, or rules.
+                       backups, xcode, caches, packages, toolchains, containers,
+                       snapshots, doctor, protect, guard, or rules.
   --output PATH        Output path for report.
   --log PATH           Write apply audit log here. Default: ~/.local/state/cleanroom/runs/*.log.
   --config PATH        Load config file. Default: ~/.config/cleanroom/config.
@@ -144,7 +146,8 @@ Options:
                        implicit data, and local conversation caches where known.
   --include-ai-models  Remove downloaded local AI models/backends from LM Studio, Ollama,
                        Hugging Face cache, and similar known stores.
-  --include-containers Remove local container VM disks for Colima/Lima. This can remove containers.
+  --include-containers Remove local container VM disks and image stores for
+                       Docker Desktop, Colima, Lima, and Podman. This can remove containers.
   --include-gemini     Alias for --include-ai-workspaces.
   --include-lmstudio   Alias for --include-ai-models.
   -h, --help           Show help.
@@ -195,6 +198,8 @@ Examples:
   cleanroom packages --json
   cleanroom toolchains
   cleanroom toolchains --json
+  cleanroom containers
+  cleanroom containers --json
   cleanroom snapshots
   cleanroom snapshots --json
   cleanroom report --output cleanroom-report.md
@@ -456,6 +461,8 @@ candidate_paths() {
 ~/.cocoapods
 ~/.colima
 ~/.lima
+~/.local/share/containers
+~/.local/share/podman
 ~/.codex
 ~/Library/Application Support
 ~/Documents
@@ -482,6 +489,8 @@ report_candidate_paths() {
 ~/.cocoapods
 ~/.colima
 ~/.lima
+~/.local/share/containers
+~/.local/share/podman
 ~/.codex
 EOF
 }
@@ -996,9 +1005,16 @@ clean_ai_models() {
 clean_containers() {
   [[ "$INCLUDE_CONTAINERS" -eq 1 ]] || return 0
   log "${BOLD}Container VM disks${RESET}"
-  run_rm "~/.colima"
-  run_rm "~/.lima"
-  run_rm "~/Library/Containers/com.docker.docker/Data/vms"
+  local id runtime paths safety preview apply description path
+  while IFS=$'\t' read -r id runtime paths safety preview apply description; do
+    [[ -z "${id:-}" ]] && continue
+    while IFS= read -r path; do
+      path="${path#"${path%%[![:space:]]*}"}"
+      path="${path%"${path##*[![:space:]]}"}"
+      [[ -z "$path" ]] && continue
+      run_rm "$path"
+    done < <(printf '%s\n' "$paths" | tr ';' '\n')
+  done < <(container_rows)
 }
 
 clean_node_stale() {
@@ -2121,6 +2137,14 @@ toolchain_rows() {
   printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "ruby-cache" "ruby" "~/.gem; ~/.bundle/cache" "toolchains" "cleanroom toolchains" "cleanroom clean --apply --trash --include-toolchains" "RubyGems and Bundler caches. Gems may need to be installed again."
 }
 
+container_rows() {
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "docker-desktop-vms" "docker-desktop" "~/Library/Containers/com.docker.docker/Data/vms" "high-impact" "cleanroom containers" "cleanroom clean --apply --trash --include-containers" "Docker Desktop VM disks and container/image data. Removing this can delete containers, images, and volumes."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "colima" "colima" "~/.colima" "high-impact" "cleanroom containers" "cleanroom clean --apply --trash --include-containers" "Colima VM disks, profiles, images, containers, and volumes."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "lima" "lima" "~/.lima" "high-impact" "cleanroom containers" "cleanroom clean --apply --trash --include-containers" "Lima VM instances and disk images."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "podman-storage" "podman" "~/.local/share/containers; ~/.local/share/podman" "high-impact" "cleanroom containers" "cleanroom clean --apply --trash --include-containers" "Rootless Podman container, image, and volume storage."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "podman-desktop" "podman-desktop" "~/Library/Containers/io.podman_desktop.PodmanDesktop/Data" "high-impact" "cleanroom containers" "cleanroom clean --apply --trash --include-containers" "Podman Desktop app container data. Review before removing."
+}
+
 cache_rows() {
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "user-caches" "default" "~/Library/Caches; ~/.cache" "cleanroom clean" "cleanroom clean --apply --trash" "Standard user cache folders. Recreated automatically by apps."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "old-logs" "default" "~/Library/Logs" "cleanroom clean" "cleanroom clean --apply --trash" "User log files. Apply removes only log files older than seven days."
@@ -2285,6 +2309,58 @@ toolchain_total_kb() {
   printf '%s\n' "$total"
 }
 
+containers() {
+  local rows
+  rows="$(container_rows)"
+
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '['
+    local first=1 id runtime paths safety preview apply description kb
+    while IFS=$'\t' read -r id runtime paths safety preview apply description; do
+      [[ -z "${id:-}" ]] && continue
+      kb="$(paths_field_kb "$paths")"
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '{"id":"%s","runtime":"%s","paths":"%s","safety":"%s","size_kb":%s,"size":"%s","preview_command":"%s","apply_command":"%s","description":"%s"}' \
+        "$(printf '%s' "$id" | json_escape)" \
+        "$(printf '%s' "$runtime" | json_escape)" \
+        "$(printf '%s' "$paths" | json_escape)" \
+        "$(printf '%s' "$safety" | json_escape)" \
+        "$kb" \
+        "$(human_kb "$kb" | json_escape)" \
+        "$(printf '%s' "$preview" | json_escape)" \
+        "$(printf '%s' "$apply" | json_escape)" \
+        "$(printf '%s' "$description" | json_escape)"
+    done <<<"$rows"
+    printf ']\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}cleanroom container storage${RESET}"
+  printf 'Review-only inventory. Container cleanup is high-impact and opt-in.\n\n'
+  printf '%-10s %-20s %-16s %s\n' "size" "id" "runtime" "preview command"
+  local id runtime paths safety preview apply description kb
+  while IFS=$'\t' read -r id runtime paths safety preview apply description; do
+    [[ -z "${id:-}" ]] && continue
+    kb="$(paths_field_kb "$paths")"
+    printf '%-10s %-20s %-16s %s\n' "$(human_kb "$kb")" "$id" "$runtime" "$preview"
+    printf '  apply: %s\n' "$apply"
+    printf '  safety: %s\n' "$safety"
+    printf '  paths: %s\n' "$paths"
+    printf '  %s\n' "$description"
+  done <<<"$rows"
+}
+
+container_total_kb() {
+  local id runtime paths safety preview apply description total=0 kb
+  while IFS=$'\t' read -r id runtime paths safety preview apply description; do
+    [[ -z "${id:-}" ]] && continue
+    kb="$(paths_field_kb "$paths")"
+    total=$((total + kb))
+  done < <(container_rows)
+  printf '%s\n' "$total"
+}
+
 package_total_kb() {
   local id manager paths category preview apply total=0 kb
   while IFS=$'\t' read -r id manager paths category preview apply; do
@@ -2335,10 +2411,11 @@ app_bundle_count() {
 }
 
 overview() {
-  local plan_rows_sorted package_total toolchain_total protected_count snapshots app_count startup_items trash_total
+  local plan_rows_sorted package_total toolchain_total container_total protected_count snapshots app_count startup_items trash_total
   plan_rows_sorted="$(plan_rows | sort -rn | head -5)"
   package_total="$(package_total_kb)"
   toolchain_total="$(toolchain_total_kb)"
+  container_total="$(container_total_kb)"
   protected_count="$(protected_present_count)"
   snapshots="$(snapshot_count)"
   app_count="$(app_bundle_count)"
@@ -2348,11 +2425,13 @@ overview() {
   if [[ "$JSON" -eq 1 ]]; then
     printf '{'
     disk_json
-    printf ',"summary":{"package_store_kb":%s,"package_store":"%s","toolchain_kb":%s,"toolchain":"%s","trash_kb":%s,"trash":"%s","protected_present":%s,"snapshot_count":%s,"app_bundle_count":%s,"startup_item_count":%s}' \
+    printf ',"summary":{"package_store_kb":%s,"package_store":"%s","toolchain_kb":%s,"toolchain":"%s","container_kb":%s,"container":"%s","trash_kb":%s,"trash":"%s","protected_present":%s,"snapshot_count":%s,"app_bundle_count":%s,"startup_item_count":%s}' \
       "$package_total" \
       "$(human_kb "$package_total" | json_escape)" \
       "$toolchain_total" \
       "$(human_kb "$toolchain_total" | json_escape)" \
+      "$container_total" \
+      "$(human_kb "$container_total" | json_escape)" \
       "$trash_total" \
       "$(human_kb "$trash_total" | json_escape)" \
       "$protected_count" \
@@ -2385,6 +2464,7 @@ overview() {
   printf '\n%s\n' "${BOLD}Summary${RESET}"
   printf '%-24s %s\n' "package stores" "$(human_kb "$package_total")"
   printf '%-24s %s\n' "toolchain caches" "$(human_kb "$toolchain_total")"
+  printf '%-24s %s\n' "container storage" "$(human_kb "$container_total")"
   printf '%-24s %s\n' "Trash" "$(human_kb "$trash_total")"
   printf '%-24s %s\n' "protected paths present" "$protected_count"
   printf '%-24s %s\n' "local snapshots" "$snapshots"
@@ -2407,6 +2487,7 @@ overview() {
   printf 'cleanroom startup\n'
   printf 'cleanroom packages\n'
   printf 'cleanroom toolchains\n'
+  printf 'cleanroom containers\n'
   printf 'cleanroom protect\n'
 }
 
@@ -2469,7 +2550,7 @@ plan_rows() {
     "~/Library/Android/sdk/.temp")"
   ai_workspaces="$(sum_existing_kb "~/.gemini")"
   ai_models="$(sum_existing_kb "~/.lmstudio/models" "~/.lmstudio/extensions/backends" "~/.ollama/models" "~/.cache/huggingface/hub" "~/.cache/modelscope" "~/.cache/torch/hub" "~/.cache/whisper")"
-  containers="$(sum_existing_kb "~/.colima" "~/.lima" "~/Library/Containers/com.docker.docker/Data/vms")"
+  containers="$(container_total_kb)"
   user_trash="$(trash_total_kb)"
 
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$safe" "safe" "Default safe cleanup" "cleanroom clean" "cleanroom clean --apply --trash" "Rebuildable caches and old logs. Recommended first step."
@@ -2481,7 +2562,7 @@ plan_rows() {
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$dev" "dev-heavy" "Heavy SDK and simulator artifacts" "cleanroom clean --include-dev-heavy" "cleanroom clean --apply --trash --include-dev-heavy" "Opt-in cleanup that may require re-downloading SDKs or resetting simulator app data."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$ai_workspaces" "ai-workspaces" "Generated AI workspace state" "cleanroom clean --include-ai-workspaces" "cleanroom clean --apply --trash --include-ai-workspaces" "Generated recordings, scratch, brain, implicit data, and conversation caches where known."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$ai_models" "ai-models" "Downloaded local AI models" "cleanroom clean --include-ai-models" "cleanroom clean --apply --trash --include-ai-models" "Large model stores and backend extensions that may need to be downloaded again."
-  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$containers" "containers" "Container VM disks" "cleanroom clean --include-containers" "cleanroom clean --apply --trash --include-containers" "High-impact opt-in cleanup that can remove local containers, images, and volumes."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$containers" "containers" "Container VM disks and stores" "cleanroom containers" "cleanroom clean --apply --trash --include-containers" "High-impact opt-in cleanup that can remove local containers, images, and volumes."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$user_trash" "user-trash" "Current user Trash" "cleanroom trash" "cleanroom clean --include-user-trash --apply" "Already-deleted user Trash contents. Emptying Trash is explicit and irreversible."
 }
 
@@ -2942,8 +3023,8 @@ Default safe cleanup:
   ModelScope, and Whisper cache.
 
 --include-containers:
-  Local container VM disks for Colima/Lima/Docker Desktop. This can remove containers,
-  images, and volumes.
+  Local container VM disks and image stores for Docker Desktop, Colima, Lima, and
+  Podman. This can remove containers, images, and volumes.
 
 --include-user-trash:
   Empty ~/.Trash. This is irreversible and intentionally not included in presets.
@@ -3021,7 +3102,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  overview|scan|plan|large|duplicates|downloads|installers|nodes|apps|browsers|leftovers|backups|xcode|startup|trash|caches|packages|toolchains|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
+  overview|scan|plan|large|duplicates|downloads|installers|nodes|apps|browsers|leftovers|backups|xcode|startup|trash|caches|packages|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -3132,6 +3213,7 @@ case "$ACTION" in
   caches) caches ;;
   packages) packages ;;
   toolchains) toolchains ;;
+  containers) containers ;;
   snapshots) snapshots ;;
   report) report ;;
   clean) clean ;;

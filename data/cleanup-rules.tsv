@@ -17,4 +17,4 @@ developer-heavy	dev-heavy	destructive-opt-in	no	--include-dev-heavy	Xcode Device
 time-machine-snapshots	snapshots	system-tool	no	--include-snapshots	Local Time Machine snapshots	Asks tmutil to thin local snapshots; not recoverable through cleanroom Trash mode.
 ai-workspaces	ai-workspaces	destructive-opt-in	no	--include-ai-workspaces	~/.gemini generated recordings, scratch, brain, implicit, conversations	Removes generated AI-agent workspace state and local conversation caches where known.
 ai-models	ai-models	large-opt-in	no	--include-ai-models	~/.lmstudio/models; ~/.ollama/models; Hugging Face and related model caches	Removes downloaded local AI model stores and backend extensions.
-container-vms	containers	destructive-opt-in	no	--include-containers	~/.colima; ~/.lima; Docker Desktop VM data	Removes local container VM disks, images, and volumes.
+container-vms	containers	destructive-opt-in	no	--include-containers	~/.colima; ~/.lima; Docker Desktop VM data; Podman storage	Removes local container VM disks, images, and volumes.

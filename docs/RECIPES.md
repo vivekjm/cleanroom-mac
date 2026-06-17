@@ -23,6 +23,7 @@ cleanroom trash
 cleanroom caches
 cleanroom packages
 cleanroom toolchains
+cleanroom containers
 cleanroom snapshots
 cleanroom doctor
 cleanroom protect
@@ -56,6 +57,7 @@ cleanroom trash --json
 cleanroom caches --json
 cleanroom packages --json
 cleanroom toolchains --json
+cleanroom containers --json
 cleanroom snapshots --json
 cleanroom doctor --json
 cleanroom protect --json
@@ -99,6 +101,8 @@ cleanroom report --output cleanroom-report.md
 `packages --json` emits package-manager store sizes and matching preview/apply commands.
 
 `toolchains --json` emits rebuildable language/toolchain cache sizes with matching preview/apply commands.
+
+`containers --json` emits local container VM disk and image-store sizes with high-impact cleanup guidance.
 
 `snapshots --json` emits local Time Machine snapshot identifiers when macOS reports any. It is intentionally review-only and does not thin snapshots.
 
@@ -338,11 +342,13 @@ Model cleanup is intentionally separate because model files are often large but 
 ## Containers
 
 ```sh
+cleanroom containers
+cleanroom containers --json
 cleanroom clean --include-containers
 cleanroom clean --include-containers --apply
 ```
 
-This can remove local container VM disks, images, and volumes.
+This can remove local container VM disks, images, and volumes. Review `cleanroom containers` first.
 
 ## “System Data” Looks Wrong
 

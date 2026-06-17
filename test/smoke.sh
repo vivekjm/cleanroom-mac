@@ -39,6 +39,12 @@ mkdir -p \
   "$TEST_HOME/Library/pnpm/store" \
   "$TEST_HOME/.cache" \
   "$TEST_HOME/.lmstudio/models" \
+  "$TEST_HOME/.colima/default" \
+  "$TEST_HOME/.lima/default" \
+  "$TEST_HOME/.local/share/containers/storage" \
+  "$TEST_HOME/.local/share/podman" \
+  "$TEST_HOME/Library/Containers/com.docker.docker/Data/vms/0" \
+  "$TEST_HOME/Library/Containers/io.podman_desktop.PodmanDesktop/Data" \
   "$TEST_HOME/.Trash" \
   "$TEST_HOME/Applications/FakeBig.app/Contents/MacOS" \
   "$TEST_HOME/Downloads" \
@@ -63,6 +69,12 @@ printf 'support\n' >"$TEST_HOME/Library/Developer/Xcode/iOS DeviceSupport/18.0/S
 printf 'sim cache\n' >"$TEST_HOME/Library/Developer/CoreSimulator/Caches/cache.db"
 printf 'sim data\n' >"$TEST_HOME/Library/Developer/CoreSimulator/Devices/FakeSimulator/data/app.db"
 printf 'model\n' >"$TEST_HOME/.lmstudio/models/example.gguf"
+printf 'colima disk\n' >"$TEST_HOME/.colima/default/disk.img"
+printf 'lima disk\n' >"$TEST_HOME/.lima/default/disk.img"
+printf 'podman image\n' >"$TEST_HOME/.local/share/containers/storage/image"
+printf 'podman vm\n' >"$TEST_HOME/.local/share/podman/machine"
+printf 'docker raw\n' >"$TEST_HOME/Library/Containers/com.docker.docker/Data/vms/0/Docker.raw"
+printf 'podman desktop\n' >"$TEST_HOME/Library/Containers/io.podman_desktop.PodmanDesktop/Data/state.db"
 printf 'login data\n' >"$TEST_HOME/Library/Application Support/Google/Chrome/Default/Login Data"
 printf 'browser cache\n' >"$TEST_HOME/Library/Application Support/Google/Chrome/Default/Cache/example.cache"
 printf 'adobe support\n' >"$TEST_HOME/Library/Application Support/CleanroomTestAdobe/Creative Cloud/state.db"
@@ -122,6 +134,7 @@ overview_json="$(mktemp)"
 python3 -m json.tool "$overview_json" >/dev/null
 grep '"summary"' "$overview_json" >/dev/null
 grep '"toolchain_kb"' "$overview_json" >/dev/null
+grep '"container_kb"' "$overview_json" >/dev/null
 grep '"recommendations"' "$overview_json" >/dev/null
 rm -f "$overview_json"
 "$BIN" rules | grep 'safe-app-caches' >/dev/null
@@ -137,6 +150,7 @@ plan_json="$(mktemp)"
 python3 -m json.tool "$plan_json" >/dev/null
 grep 'cleanroom clean --apply --trash' "$plan_json" >/dev/null
 grep 'cleanroom clean --apply --trash --include-toolchains' "$plan_json" >/dev/null
+grep 'cleanroom clean --apply --trash --include-containers' "$plan_json" >/dev/null
 rm -f "$plan_json"
 "$BIN" large "$HOME/Downloads" --min-mb 1 --limit 5 | grep 'big-test.bin' >/dev/null
 large_json="$(mktemp)"
@@ -262,6 +276,14 @@ test -f "$toolchain_log"
 grep $'\ttrash\tok\t' "$toolchain_log" >/dev/null
 "$BIN" restore --log "$toolchain_log" --apply --yes >/dev/null
 test -e "$TEST_HOME/go/pkg/mod"
+"$BIN" containers | grep 'docker-desktop-vms' >/dev/null
+containers_json="$(mktemp)"
+"$BIN" containers --json > "$containers_json"
+python3 -m json.tool "$containers_json" >/dev/null
+grep 'podman-storage' "$containers_json" >/dev/null
+grep '"safety":"high-impact"' "$containers_json" >/dev/null
+grep 'cleanroom clean --apply --trash --include-containers' "$containers_json" >/dev/null
+rm -f "$containers_json"
 "$BIN" caches | grep 'user-caches' >/dev/null
 caches_json="$(mktemp)"
 "$BIN" caches --json > "$caches_json"

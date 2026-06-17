@@ -13,6 +13,7 @@ macOS Storage often labels hidden user folders as **Documents** or **System Data
 - Android SDK NDK/system images
 - npm, Yarn, pnpm, Gradle, CocoaPods stores
 - Go, Python, SwiftPM, Maven, Composer, Ruby, uv, and Poetry toolchain caches
+- Docker Desktop, Colima, Lima, and Podman container storage
 - old `node_modules`
 - AI-agent recordings, scratch data, local memory, and generated workspaces
 - local AI model downloads and backends
@@ -247,6 +248,13 @@ cleanroom toolchains
 cleanroom toolchains --json
 ```
 
+Inventory local container storage:
+
+```sh
+cleanroom containers
+cleanroom containers --json
+```
+
 Review local Time Machine snapshots:
 
 ```sh
@@ -401,10 +409,11 @@ cleanroom clean --apply --include-ai-models
 Clean local container VM disks:
 
 ```sh
+cleanroom containers
 cleanroom clean --apply --include-containers
 ```
 
-This can remove containers and local volumes.
+This can remove containers, images, and local volumes.
 
 Backward-compatible aliases:
 
@@ -462,13 +471,13 @@ Config files use simple `key=value` lines and are never executed as shell.
 
 `--include-ai-models` removes downloaded local model files and backend extensions from known stores such as LM Studio, Ollama, Hugging Face cache, and similar caches. These can usually be downloaded again later, but they may be large.
 
-`--include-containers` removes local container VM disks for known runtimes such as Colima/Lima and Docker Desktop. This can remove local containers and volumes.
+`--include-containers` removes local container VM disks and image stores for known runtimes such as Docker Desktop, Colima, Lima, and Podman. This can remove local containers, images, and volumes.
 
 `--trash` applies to paths that `cleanroom` removes directly. System commands delegated to macOS or developer tools, such as Time Machine snapshot thinning or simulator reset, may still be irreversible.
 
 `restore` only restores entries that were moved by `--trash` and still exist in the cleanroom Trash folder. It skips destinations that already exist.
 
-`overview` summarizes disk state, top recommendations, package-store size, toolchain-cache size, protected-data presence, snapshots, app bundle count, and useful next commands without deleting anything.
+`overview` summarizes disk state, top recommendations, package-store size, toolchain-cache size, container storage size, protected-data presence, snapshots, app bundle count, and useful next commands without deleting anything.
 
 `caches --json` emits safe and opt-in cache bucket sizes with the matching preview and apply commands.
 
@@ -503,6 +512,8 @@ Config files use simple `key=value` lines and are never executed as shell.
 `packages` inventories npm, Yarn, pnpm, Gradle, CocoaPods, Cargo, and Homebrew stores with preview/apply commands for matching cleanup categories.
 
 `toolchains` inventories rebuildable language/toolchain caches for Go, pip, uv, Poetry, SwiftPM, Maven, Composer, RubyGems, and Bundler. Cleanup is opt-in with `cleanroom clean --include-toolchains`, and `--trash` keeps removals restorable through the normal apply log.
+
+`containers` inventories local container VM disks and image stores for Docker Desktop, Colima, Lima, and Podman. Cleanup is high-impact and opt-in with `cleanroom clean --include-containers`.
 
 `snapshots` lists local Time Machine snapshots before you decide whether to run `cleanroom clean --include-snapshots --apply`.
 
