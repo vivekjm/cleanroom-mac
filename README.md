@@ -33,6 +33,8 @@ By default, `cleanroom` does **not** delete:
 
 The default `clean` action is also a dry-run. You must pass `--apply` to delete.
 
+For safer applied runs, pass `--trash` to move cleanroom-managed path removals into `~/.Trash/cleanroom-*` instead of deleting them immediately. Applied runs also write an audit log under `~/.local/state/cleanroom/runs/` by default.
+
 ## Install
 
 From this repo:
@@ -123,6 +125,12 @@ Apply safe cleanup:
 cleanroom clean --apply
 ```
 
+Apply cleanup by moving cleanroom-managed removals to Trash:
+
+```sh
+cleanroom clean --apply --trash --preset dev
+```
+
 Use presets:
 
 ```sh
@@ -202,6 +210,12 @@ Use a config file and protect custom paths:
 cleanroom clean --config ~/.config/cleanroom/config --exclude ~/Desktop/important-project
 ```
 
+Write an apply log to a specific path:
+
+```sh
+cleanroom clean --apply --trash --log ~/Desktop/cleanroom-run.log
+```
+
 ## Notes
 
 More examples are in [docs/RECIPES.md](docs/RECIPES.md).
@@ -215,6 +229,8 @@ Config files use simple `key=value` lines and are never executed as shell.
 `--include-ai-models` removes downloaded local model files and backend extensions from known stores such as LM Studio, Ollama, Hugging Face cache, and similar caches. These can usually be downloaded again later, but they may be large.
 
 `--include-containers` removes local container VM disks for known runtimes such as Colima/Lima and Docker Desktop. This can remove local containers and volumes.
+
+`--trash` applies to paths that `cleanroom` removes directly. System commands delegated to macOS or developer tools, such as Time Machine snapshot thinning or simulator reset, may still be irreversible.
 
 The project also ships `make install`, `make uninstall`, `make lint`, and `make test` targets for maintainers and package managers.
 

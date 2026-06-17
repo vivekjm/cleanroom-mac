@@ -30,6 +30,7 @@ bash -n "$BIN"
 "$BIN" --version | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' >/dev/null
 "$BIN" help | grep 'safe macOS storage cleaner' >/dev/null
 "$BIN" categories | grep -- '--include-ai-models' >/dev/null
+"$BIN" categories | grep -- '--trash' >/dev/null
 "$BIN" doctor | grep 'cleanroom doctor' >/dev/null
 
 config_file="$(mktemp)"
@@ -60,6 +61,15 @@ grep 'Dry-run mode' <<<"$deep_output" >/dev/null
 
 excluded_output="$("$BIN" clean --include-ai-models --exclude "$HOME/.lmstudio" 2>&1)"
 grep 'Dry-run mode' <<<"$excluded_output" >/dev/null
+
+apply_log="$(mktemp)"
+rm -f "$apply_log"
+PATH="/usr/bin:/bin:/usr/sbin:/sbin" "$BIN" clean --apply --trash --yes --log "$apply_log" >/dev/null 2>&1
+grep 'mode=trash' "$apply_log" >/dev/null
+grep 'trash	ok' "$apply_log" >/dev/null
+test ! -e "$HOME/.npm/_cacache"
+find "$HOME/.Trash" -name _cacache -print -quit | grep _cacache >/dev/null
+rm -f "$apply_log"
 
 rm -f "$config_file"
 

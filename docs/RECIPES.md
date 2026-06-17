@@ -30,6 +30,7 @@ cleanroom report --output cleanroom-report.md
 ```sh
 cleanroom clean --preset dev
 cleanroom clean --preset dev --apply
+cleanroom clean --preset dev --apply --trash
 ```
 
 Good for package stores, stale `node_modules`, and safe app caches.
@@ -46,9 +47,27 @@ Protect important project folders:
 ```text
 exclude=~/Desktop/important-project
 exclude=~/Documents/client-work
+trash=true
+log_file=~/Desktop/cleanroom-run.log
 ```
 
 Config files are plain `key=value` data and are not executed as shell.
+
+## Safer Apply Runs
+
+```sh
+cleanroom clean --preset dev --apply --trash
+```
+
+Trash mode moves paths deleted directly by `cleanroom` into `~/.Trash/cleanroom-*`. This is useful when trying the tool on a new machine or before recommending a cleanup to someone else.
+
+Every applied run writes an audit log:
+
+```sh
+ls ~/.local/state/cleanroom/runs
+```
+
+Use `--log PATH` when you want the run log somewhere specific.
 
 ## Interactive Mode
 

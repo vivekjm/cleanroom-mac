@@ -25,8 +25,9 @@ bash -n bin/cleanroom
 ./bin/cleanroom --version
 ./bin/cleanroom report
 ./bin/cleanroom clean --include-app-caches
+./bin/cleanroom clean --apply --trash --yes --log /tmp/cleanroom-test.log
 ./bin/cleanroom init-config --config /tmp/cleanroom-test-config --yes
 ./test/smoke.sh
 ```
 
-Avoid running `--apply` in tests unless inside a disposable macOS account or fixture directory.
+Avoid running `--apply` in tests unless inside a disposable macOS account or fixture directory. Prefer `--trash` and a temporary `--log` path for integration tests.

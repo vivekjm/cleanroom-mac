@@ -16,10 +16,12 @@ _cleanroom() {
 
   options=(
     '--apply[Actually delete files]'
+    '--trash[Move direct removals to ~/.Trash]'
     '--yes[Skip confirmation prompt]'
     '--verbose[Print every path touched]'
     '--json[Emit JSON for scan]'
     '--output[Output path for report]:file:_files'
+    '--log[Apply audit log path]:file:_files'
     '--config[Config file path]:file:_files'
     '--exclude[Protect path from deletion]:path:_files'
     '--days[Age threshold for stale node_modules]:days:'
