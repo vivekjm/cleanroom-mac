@@ -10,5 +10,7 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Run smoke tests
-        run: ./test/smoke.sh
+      - name: Run test suite
+        run: make test
+      - name: Build release archive
+        run: make package

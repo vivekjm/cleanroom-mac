@@ -31,3 +31,15 @@ bash -n bin/cleanroom
 ```
 
 Avoid running `--apply` in tests unless inside a disposable macOS account or fixture directory. Prefer `--trash` and a temporary `--log` path for integration tests.
+
+## Releases
+
+Run:
+
+```sh
+make package
+```
+
+This validates version consistency, runs tests, and writes a tarball plus SHA-256 file under `dist/`.
+
+See [docs/RELEASE.md](docs/RELEASE.md) for tagging and GitHub release steps.

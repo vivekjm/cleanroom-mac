@@ -55,6 +55,14 @@ Or run directly:
 ./bin/cleanroom scan
 ```
 
+From a release archive:
+
+```sh
+tar -xzf cleanroom-*.tar.gz
+cd cleanroom-*
+./install.sh
+```
+
 Uninstall:
 
 ```sh
@@ -67,6 +75,12 @@ Run the smoke tests:
 
 ```sh
 make test
+```
+
+Build a release archive:
+
+```sh
+make package
 ```
 
 ## Usage
@@ -233,6 +247,8 @@ Config files use simple `key=value` lines and are never executed as shell.
 `--trash` applies to paths that `cleanroom` removes directly. System commands delegated to macOS or developer tools, such as Time Machine snapshot thinning or simulator reset, may still be irreversible.
 
 The project also ships `make install`, `make uninstall`, `make lint`, and `make test` targets for maintainers and package managers.
+
+Release packaging is documented in [docs/RELEASE.md](docs/RELEASE.md).
 
 ## License
 

@@ -3,7 +3,7 @@ BINDIR ?= $(PREFIX)/bin
 MANDIR ?= $(PREFIX)/share/man/man1
 ZSH_COMPLETION_DIR ?= $(PREFIX)/share/zsh/site-functions
 
-.PHONY: install uninstall test lint smoke
+.PHONY: install uninstall test lint smoke package dist clean-dist check-version
 
 install:
 	install -d "$(BINDIR)"
@@ -23,6 +23,18 @@ lint:
 	bash -n install.sh
 	bash -n uninstall.sh
 	bash -n test/smoke.sh
+	bash -n scripts/check-version.sh
+	bash -n scripts/package.sh
+	./scripts/check-version.sh
 
 smoke test: lint
 	./test/smoke.sh
+
+package dist: test
+	./scripts/package.sh
+
+clean-dist:
+	rm -rf dist
+
+check-version:
+	./scripts/check-version.sh
