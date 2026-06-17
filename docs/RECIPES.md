@@ -11,6 +11,7 @@ cleanroom plan
 cleanroom large
 cleanroom duplicates
 cleanroom apps
+cleanroom caches
 cleanroom packages
 cleanroom snapshots
 cleanroom doctor
@@ -33,6 +34,7 @@ cleanroom plan --json
 cleanroom large --json ~/Documents
 cleanroom duplicates --json ~/Documents
 cleanroom apps --json
+cleanroom caches --json
 cleanroom packages --json
 cleanroom snapshots --json
 cleanroom doctor --json
@@ -53,6 +55,8 @@ cleanroom report --output cleanroom-report.md
 `duplicates --json [PATH]` emits exact duplicate groups with SHA-256 hashes, paths, and estimated possible reclaim. It is intentionally review-only and does not delete anything.
 
 `apps --json [PATH]` emits app bundle sizes for `/Applications`, `~/Applications`, or a provided path. It is intentionally review-only and does not uninstall anything.
+
+`caches --json` emits safe and opt-in cache bucket sizes with the matching preview and apply commands.
 
 `packages --json` emits package-manager store sizes and matching preview/apply commands.
 
@@ -77,6 +81,12 @@ cleanroom clean --preset dev --apply --trash
 ```
 
 Good for package stores, stale `node_modules`, and safe app caches.
+
+Inspect cache buckets first:
+
+```sh
+cleanroom caches
+```
 
 Inspect package stores first:
 

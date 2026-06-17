@@ -91,6 +91,13 @@ python3 -m json.tool "$packages_json" >/dev/null
 grep 'pnpm-store' "$packages_json" >/dev/null
 grep 'cleanroom clean --apply --trash --include-package-stores' "$packages_json" >/dev/null
 rm -f "$packages_json"
+"$BIN" caches | grep 'user-caches' >/dev/null
+caches_json="$(mktemp)"
+"$BIN" caches --json > "$caches_json"
+python3 -m json.tool "$caches_json" >/dev/null
+grep 'safe-app-caches' "$caches_json" >/dev/null
+grep 'cleanroom clean --apply --trash --include-app-caches' "$caches_json" >/dev/null
+rm -f "$caches_json"
 "$BIN" snapshots | grep 'cleanroom local snapshots' >/dev/null
 snapshots_json="$(mktemp)"
 "$BIN" snapshots --json > "$snapshots_json"

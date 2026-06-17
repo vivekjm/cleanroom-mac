@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.18.0"
+VERSION="0.19.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -46,6 +46,7 @@ Usage:
   cleanroom large [PATH] [--min-mb N] [--limit N] [--json]
   cleanroom duplicates [PATH] [--min-mb N] [--limit N] [--json]
   cleanroom apps [PATH] [--limit N] [--json]
+  cleanroom caches [--json]
   cleanroom packages [--json]
   cleanroom snapshots [--json]
   cleanroom report [--output PATH]
@@ -68,6 +69,7 @@ Actions:
   large                List largest files for review without deleting anything.
   duplicates           Find exact duplicate files for review without deleting anything.
   apps                 List largest app bundles for review without uninstalling.
+  caches               Inventory safe and opt-in cache buckets.
   packages             Inventory package-manager caches and stores.
   snapshots            List local Time Machine snapshots for review.
   report               Write a Markdown cleanup report. Prints to stdout by default.
@@ -88,7 +90,7 @@ Options:
   --yes                Do not prompt before --apply cleanup.
   --verbose            Print every path touched.
   --json               Emit JSON for overview, scan, plan, large, duplicates, apps,
-                       packages, snapshots, doctor, protect, guard, or rules.
+                       caches, packages, snapshots, doctor, protect, guard, or rules.
   --output PATH        Output path for report.
   --log PATH           Write apply audit log here. Default: ~/.local/state/cleanroom/runs/*.log.
   --config PATH        Load config file. Default: ~/.config/cleanroom/config.
@@ -136,6 +138,8 @@ Examples:
   cleanroom duplicates --json ~/Downloads
   cleanroom apps
   cleanroom apps --json /Applications
+  cleanroom caches
+  cleanroom caches --json
   cleanroom packages
   cleanroom packages --json
   cleanroom snapshots
@@ -1161,6 +1165,19 @@ package_rows() {
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "homebrew-cache" "homebrew" "~/Library/Caches/Homebrew" "default" "cleanroom clean" "cleanroom clean --apply --trash"
 }
 
+cache_rows() {
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "user-caches" "default" "~/Library/Caches; ~/.cache" "cleanroom clean" "cleanroom clean --apply --trash" "Standard user cache folders. Recreated automatically by apps."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "old-logs" "default" "~/Library/Logs" "cleanroom clean" "cleanroom clean --apply --trash" "User log files. Apply removes only log files older than seven days."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "npm-cache" "default" "~/.npm/_cacache; ~/.npm/_logs; ~/.npm/_npx" "cleanroom clean" "cleanroom clean --apply --trash" "npm caches, temporary npx installs, and npm logs."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "yarn-cache" "default" "~/.yarn/cache; ~/.yarn/berry" "cleanroom clean" "cleanroom clean --apply --trash" "Yarn package caches and Berry state."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "gradle-cache" "default" "~/.gradle/caches; ~/.gradle/daemon; ~/.gradle/native; ~/.gradle/workers" "cleanroom clean" "cleanroom clean --apply --trash" "Gradle caches, daemons, native caches, and worker state."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "pnpm-store" "default" "~/Library/pnpm/store" "cleanroom clean" "cleanroom clean --apply --trash" "Default pnpm content-addressable package store."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "xcode-derived-data" "default" "~/Library/Developer/Xcode/DerivedData" "cleanroom clean" "cleanroom clean --apply --trash" "Xcode build intermediates and indexes."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "simulator-caches" "default" "~/Library/Developer/CoreSimulator/Caches" "cleanroom clean" "cleanroom clean --apply --trash" "CoreSimulator rebuildable cache data."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "homebrew-cache" "default" "~/Library/Caches/Homebrew" "cleanroom clean" "cleanroom clean --apply --trash" "Homebrew download and build caches."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "safe-app-caches" "app-caches" "known nested app cache folders" "cleanroom clean --include-app-caches" "cleanroom clean --apply --trash --include-app-caches" "Nested cache folders for apps such as Chrome, Brave, VS Code, Cursor, Slack, Comet, and Trae. Profiles, passwords, cookies, bookmarks, and settings stay protected."
+}
+
 paths_field_kb() {
   local field="$1"
   local total=0 path kb
@@ -1172,6 +1189,54 @@ paths_field_kb() {
     total=$((total + kb))
   done < <(printf '%s\n' "$field" | tr ';' '\n')
   printf '%s\n' "$total"
+}
+
+caches() {
+  local rows
+  rows="$(cache_rows)"
+
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '['
+    local first=1 id category paths preview apply description kb
+    while IFS=$'\t' read -r id category paths preview apply description; do
+      [[ -z "${id:-}" ]] && continue
+      if [[ "$id" == "safe-app-caches" ]]; then
+        kb="$(app_cache_kb)"
+      else
+        kb="$(paths_field_kb "$paths")"
+      fi
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '{"id":"%s","category":"%s","paths":"%s","size_kb":%s,"size":"%s","preview_command":"%s","apply_command":"%s","description":"%s"}' \
+        "$(printf '%s' "$id" | json_escape)" \
+        "$(printf '%s' "$category" | json_escape)" \
+        "$(printf '%s' "$paths" | json_escape)" \
+        "$kb" \
+        "$(human_kb "$kb" | json_escape)" \
+        "$(printf '%s' "$preview" | json_escape)" \
+        "$(printf '%s' "$apply" | json_escape)" \
+        "$(printf '%s' "$description" | json_escape)"
+    done <<<"$rows"
+    printf ']\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}cleanroom caches${RESET}"
+  printf 'Review-only inventory. Use the preview command before applying cleanup.\n\n'
+  printf '%-10s %-20s %-12s %s\n' "size" "id" "category" "preview command"
+  local id category paths preview apply description kb
+  while IFS=$'\t' read -r id category paths preview apply description; do
+    [[ -z "${id:-}" ]] && continue
+    if [[ "$id" == "safe-app-caches" ]]; then
+      kb="$(app_cache_kb)"
+    else
+      kb="$(paths_field_kb "$paths")"
+    fi
+    printf '%-10s %-20s %-12s %s\n' "$(human_kb "$kb")" "$id" "$category" "$preview"
+    printf '  apply: %s\n' "$apply"
+    printf '  paths: %s\n' "$paths"
+    printf '  %s\n' "$description"
+  done <<<"$rows"
 }
 
 packages() {
@@ -1906,7 +1971,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  overview|scan|plan|large|duplicates|apps|packages|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
+  overview|scan|plan|large|duplicates|apps|caches|packages|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -2002,6 +2067,7 @@ case "$ACTION" in
   large) large ;;
   duplicates) duplicates ;;
   apps) apps ;;
+  caches) caches ;;
   packages) packages ;;
   snapshots) snapshots ;;
   report) report ;;
