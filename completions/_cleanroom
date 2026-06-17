@@ -1,0 +1,55 @@
+#compdef cleanroom
+
+_cleanroom() {
+  local -a commands options
+
+  commands=(
+    'scan:Show disk usage and cleanup candidates'
+    'report:Write a Markdown cleanup report'
+    'clean:Preview or apply cleanup'
+    'interactive:Choose cleanup categories with prompts'
+    'doctor:Check platform and safety assumptions'
+    'categories:Explain cleanup categories'
+    'init-config:Write a starter config file'
+    'help:Show help'
+  )
+
+  options=(
+    '--apply[Actually delete files]'
+    '--yes[Skip confirmation prompt]'
+    '--verbose[Print every path touched]'
+    '--json[Emit JSON for scan]'
+    '--output[Output path for report]:file:_files'
+    '--config[Config file path]:file:_files'
+    '--exclude[Protect path from deletion]:path:_files'
+    '--days[Age threshold for stale node_modules]:days:'
+    '--preset[Enable preset]:preset:(safe dev deep)'
+    '--include-dev-heavy[Include heavy developer artifacts]'
+    '--include-node-stale[Remove stale node_modules]'
+    '--include-package-stores[Include package-manager stores]'
+    '--include-app-caches[Include safe app cache folders]'
+    '--include-snapshots[Thin local snapshots]'
+    '--include-ai-workspaces[Include generated AI-agent workspace data]'
+    '--include-ai-models[Include downloaded local AI model stores]'
+    '--include-containers[Include local container VM disks]'
+    '--include-gemini[Alias for AI workspaces]'
+    '--include-lmstudio[Alias for AI models]'
+    '(-h --help)'{-h,--help}'[Show help]'
+    '(-v --version)'{-v,--version}'[Show version]'
+  )
+
+  _arguments \
+    '1:command:->cmds' \
+    '*::arg:->args'
+
+  case "$state" in
+    cmds)
+      _describe 'command' commands
+      ;;
+    args)
+      _describe 'option' options
+      ;;
+  esac
+}
+
+_cleanroom "$@"

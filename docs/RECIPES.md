@@ -18,9 +18,12 @@ cleanroom clean
 
 ```sh
 cleanroom scan --json
+cleanroom report --output cleanroom-report.md
 ```
 
-This emits disk and candidate sizes as JSON for wrappers, dashboards, or future GUI frontends.
+`scan --json` emits disk and candidate sizes as JSON for wrappers, dashboards, or future GUI frontends.
+
+`report` writes a Markdown summary with disk state, cleanup candidates, largest known cleanup locations, large-file hints from Spotlight, and safety notes. It is useful before asking for help because people can inspect what is taking space without deleting anything.
 
 ## Developer Laptop
 

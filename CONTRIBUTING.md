@@ -15,8 +15,15 @@ Thanks for helping make `cleanroom` safer and more useful.
 Run:
 
 ```sh
+make test
+```
+
+Or run the individual checks:
+
+```sh
 bash -n bin/cleanroom
 ./bin/cleanroom --version
+./bin/cleanroom report
 ./bin/cleanroom clean --include-app-caches
 ./bin/cleanroom init-config --config /tmp/cleanroom-test-config --yes
 ./test/smoke.sh

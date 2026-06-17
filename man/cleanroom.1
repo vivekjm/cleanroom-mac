@@ -1,0 +1,91 @@
+.TH CLEANROOM 1 "June 2026" "cleanroom 0.5.0" "User Commands"
+.SH NAME
+cleanroom \- safe-by-default macOS storage cleaner
+.SH SYNOPSIS
+.B cleanroom
+.RI "scan [options]"
+.br
+.B cleanroom
+.RI "report [--output path]"
+.br
+.B cleanroom
+.RI "clean [options]"
+.br
+.B cleanroom
+.RI "interactive [options]"
+.SH DESCRIPTION
+.B cleanroom
+scans common macOS storage bloat locations and cleans rebuildable cache or
+artifact data. It is dry-run by default and requires
+.B --apply
+before deleting files.
+.PP
+By default it does not delete browser profiles, saved password databases,
+Keychains, Photos libraries, Mail, iCloud Drive, or arbitrary personal files.
+.SH COMMANDS
+.TP
+.B scan
+Show disk usage, cleanup candidates, largest home folders, and large files.
+.TP
+.B report
+Generate a Markdown cleanup report.
+.TP
+.B clean
+Preview or apply cleanup.
+.TP
+.B interactive
+Prompt for cleanup categories and then run the same clean flow.
+.TP
+.B doctor
+Check platform, dependencies, disk state, and protected data assumptions.
+.TP
+.B categories
+Explain cleanup categories and safety levels.
+.TP
+.B init-config
+Write a starter config file.
+.SH OPTIONS
+.TP
+.B --apply
+Actually delete selected files.
+.TP
+.B --yes
+Skip confirmation prompts.
+.TP
+.B --preset " safe|dev|deep"
+Enable a group of cleanup categories.
+.TP
+.B --config " path"
+Load a config file.
+.TP
+.B --exclude " path"
+Protect a path from deletion.
+.TP
+.B --include-app-caches
+Remove nested app cache folders only.
+.TP
+.B --include-dev-heavy
+Remove heavy developer artifacts such as SDK components and simulator state.
+.TP
+.B --include-ai-workspaces
+Remove generated AI-agent workspace data.
+.TP
+.B --include-ai-models
+Remove downloaded local AI model stores.
+.TP
+.B --include-containers
+Remove local container VM disks. This can remove containers and volumes.
+.SH EXAMPLES
+.nf
+cleanroom scan
+cleanroom report --output cleanroom-report.md
+cleanroom clean --preset dev
+cleanroom clean --preset dev --apply
+cleanroom interactive
+.fi
+.SH SAFETY
+Review dry-run output before using
+.B --apply.
+Use
+.B --exclude
+or config excludes to protect custom project paths.

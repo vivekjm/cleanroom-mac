@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.4.0"
+VERSION="0.5.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -10,6 +10,7 @@ DAYS=30
 ACTION="scan"
 CONFIG_FILE=""
 CONFIG_LOADED=0
+OUTPUT_FILE=""
 EXCLUDES=()
 INCLUDE_DEV_HEAVY=0
 INCLUDE_NODE_STALE=0
@@ -34,6 +35,7 @@ cleanroom - safe macOS storage cleaner
 
 Usage:
   cleanroom scan [options]
+  cleanroom report [--output PATH]
   cleanroom clean [options]
   cleanroom interactive [options]
   cleanroom doctor
@@ -43,6 +45,7 @@ Usage:
 
 Actions:
   scan                 Show disk usage and likely cleanup candidates.
+  report               Write a Markdown cleanup report. Prints to stdout by default.
   clean                Clean safe rebuildable caches. Dry-run unless --apply is passed.
   interactive          Choose cleanup categories in a guided prompt.
   doctor               Check platform, dependencies, permissions, and risky state.
@@ -54,6 +57,7 @@ Options:
   --yes                Do not prompt before --apply cleanup.
   --verbose            Print every path touched.
   --json               Emit JSON for scan.
+  --output PATH        Output path for report.
   --config PATH        Load config file. Default: ~/.config/cleanroom/config.
   --exclude PATH       Never remove this path. Can be passed multiple times.
   --days N             Age threshold for stale node_modules. Default: 30.
@@ -87,6 +91,7 @@ Safety:
 Examples:
   cleanroom scan
   cleanroom scan --json
+  cleanroom report --output cleanroom-report.md
   cleanroom doctor
   cleanroom categories
   cleanroom init-config
@@ -211,6 +216,54 @@ print_size() {
   local kb
   kb="$(size_kb "$path")"
   printf '%8s  %s\n' "$(human_kb "$kb")" "$path"
+}
+
+candidate_paths() {
+  cat <<'EOF'
+~/Library/Caches
+~/Library/Logs
+~/Library/Developer
+~/Library/Android
+~/Library/pnpm
+~/.npm
+~/.yarn
+~/.gradle
+~/.cache
+~/.gemini
+~/.lmstudio
+~/.ollama
+~/.cache/huggingface
+~/.cocoapods
+~/.colima
+~/.lima
+~/.codex
+~/Library/Application Support
+~/Documents
+~/Desktop
+~/Downloads
+EOF
+}
+
+report_candidate_paths() {
+  cat <<'EOF'
+~/Library/Caches
+~/Library/Logs
+~/Library/Developer
+~/Library/Android
+~/Library/pnpm
+~/.npm
+~/.yarn
+~/.gradle
+~/.cache
+~/.gemini
+~/.lmstudio
+~/.ollama
+~/.cache/huggingface
+~/.cocoapods
+~/.colima
+~/.lima
+~/.codex
+EOF
 }
 
 disk_line() {
@@ -449,13 +502,9 @@ clean_node_stale() {
 }
 
 scan() {
-  local paths=(
-    "~/Library/Caches" "~/Library/Logs" "~/Library/Developer" "~/Library/Android"
-    "~/Library/pnpm" "~/.npm" "~/.yarn" "~/.gradle" "~/.cache" "~/.gemini"
-    "~/.lmstudio" "~/.ollama" "~/.cache/huggingface" "~/.cocoapods" "~/.colima"
-    "~/.lima" "~/.codex" "~/Library/Application Support"
-    "~/Documents" "~/Desktop" "~/Downloads"
-  )
+  local paths=()
+  local candidate
+  while IFS= read -r candidate; do paths+=("$candidate"); done < <(candidate_paths)
   if [[ "$JSON" -eq 1 ]]; then
     printf '{'
     disk_json
@@ -486,6 +535,59 @@ scan() {
   printf '\n%s\n' "${BOLD}Largest user files over 500MB${RESET}"
   find "$HOME" -xdev -type f -size +500M -print0 2>/dev/null |
     xargs -0 du -h 2>/dev/null | sort -h | tail -30 || true
+}
+
+report_body() {
+  local now
+  now="$(date '+%Y-%m-%d %H:%M:%S %Z')"
+  printf '# cleanroom report\n\n'
+  printf '%s\n' "- Generated: $now"
+  printf '%s\n\n' "- Version: $VERSION"
+
+  printf '## Disk\n\n```text\n'
+  disk_line
+  printf '```\n\n'
+
+  printf '## Cleanup Candidates\n\n'
+  printf '| Size | Path |\n| ---: | --- |\n'
+  local path kb
+  while IFS= read -r path; do
+    kb="$(size_kb "$path")"
+    printf '| %s | `%s` |\n' "$(human_kb "$kb")" "$(expand_path "$path")"
+  done < <(report_candidate_paths)
+
+  printf '\n## Largest Cleanup Candidates\n\n```text\n'
+  while IFS= read -r path; do
+    kb="$(size_kb "$path")"
+    printf '%012d\t%s\t%s\n' "$kb" "$(human_kb "$kb")" "$(expand_path "$path")"
+  done < <(report_candidate_paths) | sort -n | tail -20 | awk -F '\t' '{printf "%8s  %s\n", $2, $3}'
+  printf '```\n\n'
+
+  printf 'Broad personal folders such as `~/Documents`, `~/Desktop`, `~/Downloads`, and `~/Library/Application Support` are intentionally not recursively measured in this quick report. Run `cleanroom scan` when you want the heavier full view.\n\n'
+
+  printf '## Large File Hints Over 500MB\n\n```text\n'
+  if command -v mdfind >/dev/null 2>&1; then
+    mdfind -onlyin "$HOME" 'kMDItemFSSize > 524288000' 2>/dev/null |
+      head -100 |
+      while IFS= read -r path; do
+        [[ -f "$path" ]] && print_size "$path"
+      done | sort -h | tail -30 || true
+  else
+    printf 'Spotlight mdfind is not available on this system.\n'
+  fi
+  printf '```\n\n'
+
+  printf '## Safety Notes\n\n'
+  printf 'cleanroom does not delete browser profiles, password databases, Keychains, Photos, Mail, or iCloud Drive by default.\n'
+}
+
+report() {
+  if [[ -n "$OUTPUT_FILE" ]]; then
+    report_body >"$(expand_path "$OUTPUT_FILE")"
+    ok "Wrote report: $(expand_path "$OUTPUT_FILE")"
+  else
+    report_body
+  fi
 }
 
 doctor() {
@@ -531,6 +633,7 @@ doctor() {
   for p in "${protected[@]}"; do
     [[ -e "$p" ]] && printf '%-28s present, protected\n' "$(basename "$p")"
   done
+  return 0
 }
 
 init_config() {
@@ -685,7 +788,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  scan|clean|interactive|doctor|categories|init-config|help)
+  scan|report|clean|interactive|doctor|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -713,6 +816,11 @@ while [[ "$#" -gt 0 ]]; do
     --yes) ASSUME_YES=1 ;;
     --verbose) VERBOSE=1 ;;
     --json) JSON=1 ;;
+    --output)
+      shift
+      [[ -n "${1:-}" ]] || die "--output requires a path"
+      OUTPUT_FILE="${1:-}"
+      ;;
     --config)
       shift
       CONFIG_FILE="${1:-}"
@@ -749,6 +857,7 @@ done
 
 case "$ACTION" in
   scan) scan ;;
+  report) report ;;
   clean) clean ;;
   interactive) interactive ;;
   doctor) doctor ;;

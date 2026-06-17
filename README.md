@@ -41,10 +41,22 @@ From this repo:
 ./install.sh
 ```
 
+This installs the `cleanroom` command, a `cleanroom(1)` man page, and zsh completions under `/usr/local` by default. Override `PREFIX` if you want a different location:
+
+```sh
+PREFIX="$HOME/.local" ./install.sh
+```
+
 Or run directly:
 
 ```sh
 ./bin/cleanroom scan
+```
+
+Uninstall:
+
+```sh
+./uninstall.sh
 ```
 
 ## Development
@@ -52,7 +64,7 @@ Or run directly:
 Run the smoke tests:
 
 ```sh
-./test/smoke.sh
+make test
 ```
 
 ## Usage
@@ -67,6 +79,12 @@ Machine-readable scan:
 
 ```sh
 cleanroom scan --json
+```
+
+Create a Markdown report for sharing, audits, or GitHub issues:
+
+```sh
+cleanroom report --output cleanroom-report.md
 ```
 
 Check environment and safety assumptions:
@@ -197,6 +215,8 @@ Config files use simple `key=value` lines and are never executed as shell.
 `--include-ai-models` removes downloaded local model files and backend extensions from known stores such as LM Studio, Ollama, Hugging Face cache, and similar caches. These can usually be downloaded again later, but they may be large.
 
 `--include-containers` removes local container VM disks for known runtimes such as Colima/Lima and Docker Desktop. This can remove local containers and volumes.
+
+The project also ships `make install`, `make uninstall`, `make lint`, and `make test` targets for maintainers and package managers.
 
 ## License
 
