@@ -161,6 +161,13 @@ cleanroom apps --json /Applications
 cleanroom apps ~/Applications --limit 20
 ```
 
+Review startup and background launch items:
+
+```sh
+cleanroom startup
+cleanroom startup --json
+```
+
 Inventory safe and opt-in cache buckets:
 
 ```sh
@@ -395,6 +402,8 @@ Config files use simple `key=value` lines and are never executed as shell.
 `nodes` lists stale `node_modules` folders before you decide whether to run `cleanroom clean --include-node-stale --apply`.
 
 `apps` lists `.app` bundle sizes from `/Applications` and `~/Applications`, or a path you provide. It never uninstalls apps.
+
+`startup` lists LaunchAgents and LaunchDaemons for review. It never unloads, disables, or removes startup items.
 
 `packages` inventories npm, Yarn, pnpm, Gradle, CocoaPods, Cargo, and Homebrew stores with preview/apply commands for matching cleanup categories.
 

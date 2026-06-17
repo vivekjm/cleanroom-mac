@@ -11,6 +11,7 @@ _cleanroom() {
     'duplicates:Find exact duplicate files for review'
     'nodes:List stale node_modules folders'
     'apps:List large app bundles for review'
+    'startup:List LaunchAgents and LaunchDaemons'
     'caches:Inventory cache buckets'
     'packages:Inventory package-manager stores'
     'snapshots:List local Time Machine snapshots'

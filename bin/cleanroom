@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.20.0"
+VERSION="0.21.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -47,6 +47,7 @@ Usage:
   cleanroom duplicates [PATH] [--min-mb N] [--limit N] [--json]
   cleanroom nodes [PATH] [--days N] [--limit N] [--json]
   cleanroom apps [PATH] [--limit N] [--json]
+  cleanroom startup [--json]
   cleanroom caches [--json]
   cleanroom packages [--json]
   cleanroom snapshots [--json]
@@ -71,6 +72,7 @@ Actions:
   duplicates           Find exact duplicate files for review without deleting anything.
   nodes                List stale node_modules folders for review.
   apps                 List largest app bundles for review without uninstalling.
+  startup              List LaunchAgents and LaunchDaemons for review.
   caches               Inventory safe and opt-in cache buckets.
   packages             Inventory package-manager caches and stores.
   snapshots            List local Time Machine snapshots for review.
@@ -92,7 +94,7 @@ Options:
   --yes                Do not prompt before --apply cleanup.
   --verbose            Print every path touched.
   --json               Emit JSON for overview, scan, plan, large, duplicates, nodes, apps,
-                       caches, packages, snapshots, doctor, protect, guard, or rules.
+                       startup, caches, packages, snapshots, doctor, protect, guard, or rules.
   --output PATH        Output path for report.
   --log PATH           Write apply audit log here. Default: ~/.local/state/cleanroom/runs/*.log.
   --config PATH        Load config file. Default: ~/.config/cleanroom/config.
@@ -143,6 +145,8 @@ Examples:
   cleanroom nodes --json ~/Documents
   cleanroom apps
   cleanroom apps --json /Applications
+  cleanroom startup
+  cleanroom startup --json
   cleanroom caches
   cleanroom caches --json
   cleanroom packages
@@ -1243,6 +1247,100 @@ apps() {
   done <<<"$rows"
 }
 
+plist_value() {
+  local file="$1"
+  local key="$2"
+  plutil -extract "$key" raw -o - "$file" 2>/dev/null || true
+}
+
+startup_program() {
+  local plist="$1" program
+  program="$(plist_value "$plist" "Program")"
+  if [[ -z "$program" ]]; then
+    program="$(plutil -p "$plist" 2>/dev/null | awk '
+      /"ProgramArguments"/ {in_args=1; next}
+      in_args && /\]/ {exit}
+      in_args && /=>/ {
+        sub(/^[[:space:]]*[0-9]+ => "/, "")
+        sub(/"$/, "")
+        print
+        exit
+      }
+    ' || true)"
+  fi
+  printf '%s\n' "$program"
+}
+
+startup_rows() {
+  local entries=(
+    "user	LaunchAgent	$HOME/Library/LaunchAgents"
+    "local	LaunchAgent	/Library/LaunchAgents"
+    "local	LaunchDaemon	/Library/LaunchDaemons"
+  )
+  local entry scope type dir plist label disabled status program
+  for entry in "${entries[@]}"; do
+    IFS=$'\t' read -r scope type dir <<<"$entry"
+    [[ -d "$dir" ]] || continue
+    find "$dir" -maxdepth 1 -type f -name '*.plist' -print0 2>/dev/null |
+      while IFS= read -r -d '' plist; do
+        label="$(plist_value "$plist" "Label")"
+        [[ -n "$label" ]] || label="$(basename "$plist" .plist)"
+        disabled="$(plist_value "$plist" "Disabled")"
+        if [[ "$disabled" == "true" ]]; then
+          status="disabled"
+        else
+          status="enabled"
+        fi
+        program="$(startup_program "$plist")"
+        printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$scope" "$type" "$status" "$label" "$program" "$plist"
+      done
+  done | awk -v limit="$LIMIT" 'NR <= limit'
+}
+
+startup_count() {
+  startup_rows | awk 'END {print NR + 0}'
+}
+
+startup() {
+  local rows
+  rows="$(startup_rows)"
+
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '['
+    local first=1 scope type status label program plist
+    while IFS=$'\t' read -r scope type status label program plist; do
+      [[ -z "${plist:-}" ]] && continue
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '{"scope":"%s","type":"%s","status":"%s","label":"%s","program":"%s","path":"%s"}' \
+        "$(printf '%s' "$scope" | json_escape)" \
+        "$(printf '%s' "$type" | json_escape)" \
+        "$(printf '%s' "$status" | json_escape)" \
+        "$(printf '%s' "$label" | json_escape)" \
+        "$(printf '%s' "$program" | json_escape)" \
+        "$(printf '%s' "$plist" | json_escape)"
+    done <<<"$rows"
+    printf ']\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}cleanroom startup items${RESET}"
+  printf 'Review-only list. cleanroom does not unload, disable, or remove startup items.\n'
+  printf 'Limit: %s\n\n' "$LIMIT"
+  if [[ -z "$rows" ]]; then
+    printf 'No LaunchAgents or LaunchDaemons found.\n'
+    return 0
+  fi
+  printf '%-8s %-13s %-9s %-36s %s\n' "scope" "type" "status" "label" "path"
+  local scope type status label program plist
+  while IFS=$'\t' read -r scope type status label program plist; do
+    [[ -z "${plist:-}" ]] && continue
+    printf '%-8s %-13s %-9s %-36s %s\n' "$scope" "$type" "$status" "$label" "$plist"
+    [[ -n "$program" ]] && printf '  program: %s\n' "$program"
+  done <<<"$rows"
+  printf '\nReview login items in System Settings > General > Login Items.\n'
+}
+
 package_rows() {
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "npm-cache" "npm" "~/.npm/_cacache; ~/.npm/_logs; ~/.npm/_npx" "default" "cleanroom clean" "cleanroom clean --apply --trash"
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "yarn-cache" "yarn" "~/.yarn/cache; ~/.yarn/berry" "default" "cleanroom clean" "cleanroom clean --apply --trash"
@@ -1416,22 +1514,24 @@ app_bundle_count() {
 }
 
 overview() {
-  local plan_rows_sorted package_total protected_count snapshots app_count
+  local plan_rows_sorted package_total protected_count snapshots app_count startup_items
   plan_rows_sorted="$(plan_rows | sort -rn | head -5)"
   package_total="$(package_total_kb)"
   protected_count="$(protected_present_count)"
   snapshots="$(snapshot_count)"
   app_count="$(app_bundle_count)"
+  startup_items="$(startup_count)"
 
   if [[ "$JSON" -eq 1 ]]; then
     printf '{'
     disk_json
-    printf ',"summary":{"package_store_kb":%s,"package_store":"%s","protected_present":%s,"snapshot_count":%s,"app_bundle_count":%s}' \
+    printf ',"summary":{"package_store_kb":%s,"package_store":"%s","protected_present":%s,"snapshot_count":%s,"app_bundle_count":%s,"startup_item_count":%s}' \
       "$package_total" \
       "$(human_kb "$package_total" | json_escape)" \
       "$protected_count" \
       "$snapshots" \
-      "$app_count"
+      "$app_count" \
+      "$startup_items"
     printf ',"recommendations":['
     local first=1 kb id title preview_command apply_command description
     while IFS=$'\t' read -r kb id title preview_command apply_command description; do
@@ -1460,6 +1560,7 @@ overview() {
   printf '%-24s %s\n' "protected paths present" "$protected_count"
   printf '%-24s %s\n' "local snapshots" "$snapshots"
   printf '%-24s %s\n' "app bundles" "$app_count"
+  printf '%-24s %s\n' "startup items" "$startup_items"
 
   printf '\n%s\n' "${BOLD}Top cleanup recommendations${RESET}"
   printf '%-10s %-18s %-32s %s\n' "estimate" "id" "title" "preview command"
@@ -1472,6 +1573,7 @@ overview() {
   printf '\n%s\n' "${BOLD}Useful next commands${RESET}"
   printf 'cleanroom plan\n'
   printf 'cleanroom large ~/Documents --min-mb 250 --limit 50\n'
+  printf 'cleanroom startup\n'
   printf 'cleanroom packages\n'
   printf 'cleanroom protect\n'
 }
@@ -1822,7 +1924,7 @@ doctor() {
     disk_json
     printf ',"tools":['
     local first=1 tool required status
-    for tool in du find awk sort xargs shasum sqlite3 tmutil brew xcrun; do
+    for tool in du find awk sort xargs shasum sqlite3 plutil tmutil brew xcrun; do
       case "$tool" in
         brew|xcrun) required=false ;;
         *) required=true ;;
@@ -1859,7 +1961,7 @@ doctor() {
 
   printf '\n%s\n' "${BOLD}Tools${RESET}"
   local tool
-  for tool in du find awk sort xargs sqlite3 tmutil; do
+  for tool in du find awk sort xargs sqlite3 plutil tmutil; do
     if command -v "$tool" >/dev/null 2>&1; then
       printf '%-28s %s\n' "$tool" "ok"
     else
@@ -2059,7 +2161,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  overview|scan|plan|large|duplicates|nodes|apps|caches|packages|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
+  overview|scan|plan|large|duplicates|nodes|apps|startup|caches|packages|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -2156,6 +2258,7 @@ case "$ACTION" in
   duplicates) duplicates ;;
   nodes) nodes ;;
   apps) apps ;;
+  startup) startup ;;
   caches) caches ;;
   packages) packages ;;
   snapshots) snapshots ;;

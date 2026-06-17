@@ -12,6 +12,7 @@ cleanroom large
 cleanroom duplicates
 cleanroom nodes
 cleanroom apps
+cleanroom startup
 cleanroom caches
 cleanroom packages
 cleanroom snapshots
@@ -36,6 +37,7 @@ cleanroom large --json ~/Documents
 cleanroom duplicates --json ~/Documents
 cleanroom nodes --json ~/Documents
 cleanroom apps --json
+cleanroom startup --json
 cleanroom caches --json
 cleanroom packages --json
 cleanroom snapshots --json
@@ -59,6 +61,8 @@ cleanroom report --output cleanroom-report.md
 `nodes --json [PATH]` emits stale `node_modules` folders with age, size, and the matching preview/apply commands.
 
 `apps --json [PATH]` emits app bundle sizes for `/Applications`, `~/Applications`, or a provided path. It is intentionally review-only and does not uninstall anything.
+
+`startup --json` emits LaunchAgents and LaunchDaemons with scope, type, status, label, program, and path. It is intentionally review-only and does not unload, disable, or remove anything.
 
 `caches --json` emits safe and opt-in cache bucket sizes with the matching preview and apply commands.
 
@@ -125,6 +129,15 @@ cleanroom apps --json /Applications
 ```
 
 Review large app bundles manually. cleanroom does not uninstall apps because app removal can require vendor uninstallers, launch agents, helper tools, login items, and account-specific data.
+
+## Slow Startup / Background Items
+
+```sh
+cleanroom startup
+cleanroom startup --json
+```
+
+Review LaunchAgents and LaunchDaemons before removing vendor tools manually. cleanroom does not unload, disable, or remove startup items.
 
 ## Config File
 

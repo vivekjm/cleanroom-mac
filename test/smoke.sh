@@ -12,6 +12,7 @@ trap cleanup EXIT
 
 mkdir -p \
   "$TEST_HOME/Library/Caches" \
+  "$TEST_HOME/Library/LaunchAgents" \
   "$TEST_HOME/Library/Logs" \
   "$TEST_HOME/Library/Developer/Xcode/DerivedData" \
   "$TEST_HOME/Library/Application Support/Google/Chrome/Default" \
@@ -35,6 +36,18 @@ printf 'browser cache\n' >"$TEST_HOME/Library/Application Support/Google/Chrome/
 printf 'keychain\n' >"$TEST_HOME/Library/Keychains/login.keychain-db"
 printf 'old dependency\n' >"$TEST_HOME/Documents/example/node_modules/package.txt"
 touch -t 202001010000 "$TEST_HOME/Documents/example/node_modules" "$TEST_HOME/Documents/example/node_modules/package.txt"
+cat >"$TEST_HOME/Library/LaunchAgents/com.example.cleanroom-test.plist" <<'PLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "https://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.example.cleanroom-test</string>
+  <key>Program</key>
+  <string>/usr/bin/true</string>
+</dict>
+</plist>
+PLIST
 dd if=/dev/zero of="$TEST_HOME/Downloads/big-test.bin" bs=1024 count=2048 >/dev/null 2>&1
 dd if=/dev/zero of="$TEST_HOME/Documents/duplicates/copy-a.bin" bs=1024 count=2048 >/dev/null 2>&1
 cp "$TEST_HOME/Documents/duplicates/copy-a.bin" "$TEST_HOME/Documents/duplicates/copy-b.bin"
@@ -93,6 +106,13 @@ apps_json="$(mktemp)"
 python3 -m json.tool "$apps_json" >/dev/null
 grep 'FakeBig' "$apps_json" >/dev/null
 rm -f "$apps_json"
+"$BIN" startup | grep 'com.example.cleanroom-test' >/dev/null
+startup_json="$(mktemp)"
+"$BIN" startup --json > "$startup_json"
+python3 -m json.tool "$startup_json" >/dev/null
+grep 'com.example.cleanroom-test' "$startup_json" >/dev/null
+grep '"type":"LaunchAgent"' "$startup_json" >/dev/null
+rm -f "$startup_json"
 "$BIN" packages | grep 'pnpm-store' >/dev/null
 packages_json="$(mktemp)"
 "$BIN" packages --json > "$packages_json"
