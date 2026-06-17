@@ -47,12 +47,38 @@ Or run directly:
 ./bin/cleanroom scan
 ```
 
+## Development
+
+Run the smoke tests:
+
+```sh
+./test/smoke.sh
+```
+
 ## Usage
 
 Scan:
 
 ```sh
 cleanroom scan
+```
+
+Machine-readable scan:
+
+```sh
+cleanroom scan --json
+```
+
+Check environment and safety assumptions:
+
+```sh
+cleanroom doctor
+```
+
+See cleanup categories:
+
+```sh
+cleanroom categories
 ```
 
 Preview safe cleanup:

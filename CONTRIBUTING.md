@@ -18,6 +18,7 @@ Run:
 bash -n bin/cleanroom
 ./bin/cleanroom --version
 ./bin/cleanroom clean --include-app-caches
+./test/smoke.sh
 ```
 
 Avoid running `--apply` in tests unless inside a disposable macOS account or fixture directory.

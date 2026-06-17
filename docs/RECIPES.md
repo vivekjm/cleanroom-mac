@@ -6,10 +6,20 @@ Common `cleanroom` workflows.
 
 ```sh
 cleanroom scan
+cleanroom doctor
+cleanroom categories
 cleanroom clean
 ```
 
-The second command is a dry-run. Add `--apply` only after reviewing the preview.
+`cleanroom clean` is a dry-run. Add `--apply` only after reviewing the preview.
+
+## Automation / Reporting
+
+```sh
+cleanroom scan --json
+```
+
+This emits disk and candidate sizes as JSON for wrappers, dashboards, or future GUI frontends.
 
 ## Developer Laptop
 

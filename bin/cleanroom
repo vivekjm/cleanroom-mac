@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.2.0"
+VERSION="0.3.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
+JSON=0
 DAYS=30
 ACTION="scan"
 INCLUDE_DEV_HEAVY=0
@@ -31,16 +32,21 @@ cleanroom - safe macOS storage cleaner
 Usage:
   cleanroom scan [options]
   cleanroom clean [options]
+  cleanroom doctor
+  cleanroom categories
   cleanroom help
 
 Actions:
   scan                 Show disk usage and likely cleanup candidates.
   clean                Clean safe rebuildable caches. Dry-run unless --apply is passed.
+  doctor               Check platform, dependencies, permissions, and risky state.
+  categories           Explain cleanup categories and safety levels.
 
 Options:
   --apply              Actually delete files. Without this, clean only previews.
   --yes                Do not prompt before --apply cleanup.
   --verbose            Print every path touched.
+  --json               Emit JSON for scan.
   --days N             Age threshold for stale node_modules. Default: 30.
   --preset NAME        Enable a useful group: safe, dev, deep.
                        safe: default rebuildable caches.
@@ -71,6 +77,9 @@ Safety:
 
 Examples:
   cleanroom scan
+  cleanroom scan --json
+  cleanroom doctor
+  cleanroom categories
   cleanroom clean
   cleanroom clean --preset dev
   cleanroom clean --apply --include-app-caches
@@ -128,6 +137,22 @@ print_size() {
 
 disk_line() {
   df -h /System/Volumes/Data 2>/dev/null || df -h /
+}
+
+json_escape() {
+  sed 's/\\/\\\\/g; s/"/\\"/g'
+}
+
+disk_json() {
+  local line
+  line="$(df -k /System/Volumes/Data 2>/dev/null | awk 'NR==2 {print $2, $3, $4, $5, $9}')"
+  if [[ -z "$line" ]]; then
+    line="$(df -k / | awk 'NR==2 {print $2, $3, $4, $5, $9}')"
+  fi
+  awk -v values="$line" 'BEGIN {
+    split(values, a, " ")
+    printf "\"disk\":{\"size_kb\":%s,\"used_kb\":%s,\"available_kb\":%s,\"capacity\":\"%s\",\"mount\":\"%s\"}", a[1], a[2], a[3], a[4], a[5]
+  }'
 }
 
 confirm_apply() {
@@ -246,10 +271,12 @@ clean_app_caches() {
         -name 'Cache' -o -name 'Code Cache' -o -name 'GPUCache' -o -name 'DawnCache' \
         -o -name 'ShaderCache' -o -name 'GrShaderCache' -o -name 'CachedData' \
         -o -name 'Crashpad' \
-      \) -prune -exec du -sk {} + 2>/dev/null | awk '{total += $1} END {print total + 0}')"
+      \) -prune -exec du -sk {} + 2>/dev/null | awk '{total += $1} END {print total + 0}' || true)"
+      [[ -n "$total" ]] || total=0
       printf 'would clean %8s  %s cache folders\n' "$(human_kb "$total")" "$root"
     fi
   done
+  return 0
 }
 
 clean_dev_heavy() {
@@ -332,12 +359,10 @@ clean_node_stale() {
         run_rm "$path"
       done
   done
+  return 0
 }
 
 scan() {
-  log "${BOLD}Disk${RESET}"
-  disk_line
-  printf '\n%s\n' "${BOLD}Common cleanup candidates${RESET}"
   local paths=(
     "~/Library/Caches" "~/Library/Logs" "~/Library/Developer" "~/Library/Android"
     "~/Library/pnpm" "~/.npm" "~/.yarn" "~/.gradle" "~/.cache" "~/.gemini"
@@ -345,6 +370,27 @@ scan() {
     "~/.lima" "~/.codex" "~/Library/Application Support"
     "~/Documents" "~/Desktop" "~/Downloads"
   )
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '{'
+    disk_json
+    printf ',"candidates":['
+    local first=1
+    local path expanded kb
+    for path in "${paths[@]}"; do
+      expanded="$(expand_path "$path")"
+      kb="$(size_kb "$path")"
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '{"path":"%s","size_kb":%s}' "$(printf '%s' "$expanded" | json_escape)" "$kb"
+    done
+    printf ']}'
+    printf '\n'
+    return 0
+  fi
+
+  log "${BOLD}Disk${RESET}"
+  disk_line
+  printf '\n%s\n' "${BOLD}Common cleanup candidates${RESET}"
   local path
   for path in "${paths[@]}"; do print_size "$path"; done
 
@@ -354,6 +400,90 @@ scan() {
   printf '\n%s\n' "${BOLD}Largest user files over 500MB${RESET}"
   find "$HOME" -xdev -type f -size +500M -print0 2>/dev/null |
     xargs -0 du -h 2>/dev/null | sort -h | tail -30 || true
+}
+
+doctor() {
+  log "${BOLD}cleanroom doctor${RESET}"
+  printf '%-28s %s\n' "version" "$VERSION"
+  printf '%-28s %s\n' "shell" "${SHELL:-unknown}"
+  printf '%-28s %s\n' "macOS" "$(sw_vers -productVersion 2>/dev/null || echo unknown)"
+  printf '%-28s %s\n' "architecture" "$(uname -m)"
+  printf '%-28s ' "disk"
+  df -h /System/Volumes/Data 2>/dev/null | awk 'NR==2 {print $4 " free, " $5 " used"}' || df -h / | awk 'NR==2 {print $4 " free, " $5 " used"}'
+
+  printf '\n%s\n' "${BOLD}Tools${RESET}"
+  local tool
+  for tool in du find awk sort xargs sqlite3 tmutil; do
+    if command -v "$tool" >/dev/null 2>&1; then
+      printf '%-28s %s\n' "$tool" "ok"
+    else
+      printf '%-28s missing\n' "$tool"
+    fi
+  done
+  if command -v brew >/dev/null 2>&1; then
+    printf '%-28s %s\n' "brew" "ok"
+  else
+    printf '%-28s %s\n' "brew" "optional missing"
+  fi
+  if command -v xcrun >/dev/null 2>&1; then
+    printf '%-28s %s\n' "xcrun" "ok"
+  else
+    printf '%-28s %s\n' "xcrun" "optional missing"
+  fi
+
+  printf '\n%s\n' "${BOLD}Protected data check${RESET}"
+  local protected=(
+    "$HOME/Library/Keychains"
+    "$HOME/Library/Application Support/Google/Chrome"
+    "$HOME/Library/Mail"
+    "$HOME/Library/Mobile Documents"
+    "$HOME/Pictures/Photos Library.photoslibrary"
+  )
+  local p
+  for p in "${protected[@]}"; do
+    [[ -e "$p" ]] && printf '%-28s present, protected\n' "$(basename "$p")"
+  done
+}
+
+categories() {
+  cat <<'EOF'
+cleanroom categories
+
+Default safe cleanup:
+  Rebuildable user caches, logs older than 7 days, npm/Yarn/Gradle cache, Xcode DerivedData.
+
+--include-app-caches:
+  Nested app cache folders only. Does not remove browser profiles, password databases,
+  cookies, bookmarks, or full app profile directories.
+
+--include-package-stores:
+  Rebuildable package-manager stores such as pnpm, CocoaPods repos, Gradle caches,
+  and Cargo registry cache.
+
+--include-node-stale:
+  node_modules older than --days under Desktop/Documents/Downloads.
+
+--include-dev-heavy:
+  Xcode device support, unavailable simulators, simulator app data, Android NDK,
+  and Android system images.
+
+--include-ai-workspaces:
+  Generated AI-agent recordings, scratch data, local brain/memory, implicit data,
+  and local conversation caches where known.
+
+--include-ai-models:
+  Downloaded local AI model stores such as LM Studio, Ollama, Hugging Face, torch hub,
+  ModelScope, and Whisper cache.
+
+--include-containers:
+  Local container VM disks for Colima/Lima/Docker Desktop. This can remove containers,
+  images, and volumes.
+
+Presets:
+  safe  default cleanup only
+  dev   safe + app caches + package stores + stale node_modules
+  deep  dev + heavy SDKs + snapshots + AI workspaces
+EOF
 }
 
 clean() {
@@ -407,7 +537,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  scan|clean|help)
+  scan|clean|doctor|categories|help)
     ACTION="$1"
     shift
     ;;
@@ -418,6 +548,7 @@ while [[ "$#" -gt 0 ]]; do
     --apply) APPLY=1 ;;
     --yes) ASSUME_YES=1 ;;
     --verbose) VERBOSE=1 ;;
+    --json) JSON=1 ;;
     --preset)
       shift
       apply_preset "${1:-}"
@@ -447,6 +578,8 @@ done
 case "$ACTION" in
   scan) scan ;;
   clean) clean ;;
+  doctor) doctor ;;
+  categories) categories ;;
   help) usage ;;
   *) die "Unknown action: $ACTION" ;;
 esac
