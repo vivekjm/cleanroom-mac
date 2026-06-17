@@ -81,6 +81,18 @@ See cleanup categories:
 cleanroom categories
 ```
 
+Create a config file:
+
+```sh
+cleanroom init-config
+```
+
+Use a guided prompt:
+
+```sh
+cleanroom interactive
+```
+
 Preview safe cleanup:
 
 ```sh
@@ -166,9 +178,17 @@ Combine categories:
 cleanroom clean --apply --include-app-caches --include-dev-heavy --include-node-stale --days 30
 ```
 
+Use a config file and protect custom paths:
+
+```sh
+cleanroom clean --config ~/.config/cleanroom/config --exclude ~/Desktop/important-project
+```
+
 ## Notes
 
 More examples are in [docs/RECIPES.md](docs/RECIPES.md).
+
+Config files use simple `key=value` lines and are never executed as shell.
 
 `--include-dev-heavy` can remove simulator app state and Android SDK components that may need to be reinstalled later.
 

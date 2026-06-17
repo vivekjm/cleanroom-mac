@@ -18,6 +18,7 @@ Run:
 bash -n bin/cleanroom
 ./bin/cleanroom --version
 ./bin/cleanroom clean --include-app-caches
+./bin/cleanroom init-config --config /tmp/cleanroom-test-config --yes
 ./test/smoke.sh
 ```
 

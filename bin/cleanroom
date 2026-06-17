@@ -1,13 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.3.0"
+VERSION="0.4.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
 JSON=0
 DAYS=30
 ACTION="scan"
+CONFIG_FILE=""
+CONFIG_LOADED=0
+EXCLUDES=()
 INCLUDE_DEV_HEAVY=0
 INCLUDE_NODE_STALE=0
 INCLUDE_GEMINI=0
@@ -32,21 +35,27 @@ cleanroom - safe macOS storage cleaner
 Usage:
   cleanroom scan [options]
   cleanroom clean [options]
+  cleanroom interactive [options]
   cleanroom doctor
   cleanroom categories
+  cleanroom init-config [--config PATH]
   cleanroom help
 
 Actions:
   scan                 Show disk usage and likely cleanup candidates.
   clean                Clean safe rebuildable caches. Dry-run unless --apply is passed.
+  interactive          Choose cleanup categories in a guided prompt.
   doctor               Check platform, dependencies, permissions, and risky state.
   categories           Explain cleanup categories and safety levels.
+  init-config          Write a starter config file.
 
 Options:
   --apply              Actually delete files. Without this, clean only previews.
   --yes                Do not prompt before --apply cleanup.
   --verbose            Print every path touched.
   --json               Emit JSON for scan.
+  --config PATH        Load config file. Default: ~/.config/cleanroom/config.
+  --exclude PATH       Never remove this path. Can be passed multiple times.
   --days N             Age threshold for stale node_modules. Default: 30.
   --preset NAME        Enable a useful group: safe, dev, deep.
                        safe: default rebuildable caches.
@@ -80,6 +89,8 @@ Examples:
   cleanroom scan --json
   cleanroom doctor
   cleanroom categories
+  cleanroom init-config
+  cleanroom interactive
   cleanroom clean
   cleanroom clean --preset dev
   cleanroom clean --apply --include-app-caches
@@ -96,6 +107,73 @@ expand_path() {
   local path="$1"
   path="${path/#\~/$HOME}"
   printf '%s\n' "$path"
+}
+
+config_default_path() {
+  printf '%s\n' "$HOME/.config/cleanroom/config"
+}
+
+truthy() {
+  case "${1:-}" in
+    1|true|TRUE|yes|YES|on|ON) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+add_exclude() {
+  local path
+  path="$(expand_path "$1")"
+  [[ -n "$path" ]] && EXCLUDES+=("$path")
+}
+
+is_excluded() {
+  local path="$1"
+  local excluded
+  [[ "${#EXCLUDES[@]}" -eq 0 ]] && return 1
+  for excluded in "${EXCLUDES[@]}"; do
+    [[ -z "$excluded" ]] && continue
+    if [[ "$path" == "$excluded" || "$path" == "$excluded/"* ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+load_config() {
+  local file="$1"
+  file="$(expand_path "$file")"
+  [[ -f "$file" ]] || return 0
+  CONFIG_LOADED=1
+
+  local line key value
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    line="${line%%#*}"
+    line="${line#"${line%%[![:space:]]*}"}"
+    line="${line%"${line##*[![:space:]]}"}"
+    [[ -z "$line" || "$line" != *"="* ]] && continue
+
+    key="${line%%=*}"
+    value="${line#*=}"
+    key="${key//[[:space:]]/}"
+    value="${value#"${value%%[![:space:]]*}"}"
+    value="${value%"${value##*[![:space:]]}"}"
+    value="${value%\"}"
+    value="${value#\"}"
+
+    case "$key" in
+      preset) apply_preset "$value" ;;
+      days) [[ "$value" =~ ^[0-9]+$ ]] && DAYS="$value" ;;
+      include_app_caches) truthy "$value" && INCLUDE_APP_CACHES=1 ;;
+      include_package_stores) truthy "$value" && INCLUDE_PACKAGE_STORES=1 ;;
+      include_node_stale) truthy "$value" && INCLUDE_NODE_STALE=1 ;;
+      include_dev_heavy) truthy "$value" && INCLUDE_DEV_HEAVY=1 ;;
+      include_snapshots) truthy "$value" && INCLUDE_SNAPSHOTS=1 ;;
+      include_ai_workspaces) truthy "$value" && INCLUDE_AI_WORKSPACES=1 ;;
+      include_ai_models) truthy "$value" && INCLUDE_AI_MODELS=1 ;;
+      include_containers) truthy "$value" && INCLUDE_CONTAINERS=1 ;;
+      exclude) add_exclude "$value" ;;
+    esac
+  done <"$file"
 }
 
 exists() {
@@ -172,6 +250,10 @@ run_rm() {
   local path="$1"
   path="$(expand_path "$path")"
   [[ -e "$path" ]] || return 0
+  if is_excluded "$path"; then
+    [[ "$VERBOSE" -eq 1 ]] && warn "skipping excluded path: $path"
+    return 0
+  fi
 
   local kb
   kb="$(size_kb "$path")"
@@ -187,6 +269,10 @@ run_find_delete_children() {
   local path="$1"
   path="$(expand_path "$path")"
   [[ -d "$path" ]] || return 0
+  if is_excluded "$path"; then
+    [[ "$VERBOSE" -eq 1 ]] && warn "skipping excluded path: $path"
+    return 0
+  fi
   if [[ "$APPLY" -eq 1 ]]; then
     [[ "$VERBOSE" -eq 1 ]] && log "clearing children of $path"
     find "$path" -mindepth 1 -maxdepth 1 -exec rm -rf {} + 2>/dev/null || true
@@ -408,6 +494,8 @@ doctor() {
   printf '%-28s %s\n' "shell" "${SHELL:-unknown}"
   printf '%-28s %s\n' "macOS" "$(sw_vers -productVersion 2>/dev/null || echo unknown)"
   printf '%-28s %s\n' "architecture" "$(uname -m)"
+  printf '%-28s %s\n' "config" "$(if [[ "$CONFIG_LOADED" -eq 1 ]]; then echo "$CONFIG_FILE"; else echo "not loaded"; fi)"
+  printf '%-28s %s\n' "excludes" "${#EXCLUDES[@]}"
   printf '%-28s ' "disk"
   df -h /System/Volumes/Data 2>/dev/null | awk 'NR==2 {print $4 " free, " $5 " used"}' || df -h / | awk 'NR==2 {print $4 " free, " $5 " used"}'
 
@@ -443,6 +531,66 @@ doctor() {
   for p in "${protected[@]}"; do
     [[ -e "$p" ]] && printf '%-28s present, protected\n' "$(basename "$p")"
   done
+}
+
+init_config() {
+  local file
+  file="${CONFIG_FILE:-$(config_default_path)}"
+  file="$(expand_path "$file")"
+  if [[ -e "$file" && "$ASSUME_YES" -ne 1 ]]; then
+    die "Config already exists: $file"
+  fi
+  mkdir -p "$(dirname "$file")"
+  cat >"$file" <<'EOF'
+# cleanroom config
+# Data only: this file is not executed as shell.
+
+# preset can be: safe, dev, deep
+preset=dev
+
+# stale node_modules threshold
+days=30
+
+# Optional categories
+include_app_caches=true
+include_package_stores=true
+include_node_stale=true
+include_dev_heavy=false
+include_snapshots=false
+include_ai_workspaces=false
+include_ai_models=false
+include_containers=false
+
+# Protect custom paths from deletion.
+# Add one exclude=... line per path.
+# exclude=~/Desktop/important-project
+EOF
+  ok "Wrote config: $file"
+}
+
+ask_yes_no() {
+  local prompt="$1"
+  local answer
+  printf '%s [y/N]: ' "$prompt"
+  read -r answer
+  case "$answer" in
+    y|Y|yes|YES) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+interactive() {
+  log "${BOLD}cleanroom interactive${RESET}"
+  warn "Interactive mode still dry-runs unless --apply is passed."
+  ask_yes_no "Include safe app cache folders?" && INCLUDE_APP_CACHES=1
+  ask_yes_no "Include package-manager stores?" && INCLUDE_PACKAGE_STORES=1
+  ask_yes_no "Include stale node_modules older than ${DAYS} days?" && INCLUDE_NODE_STALE=1
+  ask_yes_no "Include heavy SDK/simulator cleanup?" && INCLUDE_DEV_HEAVY=1
+  ask_yes_no "Include local snapshot thinning?" && INCLUDE_SNAPSHOTS=1
+  ask_yes_no "Include AI-agent workspace cleanup?" && INCLUDE_AI_WORKSPACES=1
+  ask_yes_no "Include downloaded AI model cleanup?" && INCLUDE_AI_MODELS=1
+  ask_yes_no "Include container VM disk cleanup?" && INCLUDE_CONTAINERS=1
+  clean
 }
 
 categories() {
@@ -537,11 +685,27 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  scan|clean|doctor|categories|help)
+  scan|clean|interactive|doctor|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
 esac
+
+args=("$@")
+for ((i = 0; i < ${#args[@]}; i++)); do
+  if [[ "${args[$i]}" == "--config" && $((i + 1)) -lt ${#args[@]} ]]; then
+    CONFIG_FILE="${args[$((i + 1))]}"
+  fi
+done
+
+if [[ -z "$CONFIG_FILE" ]]; then
+  default_config="$(config_default_path)"
+  [[ -f "$default_config" ]] && CONFIG_FILE="$default_config"
+fi
+
+if [[ -n "$CONFIG_FILE" && "$ACTION" != "init-config" ]]; then
+  load_config "$CONFIG_FILE"
+fi
 
 while [[ "$#" -gt 0 ]]; do
   case "$1" in
@@ -549,6 +713,14 @@ while [[ "$#" -gt 0 ]]; do
     --yes) ASSUME_YES=1 ;;
     --verbose) VERBOSE=1 ;;
     --json) JSON=1 ;;
+    --config)
+      shift
+      CONFIG_FILE="${1:-}"
+      ;;
+    --exclude)
+      shift
+      add_exclude "${1:-}"
+      ;;
     --preset)
       shift
       apply_preset "${1:-}"
@@ -578,8 +750,10 @@ done
 case "$ACTION" in
   scan) scan ;;
   clean) clean ;;
+  interactive) interactive ;;
   doctor) doctor ;;
   categories) categories ;;
+  init-config) init_config ;;
   help) usage ;;
   *) die "Unknown action: $ACTION" ;;
 esac

@@ -8,6 +8,7 @@ Common `cleanroom` workflows.
 cleanroom scan
 cleanroom doctor
 cleanroom categories
+cleanroom init-config
 cleanroom clean
 ```
 
@@ -29,6 +30,31 @@ cleanroom clean --preset dev --apply
 ```
 
 Good for package stores, stale `node_modules`, and safe app caches.
+
+## Config File
+
+```sh
+cleanroom init-config
+cleanroom clean --config ~/.config/cleanroom/config
+```
+
+Protect important project folders:
+
+```text
+exclude=~/Desktop/important-project
+exclude=~/Documents/client-work
+```
+
+Config files are plain `key=value` data and are not executed as shell.
+
+## Interactive Mode
+
+```sh
+cleanroom interactive
+cleanroom interactive --apply
+```
+
+This prompts for cleanup categories, then runs the same dry-run/apply flow.
 
 ## Xcode / Android Bloat
 

@@ -34,3 +34,19 @@ These categories are intentionally excluded from the default cleaner:
 - `--include-containers`: local container VM disks. This may remove containers, images, and volumes.
 
 Any new rule that can remove personal state, credentials, app profiles, project source, model downloads, or container volumes must be behind an explicit opt-in flag.
+
+## Excludes
+
+Users can protect custom paths with:
+
+```sh
+cleanroom clean --exclude ~/Desktop/important-project
+```
+
+or in config:
+
+```text
+exclude=~/Desktop/important-project
+```
+
+Excludes apply centrally to deletion helpers and should be respected by new cleanup rules.
