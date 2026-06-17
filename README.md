@@ -20,6 +20,7 @@ macOS Storage often labels hidden user folders as **Documents** or **System Data
 - Chrome/VS Code/Cursor cache folders
 - browser profile and cache footprint
 - app leftovers after manual uninstalls
+- old logs, crash reports, and diagnostic reports
 - old downloaded installer files
 - local iPhone and iPad backups
 
@@ -232,6 +233,13 @@ Inventory safe and opt-in cache buckets:
 ```sh
 cleanroom caches
 cleanroom caches --json
+```
+
+Inventory logs and diagnostic reports:
+
+```sh
+cleanroom diagnostics
+cleanroom diagnostics --json
 ```
 
 Inventory package-manager caches and stores:
@@ -477,9 +485,11 @@ Config files use simple `key=value` lines and are never executed as shell.
 
 `restore` only restores entries that were moved by `--trash` and still exist in the cleanroom Trash folder. It skips destinations that already exist.
 
-`overview` summarizes disk state, top recommendations, package-store size, toolchain-cache size, container storage size, protected-data presence, snapshots, app bundle count, and useful next commands without deleting anything.
+`overview` summarizes disk state, top recommendations, package-store size, toolchain-cache size, container storage size, diagnostic-report size, protected-data presence, snapshots, app bundle count, and useful next commands without deleting anything.
 
 `caches --json` emits safe and opt-in cache bucket sizes with the matching preview and apply commands.
+
+`diagnostics` inventories user logs, diagnostic reports, and CrashReporter data. Default cleanup already removes old log files; diagnostic report cleanup is opt-in with `cleanroom clean --include-diagnostics --days N`.
 
 `doctor --json` emits platform, config, disk, dependency, and safety-catalog diagnostics for wrappers and support reports.
 

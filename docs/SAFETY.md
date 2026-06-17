@@ -29,6 +29,7 @@ It must not remove the whole profile folder.
 These categories are intentionally excluded from the default cleaner:
 
 - `--include-dev-heavy`: SDKs, simulator state, Android NDK/system images.
+- `--include-diagnostics`: old user diagnostic reports and CrashReporter files. These are usually disposable, but may be useful when debugging recent crashes.
 - `--include-toolchains`: rebuildable language/toolchain caches such as Go modules, pip, uv, Poetry, SwiftPM, Maven, Composer, RubyGems, and Bundler caches.
 - `--include-ai-workspaces`: generated AI-agent recordings, scratch folders, memory/brain folders, and local conversation caches where known.
 - `--include-ai-models`: downloaded local model files and AI backend extensions. These can be re-downloaded, but may be intentionally installed by the user.

@@ -1,4 +1,4 @@
-.TH CLEANROOM 1 "June 2026" "cleanroom 0.31.0" "User Commands"
+.TH CLEANROOM 1 "June 2026" "cleanroom 0.32.0" "User Commands"
 .SH NAME
 cleanroom \- safe-by-default macOS storage cleaner
 .SH SYNOPSIS
@@ -49,6 +49,9 @@ cleanroom \- safe-by-default macOS storage cleaner
 .br
 .B cleanroom
 .RI "caches [--json]"
+.br
+.B cleanroom
+.RI "diagnostics [--json]"
 .br
 .B cleanroom
 .RI "packages [--json]"
@@ -152,6 +155,9 @@ Inventory current user Trash contents without emptying Trash.
 .B caches
 Inventory safe and opt-in cache buckets with preview/apply commands.
 .TP
+.B diagnostics
+Inventory user logs, diagnostic reports, and CrashReporter data.
+.TP
 .B packages
 Inventory package-manager caches and stores with preview/apply commands.
 .TP
@@ -245,6 +251,10 @@ Remove downloaded local AI model stores.
 Remove local container VM disks and image stores. This can remove containers,
 images, and volumes.
 .TP
+.B --include-diagnostics
+Remove old user diagnostic reports and CrashReporter files older than
+.BR --days .
+.TP
 .B --include-user-trash
 Empty ~/.Trash during apply. This is irreversible.
 .TP
@@ -269,6 +279,7 @@ cleanroom xcode --json
 cleanroom startup --json
 cleanroom trash --json
 cleanroom caches --json
+cleanroom diagnostics --json
 cleanroom packages --json
 cleanroom toolchains --json
 cleanroom containers --json

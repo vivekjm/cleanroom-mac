@@ -21,6 +21,7 @@ cleanroom xcode
 cleanroom startup
 cleanroom trash
 cleanroom caches
+cleanroom diagnostics
 cleanroom packages
 cleanroom toolchains
 cleanroom containers
@@ -55,6 +56,7 @@ cleanroom xcode --json
 cleanroom startup --json
 cleanroom trash --json
 cleanroom caches --json
+cleanroom diagnostics --json
 cleanroom packages --json
 cleanroom toolchains --json
 cleanroom containers --json
@@ -98,6 +100,8 @@ cleanroom report --output cleanroom-report.md
 
 `caches --json` emits safe and opt-in cache bucket sizes with the matching preview and apply commands.
 
+`diagnostics --json` emits user log, diagnostic report, and CrashReporter sizes with matching preview/apply commands.
+
 `packages --json` emits package-manager store sizes and matching preview/apply commands.
 
 `toolchains --json` emits rebuildable language/toolchain cache sizes with matching preview/apply commands.
@@ -137,6 +141,14 @@ Inspect cache buckets first:
 
 ```sh
 cleanroom caches
+```
+
+Inspect diagnostics first:
+
+```sh
+cleanroom diagnostics
+cleanroom clean --include-diagnostics --days 30
+cleanroom clean --apply --trash --include-diagnostics --days 30
 ```
 
 Inspect package stores first:

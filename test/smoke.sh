@@ -21,6 +21,8 @@ mkdir -p \
   "$TEST_HOME/.m2/repository" \
   "$TEST_HOME/Library/Caches/composer" \
   "$TEST_HOME/.bundle/cache" \
+  "$TEST_HOME/Library/DiagnosticReports" \
+  "$TEST_HOME/Library/Application Support/CrashReporter" \
   "$TEST_HOME/Library/LaunchAgents" \
   "$TEST_HOME/Library/Logs" \
   "$TEST_HOME/Library/Developer/Xcode/DerivedData" \
@@ -61,6 +63,8 @@ printf 'swiftpm cache\n' >"$TEST_HOME/Library/Caches/org.swift.swiftpm/pkg.cache
 printf 'maven cache\n' >"$TEST_HOME/.m2/repository/artifact.jar"
 printf 'composer cache\n' >"$TEST_HOME/Library/Caches/composer/pkg.zip"
 printf 'bundler cache\n' >"$TEST_HOME/.bundle/cache/gem.gem"
+printf 'diagnostic\n' >"$TEST_HOME/Library/DiagnosticReports/OldApp.crash"
+printf 'crash reporter\n' >"$TEST_HOME/Library/Application Support/CrashReporter/OldApp.plist"
 printf 'pnpm\n' >"$TEST_HOME/Library/pnpm/store/example"
 printf 'log\n' >"$TEST_HOME/Library/Logs/example.log"
 printf 'derived data\n' >"$TEST_HOME/Library/Developer/Xcode/DerivedData/build.db"
@@ -84,6 +88,7 @@ printf 'keychain\n' >"$TEST_HOME/Library/Keychains/login.keychain-db"
 printf 'trashed\n' >"$TEST_HOME/.Trash/old-trash.txt"
 printf 'old dependency\n' >"$TEST_HOME/Documents/example/node_modules/package.txt"
 touch -t 202001010000 "$TEST_HOME/Documents/example/node_modules" "$TEST_HOME/Documents/example/node_modules/package.txt"
+touch -t 202001010000 "$TEST_HOME/Library/DiagnosticReports/OldApp.crash" "$TEST_HOME/Library/Application Support/CrashReporter/OldApp.plist"
 cat >"$TEST_HOME/Library/LaunchAgents/com.example.cleanroom-test.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "https://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -135,6 +140,7 @@ python3 -m json.tool "$overview_json" >/dev/null
 grep '"summary"' "$overview_json" >/dev/null
 grep '"toolchain_kb"' "$overview_json" >/dev/null
 grep '"container_kb"' "$overview_json" >/dev/null
+grep '"diagnostic_kb"' "$overview_json" >/dev/null
 grep '"recommendations"' "$overview_json" >/dev/null
 rm -f "$overview_json"
 "$BIN" rules | grep 'safe-app-caches' >/dev/null
@@ -142,6 +148,7 @@ rules_json="$(mktemp)"
 "$BIN" rules --json > "$rules_json"
 python3 -m json.tool "$rules_json" >/dev/null
 grep 'ai-models' "$rules_json" >/dev/null
+grep 'old-diagnostics' "$rules_json" >/dev/null
 grep 'toolchain-caches' "$rules_json" >/dev/null
 rm -f "$rules_json"
 "$BIN" plan | grep 'cleanroom plan' >/dev/null
@@ -151,6 +158,7 @@ python3 -m json.tool "$plan_json" >/dev/null
 grep 'cleanroom clean --apply --trash' "$plan_json" >/dev/null
 grep 'cleanroom clean --apply --trash --include-toolchains' "$plan_json" >/dev/null
 grep 'cleanroom clean --apply --trash --include-containers' "$plan_json" >/dev/null
+grep 'cleanroom clean --apply --trash --include-diagnostics --days 30' "$plan_json" >/dev/null
 rm -f "$plan_json"
 "$BIN" large "$HOME/Downloads" --min-mb 1 --limit 5 | grep 'big-test.bin' >/dev/null
 large_json="$(mktemp)"
@@ -291,6 +299,20 @@ python3 -m json.tool "$caches_json" >/dev/null
 grep 'safe-app-caches' "$caches_json" >/dev/null
 grep 'cleanroom clean --apply --trash --include-app-caches' "$caches_json" >/dev/null
 rm -f "$caches_json"
+"$BIN" diagnostics | grep 'diagnostic-reports' >/dev/null
+diagnostics_json="$(mktemp)"
+"$BIN" diagnostics --json > "$diagnostics_json"
+python3 -m json.tool "$diagnostics_json" >/dev/null
+grep 'crash-reporter' "$diagnostics_json" >/dev/null
+grep 'cleanroom clean --apply --trash --include-diagnostics --days 30' "$diagnostics_json" >/dev/null
+rm -f "$diagnostics_json"
+diagnostics_log="$TEST_HOME/diagnostics-apply.log"
+"$BIN" clean --include-diagnostics --days 30 --apply --trash --yes --log "$diagnostics_log" >/dev/null
+test ! -e "$TEST_HOME/Library/DiagnosticReports/OldApp.crash"
+test -f "$diagnostics_log"
+grep $'\ttrash\tok\t' "$diagnostics_log" >/dev/null
+"$BIN" restore --log "$diagnostics_log" --apply --yes >/dev/null
+test -e "$TEST_HOME/Library/DiagnosticReports/OldApp.crash"
 "$BIN" snapshots | grep 'cleanroom local snapshots' >/dev/null
 snapshots_json="$(mktemp)"
 "$BIN" snapshots --json > "$snapshots_json"
