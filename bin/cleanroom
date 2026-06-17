@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.29.0"
+VERSION="0.30.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -25,6 +25,7 @@ INCLUDE_LMSTUDIO=0
 INCLUDE_AI_WORKSPACES=0
 INCLUDE_AI_MODELS=0
 INCLUDE_PACKAGE_STORES=0
+INCLUDE_TOOLCHAINS=0
 INCLUDE_CONTAINERS=0
 INCLUDE_APP_CACHES=0
 INCLUDE_SNAPSHOTS=0
@@ -59,6 +60,7 @@ Usage:
   cleanroom trash [--json]
   cleanroom caches [--json]
   cleanroom packages [--json]
+  cleanroom toolchains [--json]
   cleanroom snapshots [--json]
   cleanroom report [--output PATH]
   cleanroom clean [options]
@@ -91,6 +93,7 @@ Actions:
   trash                Inventory current user Trash contents.
   caches               Inventory safe and opt-in cache buckets.
   packages             Inventory package-manager caches and stores.
+  toolchains           Inventory language/toolchain caches and stores.
   snapshots            List local Time Machine snapshots for review.
   report               Write a Markdown cleanup report. Prints to stdout by default.
   clean                Clean safe rebuildable caches. Dry-run unless --apply is passed.
@@ -111,7 +114,8 @@ Options:
   --verbose            Print every path touched.
   --json               Emit JSON for overview, scan, plan, large, duplicates, downloads,
                        installers, nodes, apps, browsers, leftovers, startup, trash,
-                       backups, xcode, caches, packages, snapshots, doctor, protect, guard, or rules.
+                       backups, xcode, caches, packages, toolchains, snapshots, doctor,
+                       protect, guard, or rules.
   --output PATH        Output path for report.
   --log PATH           Write apply audit log here. Default: ~/.local/state/cleanroom/runs/*.log.
   --config PATH        Load config file. Default: ~/.config/cleanroom/config.
@@ -121,13 +125,15 @@ Options:
   --min-mb N           Minimum file size for large-file discovery. Default: 500.
   --preset NAME        Enable a useful group: safe, dev, deep.
                        safe: default rebuildable caches.
-                       dev: safe + app caches + package stores + stale node_modules.
+                       dev: safe + app caches + package/toolchain stores + stale node_modules.
                        deep: dev + heavy SDKs + snapshots + AI workspaces.
   --include-dev-heavy  Include heavier developer data:
                        Xcode device support, simulator app data, Android NDK/system images.
   --include-node-stale Remove node_modules older than --days from Desktop/Documents/Downloads.
   --include-package-stores
                        Include rebuildable package stores like CocoaPods repos and pnpm store.
+  --include-toolchains Include rebuildable language/toolchain caches like Go, pip, uv,
+                       SwiftPM, Maven, Composer, RubyGems, and Bundler.
   --include-app-caches Include safe cache folders inside Google/Chrome, VS Code, Cursor, Slack, etc.
                        Does not remove profiles, passwords, cookies, bookmarks, or settings wholesale.
   --include-snapshots  Ask Time Machine to thin local snapshots.
@@ -187,6 +193,8 @@ Examples:
   cleanroom caches --json
   cleanroom packages
   cleanroom packages --json
+  cleanroom toolchains
+  cleanroom toolchains --json
   cleanroom snapshots
   cleanroom snapshots --json
   cleanroom report --output cleanroom-report.md
@@ -317,6 +325,7 @@ load_config() {
       days) [[ "$value" =~ ^[0-9]+$ ]] && DAYS="$value" ;;
       include_app_caches) truthy "$value" && INCLUDE_APP_CACHES=1 ;;
       include_package_stores) truthy "$value" && INCLUDE_PACKAGE_STORES=1 ;;
+      include_toolchains) truthy "$value" && INCLUDE_TOOLCHAINS=1 ;;
       include_node_stale) truthy "$value" && INCLUDE_NODE_STALE=1 ;;
       include_dev_heavy) truthy "$value" && INCLUDE_DEV_HEAVY=1 ;;
       include_snapshots) truthy "$value" && INCLUDE_SNAPSHOTS=1 ;;
@@ -855,6 +864,21 @@ clean_package_stores() {
   run_rm "~/.gradle-tangibly-release/wrapper"
   run_rm "~/.gradle-tangibly-release/native"
   run_rm "~/.cargo/registry/cache"
+}
+
+clean_toolchains() {
+  [[ "$INCLUDE_TOOLCHAINS" -eq 1 ]] || return 0
+  log "${BOLD}Language and toolchain caches${RESET}"
+  local id ecosystem paths category preview apply description path
+  while IFS=$'\t' read -r id ecosystem paths category preview apply description; do
+    [[ -z "${id:-}" ]] && continue
+    while IFS= read -r path; do
+      path="${path#"${path%%[![:space:]]*}"}"
+      path="${path%"${path##*[![:space:]]}"}"
+      [[ -z "$path" ]] && continue
+      run_rm "$path"
+    done < <(printf '%s\n' "$paths" | tr ';' '\n')
+  done < <(toolchain_rows)
 }
 
 clean_logs() {
@@ -2085,6 +2109,18 @@ package_rows() {
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "homebrew-cache" "homebrew" "~/Library/Caches/Homebrew" "default" "cleanroom clean" "cleanroom clean --apply --trash"
 }
 
+toolchain_rows() {
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "go-build-cache" "go" "~/Library/Caches/go-build; ~/.cache/go-build" "toolchains" "cleanroom toolchains" "cleanroom clean --apply --trash --include-toolchains" "Go build cache. Recreated by the Go toolchain."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "go-mod-cache" "go" "~/go/pkg/mod" "toolchains" "cleanroom toolchains" "cleanroom clean --apply --trash --include-toolchains" "Downloaded Go modules. Re-downloaded by go mod commands."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "pip-cache" "python" "~/Library/Caches/pip; ~/.cache/pip" "toolchains" "cleanroom toolchains" "cleanroom clean --apply --trash --include-toolchains" "pip wheel and HTTP caches."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "uv-cache" "python" "~/.cache/uv" "toolchains" "cleanroom toolchains" "cleanroom clean --apply --trash --include-toolchains" "uv package cache and build artifacts."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "poetry-cache" "python" "~/Library/Caches/pypoetry; ~/.cache/pypoetry" "toolchains" "cleanroom toolchains" "cleanroom clean --apply --trash --include-toolchains" "Poetry package and virtualenv metadata caches."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "swiftpm-cache" "swift" "~/Library/Caches/org.swift.swiftpm; ~/.swiftpm/cache" "toolchains" "cleanroom toolchains" "cleanroom clean --apply --trash --include-toolchains" "Swift Package Manager cache. Packages can be resolved again."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "maven-repository" "jvm" "~/.m2/repository" "toolchains" "cleanroom toolchains" "cleanroom clean --apply --trash --include-toolchains" "Local Maven dependency repository. Dependencies can be downloaded again."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "composer-cache" "php" "~/Library/Caches/composer; ~/.composer/cache" "toolchains" "cleanroom toolchains" "cleanroom clean --apply --trash --include-toolchains" "Composer package cache."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "ruby-cache" "ruby" "~/.gem; ~/.bundle/cache" "toolchains" "cleanroom toolchains" "cleanroom clean --apply --trash --include-toolchains" "RubyGems and Bundler caches. Gems may need to be installed again."
+}
+
 cache_rows() {
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "user-caches" "default" "~/Library/Caches; ~/.cache" "cleanroom clean" "cleanroom clean --apply --trash" "Standard user cache folders. Recreated automatically by apps."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "old-logs" "default" "~/Library/Logs" "cleanroom clean" "cleanroom clean --apply --trash" "User log files. Apply removes only log files older than seven days."
@@ -2198,6 +2234,57 @@ packages() {
   done <<<"$rows"
 }
 
+toolchains() {
+  local rows
+  rows="$(toolchain_rows)"
+
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '['
+    local first=1 id ecosystem paths category preview apply description kb
+    while IFS=$'\t' read -r id ecosystem paths category preview apply description; do
+      [[ -z "${id:-}" ]] && continue
+      kb="$(paths_field_kb "$paths")"
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '{"id":"%s","ecosystem":"%s","paths":"%s","category":"%s","size_kb":%s,"size":"%s","preview_command":"%s","apply_command":"%s","description":"%s"}' \
+        "$(printf '%s' "$id" | json_escape)" \
+        "$(printf '%s' "$ecosystem" | json_escape)" \
+        "$(printf '%s' "$paths" | json_escape)" \
+        "$(printf '%s' "$category" | json_escape)" \
+        "$kb" \
+        "$(human_kb "$kb" | json_escape)" \
+        "$(printf '%s' "$preview" | json_escape)" \
+        "$(printf '%s' "$apply" | json_escape)" \
+        "$(printf '%s' "$description" | json_escape)"
+    done <<<"$rows"
+    printf ']\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}cleanroom language toolchains${RESET}"
+  printf 'Review-only inventory. Use the preview command before applying cleanup.\n\n'
+  printf '%-10s %-18s %-10s %s\n' "size" "id" "ecosystem" "preview command"
+  local id ecosystem paths category preview apply description kb
+  while IFS=$'\t' read -r id ecosystem paths category preview apply description; do
+    [[ -z "${id:-}" ]] && continue
+    kb="$(paths_field_kb "$paths")"
+    printf '%-10s %-18s %-10s %s\n' "$(human_kb "$kb")" "$id" "$ecosystem" "$preview"
+    printf '  apply: %s\n' "$apply"
+    printf '  paths: %s\n' "$paths"
+    printf '  %s\n' "$description"
+  done <<<"$rows"
+}
+
+toolchain_total_kb() {
+  local id ecosystem paths category preview apply description total=0 kb
+  while IFS=$'\t' read -r id ecosystem paths category preview apply description; do
+    [[ -z "${id:-}" ]] && continue
+    kb="$(paths_field_kb "$paths")"
+    total=$((total + kb))
+  done < <(toolchain_rows)
+  printf '%s\n' "$total"
+}
+
 package_total_kb() {
   local id manager paths category preview apply total=0 kb
   while IFS=$'\t' read -r id manager paths category preview apply; do
@@ -2248,9 +2335,10 @@ app_bundle_count() {
 }
 
 overview() {
-  local plan_rows_sorted package_total protected_count snapshots app_count startup_items trash_total
+  local plan_rows_sorted package_total toolchain_total protected_count snapshots app_count startup_items trash_total
   plan_rows_sorted="$(plan_rows | sort -rn | head -5)"
   package_total="$(package_total_kb)"
+  toolchain_total="$(toolchain_total_kb)"
   protected_count="$(protected_present_count)"
   snapshots="$(snapshot_count)"
   app_count="$(app_bundle_count)"
@@ -2260,9 +2348,11 @@ overview() {
   if [[ "$JSON" -eq 1 ]]; then
     printf '{'
     disk_json
-    printf ',"summary":{"package_store_kb":%s,"package_store":"%s","trash_kb":%s,"trash":"%s","protected_present":%s,"snapshot_count":%s,"app_bundle_count":%s,"startup_item_count":%s}' \
+    printf ',"summary":{"package_store_kb":%s,"package_store":"%s","toolchain_kb":%s,"toolchain":"%s","trash_kb":%s,"trash":"%s","protected_present":%s,"snapshot_count":%s,"app_bundle_count":%s,"startup_item_count":%s}' \
       "$package_total" \
       "$(human_kb "$package_total" | json_escape)" \
+      "$toolchain_total" \
+      "$(human_kb "$toolchain_total" | json_escape)" \
       "$trash_total" \
       "$(human_kb "$trash_total" | json_escape)" \
       "$protected_count" \
@@ -2294,6 +2384,7 @@ overview() {
   disk_line
   printf '\n%s\n' "${BOLD}Summary${RESET}"
   printf '%-24s %s\n' "package stores" "$(human_kb "$package_total")"
+  printf '%-24s %s\n' "toolchain caches" "$(human_kb "$toolchain_total")"
   printf '%-24s %s\n' "Trash" "$(human_kb "$trash_total")"
   printf '%-24s %s\n' "protected paths present" "$protected_count"
   printf '%-24s %s\n' "local snapshots" "$snapshots"
@@ -2315,6 +2406,7 @@ overview() {
   printf 'cleanroom trash\n'
   printf 'cleanroom startup\n'
   printf 'cleanroom packages\n'
+  printf 'cleanroom toolchains\n'
   printf 'cleanroom protect\n'
 }
 
@@ -2358,7 +2450,7 @@ snapshots() {
 }
 
 plan_rows() {
-  local safe package app installers node dev ai_workspaces ai_models containers user_trash
+  local safe package toolchain app installers node dev ai_workspaces ai_models containers user_trash
   safe="$(sum_existing_kb \
     "~/Library/Caches" "~/.cache" "~/.npm/_cacache" "~/.npm/_logs" "~/.npm/_npx" \
     "~/.yarn/cache" "~/.yarn/berry" "~/.gradle/caches" "~/.gradle/daemon" \
@@ -2366,6 +2458,7 @@ plan_rows() {
     "~/Library/Developer/Xcode/DerivedData" "~/Library/Developer/CoreSimulator/Caches" \
     "~/Library/Caches/Homebrew" "~/Library/Logs")"
   package="$(sum_existing_kb "~/Library/pnpm/store" "~/.pnpm-store" "~/.cocoapods/repos" "~/.cargo/registry/cache")"
+  toolchain="$(toolchain_total_kb)"
   app="$(app_cache_kb)"
   installers="$(installer_total_kb)"
   node="$(stale_node_kb)"
@@ -2383,6 +2476,7 @@ plan_rows() {
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$app" "app-caches" "Safe app cache folders" "cleanroom clean --include-app-caches" "cleanroom clean --apply --trash --include-app-caches" "Nested cache folders only; browser profiles and passwords stay protected."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$installers" "old-installers" "Old downloaded installers" "cleanroom clean --include-installers --days $DAYS" "cleanroom clean --apply --trash --include-installers --days $DAYS" "Downloaded .dmg, .pkg, .mpkg, .xip, .ipsw, and .iso files older than $DAYS days in ~/Downloads."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$package" "package-stores" "Package-manager stores" "cleanroom clean --include-package-stores" "cleanroom clean --apply --trash --include-package-stores" "Rebuildable package stores such as pnpm, CocoaPods, Cargo, and Gradle-related stores."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$toolchain" "toolchains" "Language toolchain caches" "cleanroom toolchains" "cleanroom clean --apply --trash --include-toolchains" "Rebuildable caches for Go, Python, SwiftPM, Maven, Composer, RubyGems, Bundler, uv, and Poetry."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$node" "node-stale" "Stale node_modules" "cleanroom clean --include-node-stale --days $DAYS" "cleanroom clean --apply --trash --include-node-stale --days $DAYS" "node_modules older than $DAYS days under Desktop, Documents, and Downloads."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$dev" "dev-heavy" "Heavy SDK and simulator artifacts" "cleanroom clean --include-dev-heavy" "cleanroom clean --apply --trash --include-dev-heavy" "Opt-in cleanup that may require re-downloading SDKs or resetting simulator app data."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$ai_workspaces" "ai-workspaces" "Generated AI workspace state" "cleanroom clean --include-ai-workspaces" "cleanroom clean --apply --trash --include-ai-workspaces" "Generated recordings, scratch, brain, implicit data, and conversation caches where known."
@@ -2761,6 +2855,7 @@ days=30
 # Optional categories
 include_app_caches=true
 include_package_stores=true
+include_toolchains=true
 include_node_stale=true
 include_dev_heavy=false
 include_snapshots=false
@@ -2796,6 +2891,7 @@ interactive() {
   warn "Interactive mode still dry-runs unless --apply is passed."
   ask_yes_no "Include safe app cache folders?" && INCLUDE_APP_CACHES=1
   ask_yes_no "Include package-manager stores?" && INCLUDE_PACKAGE_STORES=1
+  ask_yes_no "Include language/toolchain caches?" && INCLUDE_TOOLCHAINS=1
   ask_yes_no "Include old downloaded installers older than ${DAYS} days?" && INCLUDE_INSTALLERS=1
   ask_yes_no "Include stale node_modules older than ${DAYS} days?" && INCLUDE_NODE_STALE=1
   ask_yes_no "Include heavy SDK/simulator cleanup?" && INCLUDE_DEV_HEAVY=1
@@ -2821,6 +2917,10 @@ Default safe cleanup:
 --include-package-stores:
   Rebuildable package-manager stores such as pnpm, CocoaPods repos, Gradle caches,
   and Cargo registry cache.
+
+--include-toolchains:
+  Rebuildable language/toolchain caches such as Go build/module cache, pip, uv,
+  Poetry, SwiftPM, Maven, Composer, RubyGems, and Bundler cache.
 
 --include-node-stale:
   node_modules older than --days under Desktop/Documents/Downloads.
@@ -2855,7 +2955,7 @@ Default safe cleanup:
 
 Presets:
   safe  default cleanup only
-  dev   safe + app caches + package stores + stale node_modules
+  dev   safe + app caches + package/toolchain stores + stale node_modules
   deep  dev + heavy SDKs + snapshots + AI workspaces
 EOF
 }
@@ -2874,6 +2974,7 @@ clean() {
   safe_clean
   clean_logs
   clean_package_stores
+  clean_toolchains
   clean_app_caches
   clean_dev_heavy
   clean_installers
@@ -2896,11 +2997,13 @@ apply_preset() {
     dev)
       INCLUDE_APP_CACHES=1
       INCLUDE_PACKAGE_STORES=1
+      INCLUDE_TOOLCHAINS=1
       INCLUDE_NODE_STALE=1
       ;;
     deep)
       INCLUDE_APP_CACHES=1
       INCLUDE_PACKAGE_STORES=1
+      INCLUDE_TOOLCHAINS=1
       INCLUDE_NODE_STALE=1
       INCLUDE_DEV_HEAVY=1
       INCLUDE_SNAPSHOTS=1
@@ -2918,7 +3021,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  overview|scan|plan|large|duplicates|downloads|installers|nodes|apps|browsers|leftovers|backups|xcode|startup|trash|caches|packages|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
+  overview|scan|plan|large|duplicates|downloads|installers|nodes|apps|browsers|leftovers|backups|xcode|startup|trash|caches|packages|toolchains|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -2988,6 +3091,7 @@ while [[ "$#" -gt 0 ]]; do
     --include-node-stale) INCLUDE_NODE_STALE=1 ;;
     --include-installers) INCLUDE_INSTALLERS=1 ;;
     --include-package-stores) INCLUDE_PACKAGE_STORES=1 ;;
+    --include-toolchains) INCLUDE_TOOLCHAINS=1 ;;
     --include-app-caches) INCLUDE_APP_CACHES=1 ;;
     --include-snapshots) INCLUDE_SNAPSHOTS=1 ;;
     --include-user-trash) INCLUDE_USER_TRASH=1 ;;
@@ -3027,6 +3131,7 @@ case "$ACTION" in
   trash) trash ;;
   caches) caches ;;
   packages) packages ;;
+  toolchains) toolchains ;;
   snapshots) snapshots ;;
   report) report ;;
   clean) clean ;;

@@ -12,6 +12,15 @@ trap cleanup EXIT
 
 mkdir -p \
   "$TEST_HOME/Library/Caches" \
+  "$TEST_HOME/Library/Caches/go-build" \
+  "$TEST_HOME/go/pkg/mod" \
+  "$TEST_HOME/Library/Caches/pip" \
+  "$TEST_HOME/.cache/uv" \
+  "$TEST_HOME/Library/Caches/pypoetry" \
+  "$TEST_HOME/Library/Caches/org.swift.swiftpm" \
+  "$TEST_HOME/.m2/repository" \
+  "$TEST_HOME/Library/Caches/composer" \
+  "$TEST_HOME/.bundle/cache" \
   "$TEST_HOME/Library/LaunchAgents" \
   "$TEST_HOME/Library/Logs" \
   "$TEST_HOME/Library/Developer/Xcode/DerivedData" \
@@ -37,6 +46,15 @@ mkdir -p \
   "$TEST_HOME/Documents/example/node_modules"
 
 printf 'cache\n' >"$TEST_HOME/Library/Caches/example.cache"
+printf 'go build\n' >"$TEST_HOME/Library/Caches/go-build/cache.bin"
+printf 'go module\n' >"$TEST_HOME/go/pkg/mod/example.mod"
+printf 'pip cache\n' >"$TEST_HOME/Library/Caches/pip/http.cache"
+printf 'uv cache\n' >"$TEST_HOME/.cache/uv/pkg.cache"
+printf 'poetry cache\n' >"$TEST_HOME/Library/Caches/pypoetry/pkg.cache"
+printf 'swiftpm cache\n' >"$TEST_HOME/Library/Caches/org.swift.swiftpm/pkg.cache"
+printf 'maven cache\n' >"$TEST_HOME/.m2/repository/artifact.jar"
+printf 'composer cache\n' >"$TEST_HOME/Library/Caches/composer/pkg.zip"
+printf 'bundler cache\n' >"$TEST_HOME/.bundle/cache/gem.gem"
 printf 'pnpm\n' >"$TEST_HOME/Library/pnpm/store/example"
 printf 'log\n' >"$TEST_HOME/Library/Logs/example.log"
 printf 'derived data\n' >"$TEST_HOME/Library/Developer/Xcode/DerivedData/build.db"
@@ -96,12 +114,14 @@ bash -n "$BIN"
 "$BIN" --version | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' >/dev/null
 "$BIN" help | grep 'safe macOS storage cleaner' >/dev/null
 "$BIN" categories | grep -- '--include-ai-models' >/dev/null
+"$BIN" categories | grep -- '--include-toolchains' >/dev/null
 "$BIN" categories | grep -- '--trash' >/dev/null
 "$BIN" overview | grep 'cleanroom overview' >/dev/null
 overview_json="$(mktemp)"
 "$BIN" overview --json > "$overview_json"
 python3 -m json.tool "$overview_json" >/dev/null
 grep '"summary"' "$overview_json" >/dev/null
+grep '"toolchain_kb"' "$overview_json" >/dev/null
 grep '"recommendations"' "$overview_json" >/dev/null
 rm -f "$overview_json"
 "$BIN" rules | grep 'safe-app-caches' >/dev/null
@@ -109,12 +129,14 @@ rules_json="$(mktemp)"
 "$BIN" rules --json > "$rules_json"
 python3 -m json.tool "$rules_json" >/dev/null
 grep 'ai-models' "$rules_json" >/dev/null
+grep 'toolchain-caches' "$rules_json" >/dev/null
 rm -f "$rules_json"
 "$BIN" plan | grep 'cleanroom plan' >/dev/null
 plan_json="$(mktemp)"
 "$BIN" plan --json > "$plan_json"
 python3 -m json.tool "$plan_json" >/dev/null
 grep 'cleanroom clean --apply --trash' "$plan_json" >/dev/null
+grep 'cleanroom clean --apply --trash --include-toolchains' "$plan_json" >/dev/null
 rm -f "$plan_json"
 "$BIN" large "$HOME/Downloads" --min-mb 1 --limit 5 | grep 'big-test.bin' >/dev/null
 large_json="$(mktemp)"
@@ -226,6 +248,20 @@ python3 -m json.tool "$packages_json" >/dev/null
 grep 'pnpm-store' "$packages_json" >/dev/null
 grep 'cleanroom clean --apply --trash --include-package-stores' "$packages_json" >/dev/null
 rm -f "$packages_json"
+"$BIN" toolchains | grep 'go-build-cache' >/dev/null
+toolchains_json="$(mktemp)"
+"$BIN" toolchains --json > "$toolchains_json"
+python3 -m json.tool "$toolchains_json" >/dev/null
+grep 'maven-repository' "$toolchains_json" >/dev/null
+grep 'cleanroom clean --apply --trash --include-toolchains' "$toolchains_json" >/dev/null
+rm -f "$toolchains_json"
+toolchain_log="$TEST_HOME/toolchains-apply.log"
+"$BIN" clean --include-toolchains --apply --trash --yes --log "$toolchain_log" >/dev/null
+test ! -e "$TEST_HOME/go/pkg/mod"
+test -f "$toolchain_log"
+grep $'\ttrash\tok\t' "$toolchain_log" >/dev/null
+"$BIN" restore --log "$toolchain_log" --apply --yes >/dev/null
+test -e "$TEST_HOME/go/pkg/mod"
 "$BIN" caches | grep 'user-caches' >/dev/null
 caches_json="$(mktemp)"
 "$BIN" caches --json > "$caches_json"

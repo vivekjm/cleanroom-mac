@@ -98,6 +98,7 @@ final class CleanroomAppDelegate: NSObject, NSApplicationDelegate {
         reviewRow.addArrangedSubview(button("Leftovers", action: #selector(leftovers)))
         reviewRow.addArrangedSubview(button("Caches", action: #selector(caches)))
         reviewRow.addArrangedSubview(button("Packages", action: #selector(packages)))
+        reviewRow.addArrangedSubview(button("Toolchains", action: #selector(toolchains)))
         reviewRow.addArrangedSubview(button("Snapshots", action: #selector(snapshots)))
 
         let actionRow = NSStackView()
@@ -225,6 +226,10 @@ final class CleanroomAppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func packages() {
         runCommand("packages", title: "Packages")
+    }
+
+    @objc private func toolchains() {
+        runCommand("toolchains", title: "Toolchains")
     }
 
     @objc private func snapshots() {

@@ -12,6 +12,7 @@ macOS Storage often labels hidden user folders as **Documents** or **System Data
 - Xcode Archives and DeviceSupport
 - Android SDK NDK/system images
 - npm, Yarn, pnpm, Gradle, CocoaPods stores
+- Go, Python, SwiftPM, Maven, Composer, Ruby, uv, and Poetry toolchain caches
 - old `node_modules`
 - AI-agent recordings, scratch data, local memory, and generated workspaces
 - local AI model downloads and backends
@@ -239,6 +240,13 @@ cleanroom packages
 cleanroom packages --json
 ```
 
+Inventory language/toolchain caches:
+
+```sh
+cleanroom toolchains
+cleanroom toolchains --json
+```
+
 Review local Time Machine snapshots:
 
 ```sh
@@ -334,7 +342,7 @@ Preset meanings:
 
 ```text
 safe  default rebuildable caches
-dev   safe + app caches + package stores + stale node_modules
+dev   safe + app caches + package/toolchain stores + stale node_modules
 deep  dev + heavy SDKs + snapshots + AI workspace data
 ```
 
@@ -460,7 +468,7 @@ Config files use simple `key=value` lines and are never executed as shell.
 
 `restore` only restores entries that were moved by `--trash` and still exist in the cleanroom Trash folder. It skips destinations that already exist.
 
-`overview` summarizes disk state, top recommendations, package-store size, protected-data presence, snapshots, app bundle count, and useful next commands without deleting anything.
+`overview` summarizes disk state, top recommendations, package-store size, toolchain-cache size, protected-data presence, snapshots, app bundle count, and useful next commands without deleting anything.
 
 `caches --json` emits safe and opt-in cache bucket sizes with the matching preview and apply commands.
 
@@ -493,6 +501,8 @@ Config files use simple `key=value` lines and are never executed as shell.
 `trash` inventories current `~/.Trash` contents. `--include-user-trash` empties Trash only when explicitly requested, and it is intentionally not included in presets.
 
 `packages` inventories npm, Yarn, pnpm, Gradle, CocoaPods, Cargo, and Homebrew stores with preview/apply commands for matching cleanup categories.
+
+`toolchains` inventories rebuildable language/toolchain caches for Go, pip, uv, Poetry, SwiftPM, Maven, Composer, RubyGems, and Bundler. Cleanup is opt-in with `cleanroom clean --include-toolchains`, and `--trash` keeps removals restorable through the normal apply log.
 
 `snapshots` lists local Time Machine snapshots before you decide whether to run `cleanroom clean --include-snapshots --apply`.
 

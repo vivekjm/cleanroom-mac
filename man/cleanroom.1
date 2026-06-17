@@ -1,4 +1,4 @@
-.TH CLEANROOM 1 "June 2026" "cleanroom 0.29.0" "User Commands"
+.TH CLEANROOM 1 "June 2026" "cleanroom 0.30.0" "User Commands"
 .SH NAME
 cleanroom \- safe-by-default macOS storage cleaner
 .SH SYNOPSIS
@@ -52,6 +52,9 @@ cleanroom \- safe-by-default macOS storage cleaner
 .br
 .B cleanroom
 .RI "packages [--json]"
+.br
+.B cleanroom
+.RI "toolchains [--json]"
 .br
 .B cleanroom
 .RI "snapshots [--json]"
@@ -148,6 +151,10 @@ Inventory safe and opt-in cache buckets with preview/apply commands.
 .TP
 .B packages
 Inventory package-manager caches and stores with preview/apply commands.
+.TP
+.B toolchains
+Inventory language and toolchain caches such as Go, pip, uv, SwiftPM, Maven,
+Composer, RubyGems, and Bundler.
 .TP
 .B snapshots
 List local Time Machine snapshots for review.
@@ -255,6 +262,7 @@ cleanroom startup --json
 cleanroom trash --json
 cleanroom caches --json
 cleanroom packages --json
+cleanroom toolchains --json
 cleanroom snapshots --json
 cleanroom report --output cleanroom-report.md
 cleanroom doctor --json

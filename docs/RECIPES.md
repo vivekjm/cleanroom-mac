@@ -22,6 +22,7 @@ cleanroom startup
 cleanroom trash
 cleanroom caches
 cleanroom packages
+cleanroom toolchains
 cleanroom snapshots
 cleanroom doctor
 cleanroom protect
@@ -54,6 +55,7 @@ cleanroom startup --json
 cleanroom trash --json
 cleanroom caches --json
 cleanroom packages --json
+cleanroom toolchains --json
 cleanroom snapshots --json
 cleanroom doctor --json
 cleanroom protect --json
@@ -96,6 +98,8 @@ cleanroom report --output cleanroom-report.md
 
 `packages --json` emits package-manager store sizes and matching preview/apply commands.
 
+`toolchains --json` emits rebuildable language/toolchain cache sizes with matching preview/apply commands.
+
 `snapshots --json` emits local Time Machine snapshot identifiers when macOS reports any. It is intentionally review-only and does not thin snapshots.
 
 `doctor --json` emits platform, config, disk, dependency, and safety-catalog diagnostics for wrappers and support reports.
@@ -136,6 +140,14 @@ Inspect package stores first:
 ```sh
 cleanroom packages
 cleanroom clean --include-package-stores
+```
+
+Inspect language/toolchain caches first:
+
+```sh
+cleanroom toolchains
+cleanroom clean --include-toolchains
+cleanroom clean --apply --trash --include-toolchains
 ```
 
 Inspect Xcode storage first:
