@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.17.0"
+VERSION="0.18.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -53,7 +53,7 @@ Usage:
   cleanroom history [--limit N]
   cleanroom restore [--log PATH] [--apply]
   cleanroom interactive [options]
-  cleanroom doctor
+  cleanroom doctor [--json]
   cleanroom protect [--json]
   cleanroom guard PATH... [--json]
   cleanroom rules [--json]
@@ -88,7 +88,7 @@ Options:
   --yes                Do not prompt before --apply cleanup.
   --verbose            Print every path touched.
   --json               Emit JSON for overview, scan, plan, large, duplicates, apps,
-                       packages, snapshots, protect, guard, or rules.
+                       packages, snapshots, doctor, protect, guard, or rules.
   --output PATH        Output path for report.
   --log PATH           Write apply audit log here. Default: ~/.local/state/cleanroom/runs/*.log.
   --config PATH        Load config file. Default: ~/.config/cleanroom/config.
@@ -142,6 +142,7 @@ Examples:
   cleanroom snapshots --json
   cleanroom report --output cleanroom-report.md
   cleanroom doctor
+  cleanroom doctor --json
   cleanroom protect
   cleanroom protect --json
   cleanroom guard ~/Library/Application\ Support/Google/Chrome
@@ -1654,6 +1655,45 @@ guard() {
 }
 
 doctor() {
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '{'
+    printf '"version":"%s",' "$(printf '%s' "$VERSION" | json_escape)"
+    printf '"platform":{"shell":"%s","macos":"%s","architecture":"%s"},' \
+      "$(printf '%s' "${SHELL:-unknown}" | json_escape)" \
+      "$(sw_vers -productVersion 2>/dev/null | json_escape || printf 'unknown')" \
+      "$(uname -m | json_escape)"
+    printf '"config":{"loaded":%s,"path":"%s","excludes":%s},' \
+      "$(if [[ "$CONFIG_LOADED" -eq 1 ]]; then echo true; else echo false; fi)" \
+      "$(printf '%s' "${CONFIG_FILE:-}" | json_escape)" \
+      "${#EXCLUDES[@]}"
+    disk_json
+    printf ',"tools":['
+    local first=1 tool required status
+    for tool in du find awk sort xargs shasum sqlite3 tmutil brew xcrun; do
+      case "$tool" in
+        brew|xcrun) required=false ;;
+        *) required=true ;;
+      esac
+      if command -v "$tool" >/dev/null 2>&1; then
+        status="ok"
+      elif [[ "$required" == true ]]; then
+        status="missing"
+      else
+        status="optional-missing"
+      fi
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '{"name":"%s","required":%s,"status":"%s"}' "$tool" "$required" "$status"
+    done
+    printf ']'
+    printf ',"safety":{"protected_present":%s,"rules_catalog":%s,"protected_catalog":%s}' \
+      "$(protected_present_count)" \
+      "$(if [[ -f "$(rules_file)" ]]; then echo true; else echo false; fi)" \
+      "$(if [[ -f "$(protected_file)" ]]; then echo true; else echo false; fi)"
+    printf '}\n'
+    return 0
+  fi
+
   log "${BOLD}cleanroom doctor${RESET}"
   printf '%-28s %s\n' "version" "$VERSION"
   printf '%-28s %s\n' "shell" "${SHELL:-unknown}"

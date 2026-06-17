@@ -1,4 +1,4 @@
-.TH CLEANROOM 1 "June 2026" "cleanroom 0.17.0" "User Commands"
+.TH CLEANROOM 1 "June 2026" "cleanroom 0.18.0" "User Commands"
 .SH NAME
 cleanroom \- safe-by-default macOS storage cleaner
 .SH SYNOPSIS
@@ -37,6 +37,9 @@ cleanroom \- safe-by-default macOS storage cleaner
 .br
 .B cleanroom
 .RI "restore [--log path] [--apply]"
+.br
+.B cleanroom
+.RI "doctor [--json]"
 .br
 .B cleanroom
 .RI "protect [--json]"
@@ -172,6 +175,7 @@ cleanroom apps --limit 30
 cleanroom packages --json
 cleanroom snapshots --json
 cleanroom report --output cleanroom-report.md
+cleanroom doctor --json
 cleanroom clean --preset dev
 cleanroom clean --preset dev --apply --trash
 cleanroom history

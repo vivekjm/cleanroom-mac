@@ -183,6 +183,7 @@ Check environment and safety assumptions:
 
 ```sh
 cleanroom doctor
+cleanroom doctor --json
 ```
 
 Audit protected personal data and app profile paths:
@@ -365,6 +366,8 @@ Config files use simple `key=value` lines and are never executed as shell.
 `restore` only restores entries that were moved by `--trash` and still exist in the cleanroom Trash folder. It skips destinations that already exist.
 
 `overview` summarizes disk state, top recommendations, package-store size, protected-data presence, snapshots, app bundle count, and useful next commands without deleting anything.
+
+`doctor --json` emits platform, config, disk, dependency, and safety-catalog diagnostics for wrappers and support reports.
 
 `plan` estimates cleanup opportunities and prints copyable dry-run commands plus explicit apply commands. It does not delete anything.
 

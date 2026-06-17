@@ -35,6 +35,7 @@ cleanroom duplicates --json ~/Documents
 cleanroom apps --json
 cleanroom packages --json
 cleanroom snapshots --json
+cleanroom doctor --json
 cleanroom protect --json
 cleanroom guard --json ~/Library/Application\ Support/Google/Chrome
 cleanroom rules --json
@@ -56,6 +57,8 @@ cleanroom report --output cleanroom-report.md
 `packages --json` emits package-manager store sizes and matching preview/apply commands.
 
 `snapshots --json` emits local Time Machine snapshot identifiers when macOS reports any. It is intentionally review-only and does not thin snapshots.
+
+`doctor --json` emits platform, config, disk, dependency, and safety-catalog diagnostics for wrappers and support reports.
 
 `protect --json` emits protected personal-state paths and whether they are present. This is useful for GUI wrappers and safety reviews before trying new cleanup rules.
 

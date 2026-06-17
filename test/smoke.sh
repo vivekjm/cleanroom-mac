@@ -98,6 +98,12 @@ python3 -m json.tool "$snapshots_json" >/dev/null
 rm -f "$snapshots_json"
 "$BIN" doctor | grep 'cleanroom doctor' >/dev/null
 "$BIN" doctor | grep 'cleanroom protect' >/dev/null
+doctor_json="$(mktemp)"
+"$BIN" doctor --json > "$doctor_json"
+python3 -m json.tool "$doctor_json" >/dev/null
+grep '"tools"' "$doctor_json" >/dev/null
+grep '"safety"' "$doctor_json" >/dev/null
+rm -f "$doctor_json"
 "$BIN" protect | grep 'chrome-login-data' >/dev/null
 protect_json="$(mktemp)"
 "$BIN" protect --json > "$protect_json"
