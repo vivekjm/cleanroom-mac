@@ -51,6 +51,8 @@ cat >"$TEST_HOME/Library/LaunchAgents/com.example.cleanroom-test.plist" <<'PLIST
 </plist>
 PLIST
 dd if=/dev/zero of="$TEST_HOME/Downloads/big-test.bin" bs=1024 count=2048 >/dev/null 2>&1
+dd if=/dev/zero of="$TEST_HOME/Downloads/old-installer.dmg" bs=1024 count=1024 >/dev/null 2>&1
+touch -t 202001010000 "$TEST_HOME/Downloads/old-installer.dmg"
 dd if=/dev/zero of="$TEST_HOME/Documents/duplicates/copy-a.bin" bs=1024 count=2048 >/dev/null 2>&1
 cp "$TEST_HOME/Documents/duplicates/copy-a.bin" "$TEST_HOME/Documents/duplicates/copy-b.bin"
 dd if=/dev/zero of="$TEST_HOME/Applications/FakeBig.app/Contents/MacOS/fake" bs=1024 count=2048 >/dev/null 2>&1
@@ -95,6 +97,13 @@ python3 -m json.tool "$duplicates_json" >/dev/null
 grep 'potential_reclaim_kb' "$duplicates_json" >/dev/null
 grep 'copy-b.bin' "$duplicates_json" >/dev/null
 rm -f "$duplicates_json"
+"$BIN" downloads --days 30 --limit 5 | grep 'old-installer.dmg' >/dev/null
+downloads_json="$(mktemp)"
+"$BIN" downloads --json --days 30 --limit 5 > "$downloads_json"
+python3 -m json.tool "$downloads_json" >/dev/null
+grep 'old-installer.dmg' "$downloads_json" >/dev/null
+grep '"age_days"' "$downloads_json" >/dev/null
+rm -f "$downloads_json"
 "$BIN" nodes "$HOME/Documents" --days 30 --limit 5 | grep 'node_modules' >/dev/null
 nodes_json="$(mktemp)"
 "$BIN" nodes --json "$HOME/Documents" --days 30 --limit 5 > "$nodes_json"

@@ -145,6 +145,14 @@ cleanroom duplicates ~/Documents --min-mb 100 --limit 20
 cleanroom duplicates --json ~/Downloads
 ```
 
+Review old Downloads files:
+
+```sh
+cleanroom downloads
+cleanroom downloads --days 30 --limit 50
+cleanroom downloads --json
+```
+
 Review stale `node_modules` folders:
 
 ```sh
@@ -413,6 +421,8 @@ Config files use simple `key=value` lines and are never executed as shell.
 `large` lists large files for review and never deletes them. Use it when macOS reports high Documents storage and you need to find videos, archives, disk images, datasets, or project artifacts manually.
 
 `duplicates` hashes files above `--min-mb`, groups exact matches, estimates possible reclaim, and never deletes anything.
+
+`downloads` lists old files in `~/Downloads` for manual review and never deletes them.
 
 `nodes` lists stale `node_modules` folders before you decide whether to run `cleanroom clean --include-node-stale --apply`.
 

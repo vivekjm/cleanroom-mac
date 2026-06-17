@@ -10,6 +10,7 @@ cleanroom scan
 cleanroom plan
 cleanroom large
 cleanroom duplicates
+cleanroom downloads
 cleanroom nodes
 cleanroom apps
 cleanroom startup
@@ -36,6 +37,7 @@ cleanroom scan --json
 cleanroom plan --json
 cleanroom large --json ~/Documents
 cleanroom duplicates --json ~/Documents
+cleanroom downloads --json
 cleanroom nodes --json ~/Documents
 cleanroom apps --json
 cleanroom startup --json
@@ -59,6 +61,8 @@ cleanroom report --output cleanroom-report.md
 `large --json [PATH]` emits large files above `--min-mb` for review. It is intentionally review-only and does not delete anything.
 
 `duplicates --json [PATH]` emits exact duplicate groups with SHA-256 hashes, paths, and estimated possible reclaim. It is intentionally review-only and does not delete anything.
+
+`downloads --json` emits old files in `~/Downloads` with age, modified date, path, and size. It is intentionally review-only and does not delete anything.
 
 `nodes --json [PATH]` emits stale `node_modules` folders with age, size, and the matching preview/apply commands.
 
@@ -120,6 +124,7 @@ cleanroom clean --include-package-stores
 cleanroom large ~/Documents --min-mb 250 --limit 50
 cleanroom large ~/Downloads --min-mb 100 --limit 50
 cleanroom duplicates ~/Documents --min-mb 100 --limit 20
+cleanroom downloads --days 30 --limit 50
 cleanroom nodes ~/Documents --days 45 --limit 30
 ```
 

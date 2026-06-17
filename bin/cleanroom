@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.22.0"
+VERSION="0.23.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -46,6 +46,7 @@ Usage:
   cleanroom plan [--json]
   cleanroom large [PATH] [--min-mb N] [--limit N] [--json]
   cleanroom duplicates [PATH] [--min-mb N] [--limit N] [--json]
+  cleanroom downloads [--days N] [--limit N] [--json]
   cleanroom nodes [PATH] [--days N] [--limit N] [--json]
   cleanroom apps [PATH] [--limit N] [--json]
   cleanroom startup [--json]
@@ -72,6 +73,7 @@ Actions:
   plan                 Rank safe cleanup opportunities and show copyable commands.
   large                List largest files for review without deleting anything.
   duplicates           Find exact duplicate files for review without deleting anything.
+  downloads            List old Downloads files for manual review.
   nodes                List stale node_modules folders for review.
   apps                 List largest app bundles for review without uninstalling.
   startup              List LaunchAgents and LaunchDaemons for review.
@@ -96,7 +98,7 @@ Options:
   --trash              Move deleted files to ~/.Trash/cleanroom-* instead of rm -rf.
   --yes                Do not prompt before --apply cleanup.
   --verbose            Print every path touched.
-  --json               Emit JSON for overview, scan, plan, large, duplicates, nodes, apps,
+  --json               Emit JSON for overview, scan, plan, large, duplicates, downloads, nodes, apps,
                        startup, trash, caches, packages, snapshots, doctor, protect, guard, or rules.
   --output PATH        Output path for report.
   --log PATH           Write apply audit log here. Default: ~/.local/state/cleanroom/runs/*.log.
@@ -144,6 +146,9 @@ Examples:
   cleanroom large --json ~/Downloads
   cleanroom duplicates ~/Documents --min-mb 100
   cleanroom duplicates --json ~/Downloads
+  cleanroom downloads
+  cleanroom downloads --days 30 --limit 50
+  cleanroom downloads --json
   cleanroom nodes
   cleanroom nodes --days 45 --limit 30
   cleanroom nodes --json ~/Documents
@@ -1042,11 +1047,82 @@ large() {
   done <<<"$rows"
 }
 
+file_mtime_iso() {
+  local epoch="$1"
+  if [[ "$epoch" =~ ^[0-9]+$ && "$epoch" -gt 0 ]]; then
+    date -r "$epoch" '+%Y-%m-%d' 2>/dev/null || printf 'unknown'
+  else
+    printf 'unknown'
+  fi
+}
+
 path_mtime_epoch() {
   local path="$1" epoch
   epoch="$(stat -f '%m' "$path" 2>/dev/null || stat -c '%Y' "$path" 2>/dev/null || true)"
   [[ "$epoch" =~ ^[0-9]+$ ]] || epoch=0
   printf '%s\n' "$epoch"
+}
+
+downloads_rows() {
+  local root="$HOME/Downloads"
+  [[ -d "$root" ]] || return 0
+  local now path kb epoch age_days
+  now="$(date '+%s')"
+  find "$root" -maxdepth 1 -type f -mtime +"$DAYS" -print0 2>/dev/null |
+    while IFS= read -r -d '' path; do
+      kb="$(size_kb "$path")"
+      epoch="$(path_mtime_epoch "$path")"
+      if [[ "$epoch" -gt 0 && "$now" -ge "$epoch" ]]; then
+        age_days=$(((now - epoch) / 86400))
+      else
+        age_days=0
+      fi
+      printf '%012d\t%s\t%s\t%s\n' "$kb" "$epoch" "$age_days" "$path"
+    done |
+    sort -rn |
+    head -n "$LIMIT"
+}
+
+downloads() {
+  local rows root
+  root="$HOME/Downloads"
+  rows="$(downloads_rows)"
+
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '['
+    local first=1 kb epoch age_days path kb_num
+    while IFS=$'\t' read -r kb epoch age_days path; do
+      [[ -z "${path:-}" ]] && continue
+      kb_num="$(printf '%s\n' "$kb" | sed 's/^0*//; s/^$/0/')"
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '{"path":"%s","size_kb":%s,"size":"%s","modified_epoch":%s,"modified":"%s","age_days":%s}' \
+        "$(printf '%s' "$path" | json_escape)" \
+        "$kb_num" \
+        "$(human_kb "${kb:-0}" | json_escape)" \
+        "${epoch:-0}" \
+        "$(file_mtime_iso "${epoch:-0}" | json_escape)" \
+        "${age_days:-0}"
+    done <<<"$rows"
+    printf ']\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}cleanroom old Downloads${RESET}"
+  printf 'Review-only list. cleanroom does not delete Downloads files.\n'
+  printf 'Path: %s\n' "$root"
+  printf 'Older than: %s days  Limit: %s\n\n' "$DAYS" "$LIMIT"
+  if [[ -z "$rows" ]]; then
+    printf 'No old Downloads files found.\n'
+    return 0
+  fi
+  printf '%-10s %-9s %-12s %s\n' "size" "age" "modified" "path"
+  local kb epoch age_days path
+  while IFS=$'\t' read -r kb epoch age_days path; do
+    [[ -z "${path:-}" ]] && continue
+    printf '%-10s %4sd     %-12s %s\n' "$(human_kb "$kb")" "${age_days:-0}" "$(file_mtime_iso "${epoch:-0}")" "$path"
+  done <<<"$rows"
+  printf '\nReview these manually in Finder before deleting anything.\n'
 }
 
 node_roots() {
@@ -1679,6 +1755,7 @@ overview() {
   printf '\n%s\n' "${BOLD}Useful next commands${RESET}"
   printf 'cleanroom plan\n'
   printf 'cleanroom large ~/Documents --min-mb 250 --limit 50\n'
+  printf 'cleanroom downloads --days 30 --limit 50\n'
   printf 'cleanroom trash\n'
   printf 'cleanroom startup\n'
   printf 'cleanroom packages\n'
@@ -2275,7 +2352,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  overview|scan|plan|large|duplicates|nodes|apps|startup|trash|caches|packages|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
+  overview|scan|plan|large|duplicates|downloads|nodes|apps|startup|trash|caches|packages|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -2371,6 +2448,7 @@ case "$ACTION" in
   plan) plan ;;
   large) large ;;
   duplicates) duplicates ;;
+  downloads) downloads ;;
   nodes) nodes ;;
   apps) apps ;;
   startup) startup ;;
