@@ -115,6 +115,13 @@ Scan:
 cleanroom scan
 ```
 
+Get ranked cleanup recommendations:
+
+```sh
+cleanroom plan
+cleanroom plan --json
+```
+
 Machine-readable scan:
 
 ```sh
@@ -293,6 +300,8 @@ Config files use simple `key=value` lines and are never executed as shell.
 `--trash` applies to paths that `cleanroom` removes directly. System commands delegated to macOS or developer tools, such as Time Machine snapshot thinning or simulator reset, may still be irreversible.
 
 `restore` only restores entries that were moved by `--trash` and still exist in the cleanroom Trash folder. It skips destinations that already exist.
+
+`plan` estimates cleanup opportunities and prints copyable dry-run commands plus explicit apply commands. It does not delete anything.
 
 The project also ships `make install`, `make uninstall`, `make lint`, `make test`, `make package`, `make homebrew-formula`, and `make macos-app` targets for maintainers and package managers.
 

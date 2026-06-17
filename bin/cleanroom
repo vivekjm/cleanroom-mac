@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.8.0"
+VERSION="0.9.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -39,6 +39,7 @@ cleanroom - safe macOS storage cleaner
 
 Usage:
   cleanroom scan [options]
+  cleanroom plan [--json]
   cleanroom report [--output PATH]
   cleanroom clean [options]
   cleanroom history [--limit N]
@@ -52,6 +53,7 @@ Usage:
 
 Actions:
   scan                 Show disk usage and likely cleanup candidates.
+  plan                 Rank safe cleanup opportunities and show copyable commands.
   report               Write a Markdown cleanup report. Prints to stdout by default.
   clean                Clean safe rebuildable caches. Dry-run unless --apply is passed.
   history              List recent apply logs.
@@ -104,6 +106,8 @@ Safety:
 Examples:
   cleanroom scan
   cleanroom scan --json
+  cleanroom plan
+  cleanroom plan --json
   cleanroom report --output cleanroom-report.md
   cleanroom doctor
   cleanroom rules
@@ -264,6 +268,54 @@ print_size() {
   local kb
   kb="$(size_kb "$path")"
   printf '%8s  %s\n' "$(human_kb "$kb")" "$path"
+}
+
+sum_existing_kb() {
+  local total=0
+  local path kb
+  for path in "$@"; do
+    kb="$(size_kb "$path")"
+    total=$((total + kb))
+  done
+  printf '%s\n' "$total"
+}
+
+app_cache_kb() {
+  local roots=(
+    "$HOME/Library/Application Support/Google"
+    "$HOME/Library/Application Support/Code"
+    "$HOME/Library/Application Support/Cursor"
+    "$HOME/Library/Application Support/Slack"
+    "$HOME/Library/Application Support/BraveSoftware"
+    "$HOME/Library/Application Support/Comet"
+    "$HOME/Library/Application Support/Trae"
+  )
+  local total=0
+  local root found
+  for root in "${roots[@]}"; do
+    [[ -d "$root" ]] || continue
+    found="$(find "$root" -type d \( \
+      -name 'Cache' -o -name 'Code Cache' -o -name 'GPUCache' -o -name 'DawnCache' \
+      -o -name 'ShaderCache' -o -name 'GrShaderCache' -o -name 'CachedData' \
+      -o -name 'Crashpad' \
+    \) -prune -exec du -sk {} + 2>/dev/null | awk '{total += $1} END {print total + 0}' || true)"
+    total=$((total + ${found:-0}))
+  done
+  printf '%s\n' "$total"
+}
+
+stale_node_kb() {
+  local total=0
+  local roots=("$HOME/Documents" "$HOME/Desktop" "$HOME/Downloads")
+  local root kb
+  for root in "${roots[@]}"; do
+    [[ -d "$root" ]] || continue
+    while IFS= read -r path; do
+      kb="$(size_kb "$path")"
+      total=$((total + kb))
+    done < <(find "$root" -maxdepth 8 -type d -name node_modules -mtime +"$DAYS" -prune -print 2>/dev/null)
+  done
+  printf '%s\n' "$total"
 }
 
 candidate_paths() {
@@ -798,6 +850,70 @@ scan() {
     xargs -0 du -h 2>/dev/null | sort -h | tail -30 || true
 }
 
+plan_rows() {
+  local safe package app node dev ai_workspaces ai_models containers
+  safe="$(sum_existing_kb \
+    "~/Library/Caches" "~/.cache" "~/.npm/_cacache" "~/.npm/_logs" "~/.npm/_npx" \
+    "~/.yarn/cache" "~/.yarn/berry" "~/.gradle/caches" "~/.gradle/daemon" \
+    "~/.gradle/native" "~/.gradle/workers" "~/Library/pnpm/store" \
+    "~/Library/Developer/Xcode/DerivedData" "~/Library/Developer/CoreSimulator/Caches" \
+    "~/Library/Caches/Homebrew" "~/Library/Logs")"
+  package="$(sum_existing_kb "~/Library/pnpm/store" "~/.pnpm-store" "~/.cocoapods/repos" "~/.cargo/registry/cache")"
+  app="$(app_cache_kb)"
+  node="$(stale_node_kb)"
+  dev="$(sum_existing_kb \
+    "~/Library/Developer/Xcode/iOS DeviceSupport" "~/Library/Developer/Xcode/watchOS DeviceSupport" \
+    "~/Library/Developer/Xcode/tvOS DeviceSupport" "~/Library/Android/sdk/ndk" \
+    "~/Library/Android/sdk/system-images" "~/Library/Android/sdk/.downloadIntermediates" \
+    "~/Library/Android/sdk/.temp")"
+  ai_workspaces="$(sum_existing_kb "~/.gemini")"
+  ai_models="$(sum_existing_kb "~/.lmstudio/models" "~/.lmstudio/extensions/backends" "~/.ollama/models" "~/.cache/huggingface/hub" "~/.cache/modelscope" "~/.cache/torch/hub" "~/.cache/whisper")"
+  containers="$(sum_existing_kb "~/.colima" "~/.lima" "~/Library/Containers/com.docker.docker/Data/vms")"
+
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$safe" "safe" "Default safe cleanup" "cleanroom clean" "cleanroom clean --apply --trash" "Rebuildable caches and old logs. Recommended first step."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$app" "app-caches" "Safe app cache folders" "cleanroom clean --include-app-caches" "cleanroom clean --apply --trash --include-app-caches" "Nested cache folders only; browser profiles and passwords stay protected."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$package" "package-stores" "Package-manager stores" "cleanroom clean --include-package-stores" "cleanroom clean --apply --trash --include-package-stores" "Rebuildable package stores such as pnpm, CocoaPods, Cargo, and Gradle-related stores."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$node" "node-stale" "Stale node_modules" "cleanroom clean --include-node-stale --days $DAYS" "cleanroom clean --apply --trash --include-node-stale --days $DAYS" "node_modules older than $DAYS days under Desktop, Documents, and Downloads."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$dev" "dev-heavy" "Heavy SDK and simulator artifacts" "cleanroom clean --include-dev-heavy" "cleanroom clean --apply --trash --include-dev-heavy" "Opt-in cleanup that may require re-downloading SDKs or resetting simulator app data."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$ai_workspaces" "ai-workspaces" "Generated AI workspace state" "cleanroom clean --include-ai-workspaces" "cleanroom clean --apply --trash --include-ai-workspaces" "Generated recordings, scratch, brain, implicit data, and conversation caches where known."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$ai_models" "ai-models" "Downloaded local AI models" "cleanroom clean --include-ai-models" "cleanroom clean --apply --trash --include-ai-models" "Large model stores and backend extensions that may need to be downloaded again."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$containers" "containers" "Container VM disks" "cleanroom clean --include-containers" "cleanroom clean --apply --trash --include-containers" "High-impact opt-in cleanup that can remove local containers, images, and volumes."
+}
+
+plan() {
+  local rows
+  rows="$(plan_rows | sort -rn)"
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '['
+    local first=1 kb id title preview_command apply_command description
+    while IFS=$'\t' read -r kb id title preview_command apply_command description; do
+      [[ -z "${id:-}" ]] && continue
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '{"id":"%s","title":"%s","estimate_kb":%s,"estimate":"%s","preview_command":"%s","apply_command":"%s","description":"%s"}' \
+        "$(printf '%s' "$id" | json_escape)" \
+        "$(printf '%s' "$title" | json_escape)" \
+        "${kb:-0}" \
+        "$(human_kb "${kb:-0}" | json_escape)" \
+        "$(printf '%s' "$preview_command" | json_escape)" \
+        "$(printf '%s' "$apply_command" | json_escape)" \
+        "$(printf '%s' "$description" | json_escape)"
+    done <<<"$rows"
+    printf ']\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}cleanroom plan${RESET}"
+  printf 'Commands shown are dry-runs. Add --apply --trash only after reviewing output.\n\n'
+  printf '%-10s %-18s %-32s %s\n' "estimate" "id" "title" "preview command"
+  while IFS=$'\t' read -r kb id title preview_command apply_command description; do
+    [[ -z "${id:-}" ]] && continue
+    printf '%-10s %-18s %-32s %s\n' "$(human_kb "${kb:-0}")" "$id" "$title" "$preview_command"
+    printf '  apply: %s\n' "$apply_command"
+    printf '  %s\n' "$description"
+  done <<<"$rows"
+}
+
 report_body() {
   local now
   now="$(date '+%Y-%m-%d %H:%M:%S %Z')"
@@ -1096,7 +1212,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  scan|report|clean|history|restore|interactive|doctor|rules|categories|init-config|help)
+  scan|plan|report|clean|history|restore|interactive|doctor|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -1176,6 +1292,7 @@ done
 
 case "$ACTION" in
   scan) scan ;;
+  plan) plan ;;
   report) report ;;
   clean) clean ;;
   history) history ;;

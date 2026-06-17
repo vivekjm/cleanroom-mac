@@ -37,6 +37,12 @@ rules_json="$(mktemp)"
 python3 -m json.tool "$rules_json" >/dev/null
 grep 'ai-models' "$rules_json" >/dev/null
 rm -f "$rules_json"
+"$BIN" plan | grep 'cleanroom plan' >/dev/null
+plan_json="$(mktemp)"
+"$BIN" plan --json > "$plan_json"
+python3 -m json.tool "$plan_json" >/dev/null
+grep 'cleanroom clean --apply --trash' "$plan_json" >/dev/null
+rm -f "$plan_json"
 "$BIN" doctor | grep 'cleanroom doctor' >/dev/null
 "$BIN" history 2>&1 | grep 'No cleanroom history found' >/dev/null
 

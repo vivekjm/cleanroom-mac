@@ -5,6 +5,7 @@ _cleanroom() {
 
   commands=(
     'scan:Show disk usage and cleanup candidates'
+    'plan:Rank cleanup opportunities'
     'report:Write a Markdown cleanup report'
     'clean:Preview or apply cleanup'
     'history:List recent apply logs'

@@ -6,6 +6,7 @@ Common `cleanroom` workflows.
 
 ```sh
 cleanroom scan
+cleanroom plan
 cleanroom doctor
 cleanroom categories
 cleanroom rules
@@ -19,11 +20,14 @@ cleanroom clean
 
 ```sh
 cleanroom scan --json
+cleanroom plan --json
 cleanroom rules --json
 cleanroom report --output cleanroom-report.md
 ```
 
 `scan --json` emits disk and candidate sizes as JSON for wrappers, dashboards, or future GUI frontends.
+
+`plan --json` emits ranked cleanup recommendations with estimated reclaim size, preview commands, and explicit apply commands.
 
 `rules --json` emits cleanup rule metadata, including safety level, default status, opt-in flag, paths, and description.
 

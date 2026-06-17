@@ -67,6 +67,7 @@ final class CleanroomAppDelegate: NSObject, NSApplicationDelegate {
         buttonRow.alignment = .centerY
 
         buttonRow.addArrangedSubview(button("Scan", action: #selector(scan)))
+        buttonRow.addArrangedSubview(button("Plan", action: #selector(plan)))
         buttonRow.addArrangedSubview(button("Report to Desktop", action: #selector(report)))
         buttonRow.addArrangedSubview(button("Dry Run Dev", action: #selector(dryRunDev)))
         buttonRow.addArrangedSubview(button("History", action: #selector(history)))
@@ -118,6 +119,10 @@ final class CleanroomAppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func scan() {
         runCommand("scan", title: "Scan")
+    }
+
+    @objc private func plan() {
+        runCommand("plan", title: "Plan")
     }
 
     @objc private func report() {

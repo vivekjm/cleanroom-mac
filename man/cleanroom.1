@@ -1,9 +1,12 @@
-.TH CLEANROOM 1 "June 2026" "cleanroom 0.8.0" "User Commands"
+.TH CLEANROOM 1 "June 2026" "cleanroom 0.9.0" "User Commands"
 .SH NAME
 cleanroom \- safe-by-default macOS storage cleaner
 .SH SYNOPSIS
 .B cleanroom
 .RI "scan [options]"
+.br
+.B cleanroom
+.RI "plan [--json]"
 .br
 .B cleanroom
 .RI "report [--output path]"
@@ -35,6 +38,9 @@ Keychains, Photos libraries, Mail, iCloud Drive, or arbitrary personal files.
 .TP
 .B scan
 Show disk usage, cleanup candidates, largest home folders, and large files.
+.TP
+.B plan
+Rank safe cleanup opportunities and show copyable commands.
 .TP
 .B report
 Generate a Markdown cleanup report.
@@ -106,6 +112,7 @@ Remove local container VM disks. This can remove containers and volumes.
 .SH EXAMPLES
 .nf
 cleanroom scan
+cleanroom plan --json
 cleanroom report --output cleanroom-report.md
 cleanroom clean --preset dev
 cleanroom clean --preset dev --apply --trash
