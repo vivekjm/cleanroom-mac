@@ -1,0 +1,370 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+VERSION="0.1.0"
+APPLY=0
+VERBOSE=0
+ASSUME_YES=0
+DAYS=30
+ACTION="scan"
+INCLUDE_DEV_HEAVY=0
+INCLUDE_NODE_STALE=0
+INCLUDE_GEMINI=0
+INCLUDE_LMSTUDIO=0
+INCLUDE_APP_CACHES=0
+INCLUDE_SNAPSHOTS=0
+
+RED="$(printf '\033[31m')"
+GREEN="$(printf '\033[32m')"
+YELLOW="$(printf '\033[33m')"
+BOLD="$(printf '\033[1m')"
+RESET="$(printf '\033[0m')"
+
+usage() {
+  cat <<'EOF'
+cleanroom - safe macOS storage cleaner
+
+Usage:
+  cleanroom scan [options]
+  cleanroom clean [options]
+  cleanroom help
+
+Actions:
+  scan                 Show disk usage and likely cleanup candidates.
+  clean                Clean safe rebuildable caches. Dry-run unless --apply is passed.
+
+Options:
+  --apply              Actually delete files. Without this, clean only previews.
+  --yes                Do not prompt before --apply cleanup.
+  --verbose            Print every path touched.
+  --days N             Age threshold for stale node_modules. Default: 30.
+  --include-dev-heavy  Include heavier developer data:
+                       Xcode device support, simulator app data, Android NDK/system images.
+  --include-node-stale Remove node_modules older than --days from Desktop/Documents/Downloads.
+  --include-app-caches Include safe cache folders inside Google/Chrome, VS Code, Cursor, Slack, etc.
+                       Does not remove profiles, passwords, cookies, bookmarks, or settings wholesale.
+  --include-snapshots  Ask Time Machine to thin local snapshots.
+  --include-gemini     Remove Gemini/Antigravity recordings, scratch, brain, implicit, conversations.
+  --include-lmstudio   Remove LM Studio downloaded models and backend extensions.
+  -h, --help           Show help.
+  -v, --version        Show version.
+
+Safety:
+  cleanroom does NOT delete browser profiles, password databases, Keychains, Photos libraries,
+  Mail, iCloud Drive, or app profile folders by default.
+
+Examples:
+  cleanroom scan
+  cleanroom clean
+  cleanroom clean --apply --include-app-caches
+  cleanroom clean --apply --include-dev-heavy --include-node-stale --days 45
+EOF
+}
+
+log() { printf '%s\n' "$*"; }
+warn() { printf '%s%s%s\n' "$YELLOW" "$*" "$RESET" >&2; }
+ok() { printf '%s%s%s\n' "$GREEN" "$*" "$RESET"; }
+die() { printf '%s%s%s\n' "$RED" "$*" "$RESET" >&2; exit 1; }
+
+expand_path() {
+  local path="$1"
+  path="${path/#\~/$HOME}"
+  printf '%s\n' "$path"
+}
+
+exists() {
+  local path
+  path="$(expand_path "$1")"
+  [[ -e "$path" ]]
+}
+
+size_kb() {
+  local path
+  path="$(expand_path "$1")"
+  [[ -e "$path" ]] || { printf '0'; return; }
+  local out
+  out="$(du -sk "$path" 2>/dev/null || true)"
+  if [[ -z "$out" ]]; then
+    printf '0'
+  else
+    printf '%s\n' "$out" | awk '{print $1; exit}'
+  fi
+}
+
+human_kb() {
+  awk -v kb="${1:-0}" 'BEGIN {
+    bytes = kb * 1024
+    split("B KB MB GB TB", units, " ")
+    i = 1
+    while (bytes >= 1024 && i < 5) { bytes /= 1024; i++ }
+    if (i <= 2) printf "%.0f%s", bytes, units[i]
+    else printf "%.1f%s", bytes, units[i]
+  }'
+}
+
+print_size() {
+  local path="$1"
+  local kb
+  kb="$(size_kb "$path")"
+  printf '%8s  %s\n' "$(human_kb "$kb")" "$path"
+}
+
+disk_line() {
+  df -h /System/Volumes/Data 2>/dev/null || df -h /
+}
+
+confirm_apply() {
+  [[ "$APPLY" -eq 1 ]] || return 0
+  [[ "$ASSUME_YES" -eq 1 ]] && return 0
+  warn "About to delete rebuildable cache/artifact files."
+  warn "Protected data like browser passwords and Keychains is not deleted."
+  printf 'Continue? Type "clean" to proceed: '
+  local answer
+  read -r answer
+  [[ "$answer" == "clean" ]] || die "Cancelled."
+}
+
+run_rm() {
+  local path="$1"
+  path="$(expand_path "$path")"
+  [[ -e "$path" ]] || return 0
+
+  local kb
+  kb="$(size_kb "$path")"
+  if [[ "$APPLY" -eq 1 ]]; then
+    [[ "$VERBOSE" -eq 1 ]] && log "removing $(human_kb "$kb")  $path"
+    rm -rf "$path" 2>/dev/null || warn "Could not remove: $path"
+  else
+    printf 'would remove %8s  %s\n' "$(human_kb "$kb")" "$path"
+  fi
+}
+
+run_find_delete_children() {
+  local path="$1"
+  path="$(expand_path "$path")"
+  [[ -d "$path" ]] || return 0
+  if [[ "$APPLY" -eq 1 ]]; then
+    [[ "$VERBOSE" -eq 1 ]] && log "clearing children of $path"
+    find "$path" -mindepth 1 -maxdepth 1 -exec rm -rf {} + 2>/dev/null || true
+  else
+    print_size "$path"
+  fi
+}
+
+safe_clean() {
+  log "${BOLD}Safe rebuildable caches${RESET}"
+  run_find_delete_children "~/Library/Caches"
+  run_find_delete_children "~/.cache"
+  run_rm "~/.npm/_cacache"
+  run_rm "~/.npm/_logs"
+  run_rm "~/.npm/_npx"
+  run_rm "~/.yarn/cache"
+  run_rm "~/.yarn/berry"
+  run_rm "~/.gradle/caches"
+  run_rm "~/.gradle/daemon"
+  run_rm "~/.gradle/native"
+  run_rm "~/.gradle/workers"
+  run_rm "~/Library/pnpm/store"
+  run_rm "~/Library/Developer/Xcode/DerivedData"
+  run_rm "~/Library/Developer/CoreSimulator/Caches"
+
+  if command -v brew >/dev/null 2>&1; then
+    if [[ "$APPLY" -eq 1 ]]; then
+      brew cleanup -s >/dev/null 2>&1 || true
+      rm -rf "$HOME/Library/Caches/Homebrew"/* 2>/dev/null || true
+    else
+      print_size "~/Library/Caches/Homebrew"
+    fi
+  fi
+}
+
+clean_logs() {
+  log "${BOLD}Old logs${RESET}"
+  if [[ "$APPLY" -eq 1 ]]; then
+    find "$HOME/Library/Logs" -type f -mtime +7 -delete 2>/dev/null || true
+    find "$HOME/Library/Logs" -type d -empty -delete 2>/dev/null || true
+  else
+    print_size "~/Library/Logs"
+  fi
+}
+
+clean_app_caches() {
+  [[ "$INCLUDE_APP_CACHES" -eq 1 ]] || return 0
+  log "${BOLD}App cache folders only${RESET}"
+  local roots=(
+    "$HOME/Library/Application Support/Google"
+    "$HOME/Library/Application Support/Code"
+    "$HOME/Library/Application Support/Cursor"
+    "$HOME/Library/Application Support/Slack"
+    "$HOME/Library/Application Support/BraveSoftware"
+    "$HOME/Library/Application Support/Comet"
+    "$HOME/Library/Application Support/Trae"
+  )
+  local root
+  for root in "${roots[@]}"; do
+    [[ -d "$root" ]] || continue
+    if [[ "$APPLY" -eq 1 ]]; then
+      find "$root" -type d \( \
+        -name 'Cache' -o -name 'Code Cache' -o -name 'GPUCache' -o -name 'DawnCache' \
+        -o -name 'ShaderCache' -o -name 'GrShaderCache' -o -name 'CachedData' \
+        -o -name 'Crashpad' \
+      \) -prune -exec rm -rf {} + 2>/dev/null || true
+    else
+      local total
+      total="$(find "$root" -type d \( \
+        -name 'Cache' -o -name 'Code Cache' -o -name 'GPUCache' -o -name 'DawnCache' \
+        -o -name 'ShaderCache' -o -name 'GrShaderCache' -o -name 'CachedData' \
+        -o -name 'Crashpad' \
+      \) -prune -exec du -sk {} + 2>/dev/null | awk '{total += $1} END {print total + 0}')"
+      printf 'would clean %8s  %s cache folders\n' "$(human_kb "$total")" "$root"
+    fi
+  done
+}
+
+clean_dev_heavy() {
+  [[ "$INCLUDE_DEV_HEAVY" -eq 1 ]] || return 0
+  log "${BOLD}Heavy developer artifacts${RESET}"
+  run_rm "~/Library/Developer/Xcode/iOS DeviceSupport"
+  run_rm "~/Library/Developer/Xcode/watchOS DeviceSupport"
+  run_rm "~/Library/Developer/Xcode/tvOS DeviceSupport"
+  run_rm "~/Library/Android/sdk/ndk"
+  run_rm "~/Library/Android/sdk/system-images"
+  run_rm "~/Library/Android/sdk/.downloadIntermediates"
+  run_rm "~/Library/Android/sdk/.temp"
+
+  if [[ "$APPLY" -eq 1 ]] && command -v xcrun >/dev/null 2>&1; then
+    xcrun simctl shutdown all >/dev/null 2>&1 || true
+    xcrun simctl delete unavailable >/dev/null 2>&1 || true
+    xcrun simctl erase all >/dev/null 2>&1 || true
+  elif command -v xcrun >/dev/null 2>&1; then
+    warn "would reset iOS Simulator app data because --include-dev-heavy is set"
+  fi
+}
+
+clean_snapshots() {
+  [[ "$INCLUDE_SNAPSHOTS" -eq 1 ]] || return 0
+  log "${BOLD}Local snapshots${RESET}"
+  if [[ "$APPLY" -eq 1 ]]; then
+    tmutil thinlocalsnapshots / 999999999999 4 2>/dev/null || true
+  else
+    tmutil listlocalsnapshots / 2>/dev/null || true
+  fi
+}
+
+clean_gemini() {
+  [[ "$INCLUDE_GEMINI" -eq 1 ]] || return 0
+  log "${BOLD}Gemini / Antigravity generated data${RESET}"
+  local roots=(antigravity antigravity-backup antigravity-ide)
+  local root
+  for root in "${roots[@]}"; do
+    run_rm "~/.gemini/$root/browser_recordings"
+    run_rm "~/.gemini/$root/scratch"
+    run_rm "~/.gemini/$root/brain"
+    run_rm "~/.gemini/$root/implicit"
+  done
+}
+
+clean_lmstudio() {
+  [[ "$INCLUDE_LMSTUDIO" -eq 1 ]] || return 0
+  log "${BOLD}LM Studio downloaded models/backends${RESET}"
+  run_rm "~/.lmstudio/models"
+  run_rm "~/.lmstudio/extensions/backends"
+  run_rm "~/.lmstudio/.internal/temp-downloads"
+}
+
+clean_node_stale() {
+  [[ "$INCLUDE_NODE_STALE" -eq 1 ]] || return 0
+  log "${BOLD}Stale node_modules older than ${DAYS} days${RESET}"
+  local roots=("$HOME/Documents" "$HOME/Desktop" "$HOME/Downloads")
+  local root
+  for root in "${roots[@]}"; do
+    [[ -d "$root" ]] || continue
+    find "$root" -maxdepth 8 -type d -name node_modules -mtime +"$DAYS" -prune -print 2>/dev/null |
+      while IFS= read -r path; do
+        run_rm "$path"
+      done
+  done
+}
+
+scan() {
+  log "${BOLD}Disk${RESET}"
+  disk_line
+  printf '\n%s\n' "${BOLD}Common cleanup candidates${RESET}"
+  local paths=(
+    "~/Library/Caches" "~/Library/Logs" "~/Library/Developer" "~/Library/Android"
+    "~/Library/pnpm" "~/.npm" "~/.yarn" "~/.gradle" "~/.cache" "~/.gemini"
+    "~/.lmstudio" "~/.cocoapods" "~/.codex" "~/Library/Application Support"
+    "~/Documents" "~/Desktop" "~/Downloads"
+  )
+  local path
+  for path in "${paths[@]}"; do print_size "$path"; done
+
+  printf '\n%s\n' "${BOLD}Largest home folders${RESET}"
+  du -x -d 1 -h "$HOME" 2>/dev/null | sort -h | tail -25 || true
+
+  printf '\n%s\n' "${BOLD}Largest user files over 500MB${RESET}"
+  find "$HOME" -xdev -type f -size +500M -print0 2>/dev/null |
+    xargs -0 du -h 2>/dev/null | sort -h | tail -30 || true
+}
+
+clean() {
+  if [[ "$APPLY" -eq 1 ]]; then
+    warn "Apply mode enabled."
+  else
+    warn "Dry-run mode. Pass --apply to actually delete."
+  fi
+  confirm_apply
+  disk_line
+  safe_clean
+  clean_logs
+  clean_app_caches
+  clean_dev_heavy
+  clean_node_stale
+  clean_snapshots
+  clean_gemini
+  clean_lmstudio
+  printf '\n%s\n' "${BOLD}After${RESET}"
+  disk_line
+}
+
+if [[ "$#" -eq 0 ]]; then
+  usage
+  exit 0
+fi
+
+case "${1:-}" in
+  scan|clean|help)
+    ACTION="$1"
+    shift
+    ;;
+esac
+
+while [[ "$#" -gt 0 ]]; do
+  case "$1" in
+    --apply) APPLY=1 ;;
+    --yes) ASSUME_YES=1 ;;
+    --verbose) VERBOSE=1 ;;
+    --days)
+      shift
+      [[ "${1:-}" =~ ^[0-9]+$ ]] || die "--days requires a number"
+      DAYS="$1"
+      ;;
+    --include-dev-heavy) INCLUDE_DEV_HEAVY=1 ;;
+    --include-node-stale) INCLUDE_NODE_STALE=1 ;;
+    --include-app-caches) INCLUDE_APP_CACHES=1 ;;
+    --include-snapshots) INCLUDE_SNAPSHOTS=1 ;;
+    --include-gemini) INCLUDE_GEMINI=1 ;;
+    --include-lmstudio) INCLUDE_LMSTUDIO=1 ;;
+    -h|--help) usage; exit 0 ;;
+    -v|--version) echo "$VERSION"; exit 0 ;;
+    *) die "Unknown option: $1" ;;
+  esac
+  shift
+done
+
+case "$ACTION" in
+  scan) scan ;;
+  clean) clean ;;
+  help) usage ;;
+  *) die "Unknown action: $ACTION" ;;
+esac
