@@ -1,4 +1,4 @@
-.TH CLEANROOM 1 "June 2026" "cleanroom 0.12.0" "User Commands"
+.TH CLEANROOM 1 "June 2026" "cleanroom 0.13.0" "User Commands"
 .SH NAME
 cleanroom \- safe-by-default macOS storage cleaner
 .SH SYNOPSIS
@@ -10,6 +10,9 @@ cleanroom \- safe-by-default macOS storage cleaner
 .br
 .B cleanroom
 .RI "large [path] [--min-mb n] [--limit n] [--json]"
+.br
+.B cleanroom
+.RI "duplicates [path] [--min-mb n] [--limit n] [--json]"
 .br
 .B cleanroom
 .RI "report [--output path]"
@@ -53,6 +56,9 @@ Rank safe cleanup opportunities and show copyable commands.
 .TP
 .B large
 List large files for review without deleting anything.
+.TP
+.B duplicates
+Find exact duplicate files for review without deleting anything.
 .TP
 .B report
 Generate a Markdown cleanup report.
@@ -103,7 +109,7 @@ Write the apply audit log to a specific file.
 Number of history entries or large files to show.
 .TP
 .B --min-mb " n"
-Minimum file size for the large command. Defaults to 500.
+Minimum file size for large and duplicate review commands. Defaults to 500.
 .TP
 .B --yes
 Skip confirmation prompts.
@@ -136,6 +142,7 @@ Remove local container VM disks. This can remove containers and volumes.
 cleanroom scan
 cleanroom plan --json
 cleanroom large ~/Documents --min-mb 250 --limit 30
+cleanroom duplicates ~/Documents --min-mb 100 --limit 20
 cleanroom report --output cleanroom-report.md
 cleanroom clean --preset dev
 cleanroom clean --preset dev --apply --trash

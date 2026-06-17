@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.12.0"
+VERSION="0.13.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -43,6 +43,7 @@ Usage:
   cleanroom scan [options]
   cleanroom plan [--json]
   cleanroom large [PATH] [--min-mb N] [--limit N] [--json]
+  cleanroom duplicates [PATH] [--min-mb N] [--limit N] [--json]
   cleanroom report [--output PATH]
   cleanroom clean [options]
   cleanroom history [--limit N]
@@ -60,6 +61,7 @@ Actions:
   scan                 Show disk usage and likely cleanup candidates.
   plan                 Rank safe cleanup opportunities and show copyable commands.
   large                List largest files for review without deleting anything.
+  duplicates           Find exact duplicate files for review without deleting anything.
   report               Write a Markdown cleanup report. Prints to stdout by default.
   clean                Clean safe rebuildable caches. Dry-run unless --apply is passed.
   history              List recent apply logs.
@@ -77,7 +79,7 @@ Options:
   --trash              Move deleted files to ~/.Trash/cleanroom-* instead of rm -rf.
   --yes                Do not prompt before --apply cleanup.
   --verbose            Print every path touched.
-  --json               Emit JSON for scan, plan, large, protect, guard, or rules.
+  --json               Emit JSON for scan, plan, large, duplicates, protect, guard, or rules.
   --output PATH        Output path for report.
   --log PATH           Write apply audit log here. Default: ~/.local/state/cleanroom/runs/*.log.
   --config PATH        Load config file. Default: ~/.config/cleanroom/config.
@@ -119,6 +121,8 @@ Examples:
   cleanroom plan --json
   cleanroom large ~/Documents --min-mb 250 --limit 30
   cleanroom large --json ~/Downloads
+  cleanroom duplicates ~/Documents --min-mb 100
+  cleanroom duplicates --json ~/Downloads
   cleanroom report --output cleanroom-report.md
   cleanroom doctor
   cleanroom protect
@@ -958,6 +962,119 @@ large() {
   done <<<"$rows"
 }
 
+duplicate_candidates() {
+  local root="$1"
+  find "$root" -xdev -type f -size "+${MIN_MB}M" -print0 2>/dev/null |
+    while IFS= read -r -d '' path; do
+      local hash kb
+      hash="$(shasum -a 256 "$path" 2>/dev/null | awk '{print $1}' || true)"
+      [[ -n "$hash" ]] || continue
+      kb="$(size_kb "$path")"
+      printf '%s\t%012d\t%s\n' "$hash" "$kb" "$path"
+    done |
+    sort -k1,1 -k2,2nr
+}
+
+duplicates_json_group() {
+  local hash="$1"
+  local size_kb="$2"
+  shift 2
+  local count="$#"
+  [[ "$count" -gt 1 ]] || return 0
+  local reclaim_kb
+  reclaim_kb=$((size_kb * (count - 1)))
+  printf '{"hash":"%s","size_kb":%s,"size":"%s","count":%s,"potential_reclaim_kb":%s,"potential_reclaim":"%s","paths":[' \
+    "$(printf '%s' "$hash" | json_escape)" \
+    "$size_kb" \
+    "$(human_kb "$size_kb" | json_escape)" \
+    "$count" \
+    "$reclaim_kb" \
+    "$(human_kb "$reclaim_kb" | json_escape)"
+  local first=1 path
+  for path in "$@"; do
+    [[ "$first" -eq 0 ]] && printf ','
+    first=0
+    printf '"%s"' "$(printf '%s' "$path" | json_escape)"
+  done
+  printf ']}'
+}
+
+duplicates_text_group() {
+  local hash="$1"
+  local size_kb="$2"
+  shift 2
+  local count="$#"
+  [[ "$count" -gt 1 ]] || return 0
+  local reclaim_kb path
+  reclaim_kb=$((size_kb * (count - 1)))
+  printf 'duplicate group  count=%s  each=%s  potential reclaim=%s\n' "$count" "$(human_kb "$size_kb")" "$(human_kb "$reclaim_kb")"
+  printf '  hash: %s\n' "$hash"
+  for path in "$@"; do
+    printf '  %s\n' "$path"
+  done
+  printf '\n'
+}
+
+duplicates() {
+  local root
+  if [[ "${#PATH_ARGS[@]}" -gt 0 ]]; then
+    root="$(expand_path "${PATH_ARGS[0]}")"
+  else
+    root="$HOME"
+  fi
+  [[ -e "$root" ]] || die "duplicates path not found: $root"
+  command -v shasum >/dev/null 2>&1 || die "duplicates requires shasum"
+
+  local rows_file
+  rows_file="$(mktemp)"
+  duplicate_candidates "$root" >"$rows_file"
+
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '['
+  else
+    printf '%s\n' "${BOLD}cleanroom duplicate files${RESET}"
+    printf 'Review-only list. cleanroom does not delete duplicate files.\n'
+    printf 'Path: %s\n' "$root"
+    printf 'Minimum: %sMB  Limit: %s groups\n\n' "$MIN_MB" "$LIMIT"
+  fi
+
+  local current_hash="" current_size=0 hash kb path emitted=0 json_first=1
+  local group_paths=()
+
+  flush_duplicate_group() {
+    [[ -n "$current_hash" ]] || return 0
+    [[ "${#group_paths[@]}" -gt 1 ]] || return 0
+    [[ "$emitted" -lt "$LIMIT" ]] || return 0
+    if [[ "$JSON" -eq 1 ]]; then
+      [[ "$json_first" -eq 0 ]] && printf ','
+      json_first=0
+      duplicates_json_group "$current_hash" "$current_size" "${group_paths[@]}"
+    else
+      duplicates_text_group "$current_hash" "$current_size" "${group_paths[@]}"
+    fi
+    emitted=$((emitted + 1))
+  }
+
+  while IFS=$'\t' read -r hash kb path; do
+    [[ -z "${hash:-}" || -z "${path:-}" ]] && continue
+    if [[ -n "$current_hash" && "$hash" != "$current_hash" ]]; then
+      flush_duplicate_group
+      group_paths=()
+    fi
+    current_hash="$hash"
+    current_size="$(printf '%s\n' "$kb" | sed 's/^0*//; s/^$/0/')"
+    group_paths+=("$path")
+  done <"$rows_file"
+  flush_duplicate_group
+
+  rm -f "$rows_file"
+  if [[ "$JSON" -eq 1 ]]; then
+    printf ']\n'
+  elif [[ "$emitted" -eq 0 ]]; then
+    printf 'No exact duplicates found over %sMB.\n' "$MIN_MB"
+  fi
+}
+
 plan_rows() {
   local safe package app node dev ai_workspaces ai_models containers
   safe="$(sum_existing_kb \
@@ -1463,7 +1580,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  scan|plan|large|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
+  scan|plan|large|duplicates|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -1542,7 +1659,7 @@ while [[ "$#" -gt 0 ]]; do
     -h|--help) usage; exit 0 ;;
     -v|--version) echo "$VERSION"; exit 0 ;;
     *)
-      if [[ "$ACTION" == "guard" || "$ACTION" == "large" ]]; then
+      if [[ "$ACTION" == "guard" || "$ACTION" == "large" || "$ACTION" == "duplicates" ]]; then
         PATH_ARGS+=("$1")
       else
         die "Unknown option: $1"
@@ -1556,6 +1673,7 @@ case "$ACTION" in
   scan) scan ;;
   plan) plan ;;
   large) large ;;
+  duplicates) duplicates ;;
   report) report ;;
   clean) clean ;;
   history) history ;;

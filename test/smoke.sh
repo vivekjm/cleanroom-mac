@@ -21,6 +21,7 @@ mkdir -p \
   "$TEST_HOME/.cache" \
   "$TEST_HOME/.lmstudio/models" \
   "$TEST_HOME/Downloads" \
+  "$TEST_HOME/Documents/duplicates" \
   "$TEST_HOME/Documents/example/node_modules"
 
 printf 'cache\n' >"$TEST_HOME/Library/Caches/example.cache"
@@ -30,6 +31,8 @@ printf 'login data\n' >"$TEST_HOME/Library/Application Support/Google/Chrome/Def
 printf 'browser cache\n' >"$TEST_HOME/Library/Application Support/Google/Chrome/Default/Cache/example.cache"
 printf 'keychain\n' >"$TEST_HOME/Library/Keychains/login.keychain-db"
 dd if=/dev/zero of="$TEST_HOME/Downloads/big-test.bin" bs=1024 count=2048 >/dev/null 2>&1
+dd if=/dev/zero of="$TEST_HOME/Documents/duplicates/copy-a.bin" bs=1024 count=2048 >/dev/null 2>&1
+cp "$TEST_HOME/Documents/duplicates/copy-a.bin" "$TEST_HOME/Documents/duplicates/copy-b.bin"
 export HOME="$TEST_HOME"
 
 bash -n "$BIN"
@@ -56,6 +59,14 @@ large_json="$(mktemp)"
 python3 -m json.tool "$large_json" >/dev/null
 grep 'big-test.bin' "$large_json" >/dev/null
 rm -f "$large_json"
+"$BIN" duplicates "$HOME/Documents" --min-mb 1 --limit 5 | grep 'copy-a.bin' >/dev/null
+"$BIN" duplicates "$HOME/Documents" --min-mb 1 --limit 5 | grep 'copy-b.bin' >/dev/null
+duplicates_json="$(mktemp)"
+"$BIN" duplicates --json "$HOME/Documents" --min-mb 1 --limit 5 > "$duplicates_json"
+python3 -m json.tool "$duplicates_json" >/dev/null
+grep 'potential_reclaim_kb' "$duplicates_json" >/dev/null
+grep 'copy-b.bin' "$duplicates_json" >/dev/null
+rm -f "$duplicates_json"
 "$BIN" doctor | grep 'cleanroom doctor' >/dev/null
 "$BIN" doctor | grep 'cleanroom protect' >/dev/null
 "$BIN" protect | grep 'chrome-login-data' >/dev/null

@@ -130,6 +130,14 @@ cleanroom large ~/Documents --min-mb 250 --limit 30
 cleanroom large --json ~/Downloads
 ```
 
+Find exact duplicate files for manual review:
+
+```sh
+cleanroom duplicates
+cleanroom duplicates ~/Documents --min-mb 100 --limit 20
+cleanroom duplicates --json ~/Downloads
+```
+
 Machine-readable scan:
 
 ```sh
@@ -330,6 +338,8 @@ Config files use simple `key=value` lines and are never executed as shell.
 `plan` estimates cleanup opportunities and prints copyable dry-run commands plus explicit apply commands. It does not delete anything.
 
 `large` lists large files for review and never deletes them. Use it when macOS reports high Documents storage and you need to find videos, archives, disk images, datasets, or project artifacts manually.
+
+`duplicates` hashes files above `--min-mb`, groups exact matches, estimates possible reclaim, and never deletes anything.
 
 The project also ships `make install`, `make uninstall`, `make lint`, `make test`, `make package`, `make homebrew-formula`, and `make macos-app` targets for maintainers and package managers.
 
