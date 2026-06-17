@@ -17,6 +17,9 @@ mkdir -p \
   "$TEST_HOME/Library/Developer/Xcode/DerivedData" \
   "$TEST_HOME/Library/Application Support/Google/Chrome/Default" \
   "$TEST_HOME/Library/Application Support/Google/Chrome/Default/Cache" \
+  "$TEST_HOME/Library/Application Support/CleanroomTestAdobe/Creative Cloud" \
+  "$TEST_HOME/Library/Caches/com.cleanroomtestadobe.acc" \
+  "$TEST_HOME/Library/Preferences" \
   "$TEST_HOME/Library/Keychains" \
   "$TEST_HOME/.npm/_cacache" \
   "$TEST_HOME/Library/pnpm/store" \
@@ -34,6 +37,9 @@ printf 'log\n' >"$TEST_HOME/Library/Logs/example.log"
 printf 'model\n' >"$TEST_HOME/.lmstudio/models/example.gguf"
 printf 'login data\n' >"$TEST_HOME/Library/Application Support/Google/Chrome/Default/Login Data"
 printf 'browser cache\n' >"$TEST_HOME/Library/Application Support/Google/Chrome/Default/Cache/example.cache"
+printf 'adobe support\n' >"$TEST_HOME/Library/Application Support/CleanroomTestAdobe/Creative Cloud/state.db"
+printf 'adobe cache\n' >"$TEST_HOME/Library/Caches/com.cleanroomtestadobe.acc/cache.bin"
+printf 'adobe prefs\n' >"$TEST_HOME/Library/Preferences/com.cleanroomtestadobe.acc.plist"
 printf 'keychain\n' >"$TEST_HOME/Library/Keychains/login.keychain-db"
 printf 'trashed\n' >"$TEST_HOME/.Trash/old-trash.txt"
 printf 'old dependency\n' >"$TEST_HOME/Documents/example/node_modules/package.txt"
@@ -126,6 +132,14 @@ grep 'Google Chrome' "$browsers_json" >/dev/null
 grep '"protected":true' "$browsers_json" >/dev/null
 grep 'cleanroom clean --apply --trash --include-app-caches' "$browsers_json" >/dev/null
 rm -f "$browsers_json"
+"$BIN" leftovers cleanroomtestadobe --limit 10 | grep 'com.cleanroomtestadobe.acc' >/dev/null
+leftovers_json="$(mktemp)"
+"$BIN" leftovers cleanroomtestadobe --json --limit 10 > "$leftovers_json"
+python3 -m json.tool "$leftovers_json" >/dev/null
+grep '"queries"' "$leftovers_json" >/dev/null
+grep 'com.cleanroomtestadobe.acc' "$leftovers_json" >/dev/null
+grep '"category":"preferences"' "$leftovers_json" >/dev/null
+rm -f "$leftovers_json"
 "$BIN" startup | grep 'com.example.cleanroom-test' >/dev/null
 startup_json="$(mktemp)"
 "$BIN" startup --json > "$startup_json"

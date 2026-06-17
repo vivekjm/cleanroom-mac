@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.24.0"
+VERSION="0.25.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -50,6 +50,7 @@ Usage:
   cleanroom nodes [PATH] [--days N] [--limit N] [--json]
   cleanroom apps [PATH] [--limit N] [--json]
   cleanroom browsers [--json]
+  cleanroom leftovers QUERY... [--limit N] [--json]
   cleanroom startup [--json]
   cleanroom trash [--json]
   cleanroom caches [--json]
@@ -78,6 +79,7 @@ Actions:
   nodes                List stale node_modules folders for review.
   apps                 List largest app bundles for review without uninstalling.
   browsers             Inventory browser profile and cache footprint.
+  leftovers            Find app leftovers by search term for manual review.
   startup              List LaunchAgents and LaunchDaemons for review.
   trash                Inventory current user Trash contents.
   caches               Inventory safe and opt-in cache buckets.
@@ -101,8 +103,8 @@ Options:
   --yes                Do not prompt before --apply cleanup.
   --verbose            Print every path touched.
   --json               Emit JSON for overview, scan, plan, large, duplicates, downloads, nodes, apps,
-                       browsers, startup, trash, caches, packages, snapshots, doctor, protect,
-                       guard, or rules.
+                       browsers, leftovers, startup, trash, caches, packages, snapshots,
+                       doctor, protect, guard, or rules.
   --output PATH        Output path for report.
   --log PATH           Write apply audit log here. Default: ~/.local/state/cleanroom/runs/*.log.
   --config PATH        Load config file. Default: ~/.config/cleanroom/config.
@@ -159,6 +161,8 @@ Examples:
   cleanroom apps --json /Applications
   cleanroom browsers
   cleanroom browsers --json
+  cleanroom leftovers adobe
+  cleanroom leftovers zoom --json
   cleanroom startup
   cleanroom startup --json
   cleanroom trash
@@ -1488,6 +1492,108 @@ browsers() {
   done <<<"$rows"
 }
 
+lower_text() {
+  printf '%s' "$1" | tr '[:upper:]' '[:lower:]'
+}
+
+leftover_match_query() {
+  local haystack query query_lower
+  haystack="$(lower_text "$1")"
+  for query in "${PATH_ARGS[@]}"; do
+    query_lower="$(lower_text "$query")"
+    [[ -z "$query_lower" ]] && continue
+    if [[ "$haystack" == *"$query_lower"* ]]; then
+      printf '%s\n' "$query"
+      return 0
+    fi
+  done
+  return 1
+}
+
+leftover_roots() {
+  printf '%s\t%s\t%s\n' "app-support" "~/Library/Application Support" "3"
+  printf '%s\t%s\t%s\n' "caches" "~/Library/Caches" "3"
+  printf '%s\t%s\t%s\n' "preferences" "~/Library/Preferences" "1"
+  printf '%s\t%s\t%s\n' "saved-state" "~/Library/Saved Application State" "1"
+  printf '%s\t%s\t%s\n' "containers" "~/Library/Containers" "1"
+  printf '%s\t%s\t%s\n' "group-containers" "~/Library/Group Containers" "1"
+  printf '%s\t%s\t%s\n' "http-storages" "~/Library/HTTPStorages" "1"
+  printf '%s\t%s\t%s\n' "webkit" "~/Library/WebKit" "2"
+  printf '%s\t%s\t%s\n' "logs" "~/Library/Logs" "2"
+  printf '%s\t%s\t%s\n' "launch-agents" "~/Library/LaunchAgents" "1"
+  printf '%s\t%s\t%s\n' "local-launch-agents" "/Library/LaunchAgents" "1"
+  printf '%s\t%s\t%s\n' "local-launch-daemons" "/Library/LaunchDaemons" "1"
+  printf '%s\t%s\t%s\n' "local-app-support" "/Library/Application Support" "2"
+}
+
+leftover_rows() {
+  [[ "${#PATH_ARGS[@]}" -gt 0 ]] || die "leftovers requires at least one search term"
+  local category root_template depth root path matched kb
+  while IFS=$'\t' read -r category root_template depth; do
+    root="$(expand_path "$root_template")"
+    [[ -d "$root" ]] || continue
+    while IFS= read -r -d '' path; do
+      matched="$(leftover_match_query "$path" || true)"
+      [[ -n "$matched" ]] || continue
+      kb="$(size_kb "$path")"
+      printf '%012d\t%s\t%s\t%s\n' "$kb" "$category" "$matched" "$path"
+    done < <(find "$root" -mindepth 1 -maxdepth "$depth" \( -type d -o -type f \) -print0 2>/dev/null)
+  done < <(leftover_roots) | sort -rn | head -n "$LIMIT"
+}
+
+json_queries_array() {
+  local first=1 query
+  printf '['
+  for query in "${PATH_ARGS[@]}"; do
+    [[ -z "$query" ]] && continue
+    [[ "$first" -eq 0 ]] && printf ','
+    first=0
+    printf '"%s"' "$(printf '%s' "$query" | json_escape)"
+  done
+  printf ']'
+}
+
+leftovers() {
+  local rows
+  rows="$(leftover_rows)"
+
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '{"queries":'
+    json_queries_array
+    printf ',"items":['
+    local first=1 kb category matched path kb_num
+    while IFS=$'\t' read -r kb category matched path; do
+      [[ -z "${path:-}" ]] && continue
+      kb_num="$(printf '%s\n' "$kb" | sed 's/^0*//; s/^$/0/')"
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '{"path":"%s","category":"%s","matched_query":"%s","size_kb":%s,"size":"%s"}' \
+        "$(printf '%s' "$path" | json_escape)" \
+        "$(printf '%s' "$category" | json_escape)" \
+        "$(printf '%s' "$matched" | json_escape)" \
+        "$kb_num" \
+        "$(human_kb "${kb:-0}" | json_escape)"
+    done <<<"$rows"
+    printf ']}\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}cleanroom app leftovers${RESET}"
+  printf 'Review-only search. cleanroom does not delete these files or folders.\n'
+  printf 'Queries: %s  Limit: %s\n\n' "${PATH_ARGS[*]}" "$LIMIT"
+  if [[ -z "$rows" ]]; then
+    printf 'No matching leftovers found.\n'
+    return 0
+  fi
+  printf '%-10s %-20s %-16s %s\n' "size" "category" "matched" "path"
+  local kb category matched path
+  while IFS=$'\t' read -r kb category matched path; do
+    [[ -z "${path:-}" ]] && continue
+    printf '%-10s %-20s %-16s %s\n' "$(human_kb "$kb")" "$category" "$matched" "$path"
+  done <<<"$rows"
+  printf '\nReview matches manually. Vendor uninstallers or app settings may be required for complete removal.\n'
+}
+
 plist_value() {
   local file="$1"
   local key="$2"
@@ -2468,7 +2574,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  overview|scan|plan|large|duplicates|downloads|nodes|apps|browsers|startup|trash|caches|packages|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
+  overview|scan|plan|large|duplicates|downloads|nodes|apps|browsers|leftovers|startup|trash|caches|packages|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -2548,7 +2654,7 @@ while [[ "$#" -gt 0 ]]; do
     -h|--help) usage; exit 0 ;;
     -v|--version) echo "$VERSION"; exit 0 ;;
     *)
-      if [[ "$ACTION" == "guard" || "$ACTION" == "large" || "$ACTION" == "duplicates" || "$ACTION" == "nodes" || "$ACTION" == "apps" ]]; then
+      if [[ "$ACTION" == "guard" || "$ACTION" == "large" || "$ACTION" == "duplicates" || "$ACTION" == "nodes" || "$ACTION" == "apps" || "$ACTION" == "leftovers" ]]; then
         PATH_ARGS+=("$1")
       else
         die "Unknown option: $1"
@@ -2568,6 +2674,7 @@ case "$ACTION" in
   nodes) nodes ;;
   apps) apps ;;
   browsers) browsers ;;
+  leftovers) leftovers ;;
   startup) startup ;;
   trash) trash ;;
   caches) caches ;;

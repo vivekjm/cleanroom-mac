@@ -92,6 +92,7 @@ final class CleanroomAppDelegate: NSObject, NSApplicationDelegate {
         reviewRow.addArrangedSubview(button("Node Modules", action: #selector(nodes)))
         reviewRow.addArrangedSubview(button("Apps", action: #selector(apps)))
         reviewRow.addArrangedSubview(button("Browsers", action: #selector(browsers)))
+        reviewRow.addArrangedSubview(button("Leftovers", action: #selector(leftovers)))
         reviewRow.addArrangedSubview(button("Caches", action: #selector(caches)))
         reviewRow.addArrangedSubview(button("Packages", action: #selector(packages)))
         reviewRow.addArrangedSubview(button("Snapshots", action: #selector(snapshots)))
@@ -185,6 +186,30 @@ final class CleanroomAppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func browsers() {
         runCommand("browsers", title: "Browsers")
+    }
+
+    @objc private func leftovers() {
+        let alert = NSAlert()
+        alert.messageText = "Find app leftovers"
+        alert.informativeText = "Enter an app or vendor name. This only searches and previews matching files."
+        alert.addButton(withTitle: "Search")
+        alert.addButton(withTitle: "Cancel")
+
+        let input = NSTextField(frame: NSRect(x: 0, y: 0, width: 280, height: 24))
+        input.placeholderString = "adobe, zoom, slack..."
+        alert.accessoryView = input
+
+        guard alert.runModal() == .alertFirstButtonReturn else {
+            return
+        }
+
+        let query = input.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else {
+            statusLabel.stringValue = "Leftovers search cancelled: empty query"
+            return
+        }
+
+        runCommand("leftovers \(shellQuote(query)) --limit 40", title: "Leftovers")
     }
 
     @objc private func caches() {

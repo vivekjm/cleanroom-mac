@@ -14,6 +14,7 @@ cleanroom downloads
 cleanroom nodes
 cleanroom apps
 cleanroom browsers
+cleanroom leftovers adobe
 cleanroom startup
 cleanroom trash
 cleanroom caches
@@ -42,6 +43,7 @@ cleanroom downloads --json
 cleanroom nodes --json ~/Documents
 cleanroom apps --json
 cleanroom browsers --json
+cleanroom leftovers adobe --json
 cleanroom startup --json
 cleanroom trash --json
 cleanroom caches --json
@@ -71,6 +73,8 @@ cleanroom report --output cleanroom-report.md
 `apps --json [PATH]` emits app bundle sizes for `/Applications`, `~/Applications`, or a provided path. It is intentionally review-only and does not uninstall anything.
 
 `browsers --json` emits browser profile size, cache size, protected status, and matching preview/apply commands. It is intentionally review-only and does not delete profiles, passwords, cookies, bookmarks, or sessions.
+
+`leftovers --json QUERY...` emits matching app support, cache, preference, container, WebKit, log, and launch-item paths for manual review. It is intentionally review-only and does not delete anything.
 
 `startup --json` emits LaunchAgents and LaunchDaemons with scope, type, status, label, program, and path. It is intentionally review-only and does not unload, disable, or remove anything.
 
@@ -142,6 +146,16 @@ cleanroom apps --json /Applications
 ```
 
 Review large app bundles manually. cleanroom does not uninstall apps because app removal can require vendor uninstallers, launch agents, helper tools, login items, and account-specific data.
+
+## App Leftovers
+
+```sh
+cleanroom leftovers adobe
+cleanroom leftovers "creative cloud" --limit 50
+cleanroom leftovers zoom --json
+```
+
+Use this after uninstalling or removing a large app. It searches common macOS support, cache, preference, container, saved-state, WebKit, log, and launch-item locations by name. It does not delete matches; review them in Finder or use the vendor uninstaller when one exists.
 
 ## Browser Storage
 
