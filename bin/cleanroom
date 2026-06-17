@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.15.0"
+VERSION="0.16.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -46,6 +46,7 @@ Usage:
   cleanroom duplicates [PATH] [--min-mb N] [--limit N] [--json]
   cleanroom apps [PATH] [--limit N] [--json]
   cleanroom packages [--json]
+  cleanroom snapshots [--json]
   cleanroom report [--output PATH]
   cleanroom clean [options]
   cleanroom history [--limit N]
@@ -66,6 +67,7 @@ Actions:
   duplicates           Find exact duplicate files for review without deleting anything.
   apps                 List largest app bundles for review without uninstalling.
   packages             Inventory package-manager caches and stores.
+  snapshots            List local Time Machine snapshots for review.
   report               Write a Markdown cleanup report. Prints to stdout by default.
   clean                Clean safe rebuildable caches. Dry-run unless --apply is passed.
   history              List recent apply logs.
@@ -84,7 +86,7 @@ Options:
   --yes                Do not prompt before --apply cleanup.
   --verbose            Print every path touched.
   --json               Emit JSON for scan, plan, large, duplicates, apps, packages,
-                       protect, guard, or rules.
+                       snapshots, protect, guard, or rules.
   --output PATH        Output path for report.
   --log PATH           Write apply audit log here. Default: ~/.local/state/cleanroom/runs/*.log.
   --config PATH        Load config file. Default: ~/.config/cleanroom/config.
@@ -132,6 +134,8 @@ Examples:
   cleanroom apps --json /Applications
   cleanroom packages
   cleanroom packages --json
+  cleanroom snapshots
+  cleanroom snapshots --json
   cleanroom report --output cleanroom-report.md
   cleanroom doctor
   cleanroom protect
@@ -1204,6 +1208,58 @@ packages() {
   done <<<"$rows"
 }
 
+snapshot_rows() {
+  command -v tmutil >/dev/null 2>&1 || return 0
+  tmutil listlocalsnapshots / 2>/dev/null |
+    while IFS= read -r line; do
+      [[ -z "$line" ]] && continue
+      local name date_part
+      name="${line##* }"
+      [[ "$name" == com.apple.* ]] || continue
+      date_part="${name#com.apple.TimeMachine.}"
+      printf '%s\t%s\n' "$name" "$date_part"
+    done
+}
+
+snapshots() {
+  local rows
+  rows="$(snapshot_rows)"
+
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '['
+    local first=1 name date_part
+    while IFS=$'\t' read -r name date_part; do
+      [[ -z "${name:-}" ]] && continue
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '{"name":"%s","date":"%s"}' \
+        "$(printf '%s' "$name" | json_escape)" \
+        "$(printf '%s' "$date_part" | json_escape)"
+    done <<<"$rows"
+    printf ']\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}cleanroom local snapshots${RESET}"
+  printf 'Review-only list. Snapshot thinning is opt-in and may not be restorable through cleanroom.\n\n'
+  if ! command -v tmutil >/dev/null 2>&1; then
+    printf 'tmutil is not available on this system.\n'
+    return 0
+  fi
+  if [[ -z "$rows" ]]; then
+    printf 'No local Time Machine snapshots found.\n'
+    return 0
+  fi
+  local name date_part
+  printf '%-32s %s\n' "date" "snapshot"
+  while IFS=$'\t' read -r name date_part; do
+    [[ -z "${name:-}" ]] && continue
+    printf '%-32s %s\n' "$date_part" "$name"
+  done <<<"$rows"
+  printf '\nPreview cleanup with: cleanroom clean --include-snapshots\n'
+  printf 'Apply thinning with: cleanroom clean --include-snapshots --apply\n'
+}
+
 plan_rows() {
   local safe package app node dev ai_workspaces ai_models containers
   safe="$(sum_existing_kb \
@@ -1709,7 +1765,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  scan|plan|large|duplicates|apps|packages|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
+  scan|plan|large|duplicates|apps|packages|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -1805,6 +1861,7 @@ case "$ACTION" in
   duplicates) duplicates ;;
   apps) apps ;;
   packages) packages ;;
+  snapshots) snapshots ;;
   report) report ;;
   clean) clean ;;
   history) history ;;

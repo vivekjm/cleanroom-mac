@@ -10,6 +10,7 @@ _cleanroom() {
     'duplicates:Find exact duplicate files for review'
     'apps:List large app bundles for review'
     'packages:Inventory package-manager stores'
+    'snapshots:List local Time Machine snapshots'
     'report:Write a Markdown cleanup report'
     'clean:Preview or apply cleanup'
     'history:List recent apply logs'

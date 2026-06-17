@@ -11,6 +11,7 @@ cleanroom large
 cleanroom duplicates
 cleanroom apps
 cleanroom packages
+cleanroom snapshots
 cleanroom doctor
 cleanroom protect
 cleanroom guard ~/Library/Application\ Support/Google/Chrome
@@ -31,6 +32,7 @@ cleanroom large --json ~/Documents
 cleanroom duplicates --json ~/Documents
 cleanroom apps --json
 cleanroom packages --json
+cleanroom snapshots --json
 cleanroom protect --json
 cleanroom guard --json ~/Library/Application\ Support/Google/Chrome
 cleanroom rules --json
@@ -48,6 +50,8 @@ cleanroom report --output cleanroom-report.md
 `apps --json [PATH]` emits app bundle sizes for `/Applications`, `~/Applications`, or a provided path. It is intentionally review-only and does not uninstall anything.
 
 `packages --json` emits package-manager store sizes and matching preview/apply commands.
+
+`snapshots --json` emits local Time Machine snapshot identifiers when macOS reports any. It is intentionally review-only and does not thin snapshots.
 
 `protect --json` emits protected personal-state paths and whether they are present. This is useful for GUI wrappers and safety reviews before trying new cleanup rules.
 
@@ -191,12 +195,13 @@ This can remove local container VM disks, images, and volumes.
 
 ```sh
 cleanroom scan
-tmutil listlocalsnapshots /
+cleanroom snapshots
 ```
 
 Then try:
 
 ```sh
+cleanroom clean --include-snapshots
 cleanroom clean --include-snapshots --apply
 ```
 

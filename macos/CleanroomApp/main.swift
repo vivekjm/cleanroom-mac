@@ -70,17 +70,24 @@ final class CleanroomAppDelegate: NSObject, NSApplicationDelegate {
         inspectRow.spacing = 8
         inspectRow.alignment = .centerY
 
+        let reviewRow = NSStackView()
+        reviewRow.orientation = .horizontal
+        reviewRow.spacing = 8
+        reviewRow.alignment = .centerY
+
         inspectRow.addArrangedSubview(button("Scan", action: #selector(scan)))
         inspectRow.addArrangedSubview(button("Plan", action: #selector(plan)))
-        inspectRow.addArrangedSubview(button("Large Files", action: #selector(largeFiles)))
-        inspectRow.addArrangedSubview(button("Duplicates", action: #selector(duplicates)))
-        inspectRow.addArrangedSubview(button("Apps", action: #selector(apps)))
-        inspectRow.addArrangedSubview(button("Packages", action: #selector(packages)))
         inspectRow.addArrangedSubview(button("Report to Desktop", action: #selector(report)))
         inspectRow.addArrangedSubview(button("History", action: #selector(history)))
         inspectRow.addArrangedSubview(button("Protected Data", action: #selector(protect)))
         inspectRow.addArrangedSubview(button("Guard Chrome", action: #selector(guardChrome)))
         inspectRow.addArrangedSubview(button("Rules", action: #selector(rules)))
+
+        reviewRow.addArrangedSubview(button("Large Files", action: #selector(largeFiles)))
+        reviewRow.addArrangedSubview(button("Duplicates", action: #selector(duplicates)))
+        reviewRow.addArrangedSubview(button("Apps", action: #selector(apps)))
+        reviewRow.addArrangedSubview(button("Packages", action: #selector(packages)))
+        reviewRow.addArrangedSubview(button("Snapshots", action: #selector(snapshots)))
 
         let actionRow = NSStackView()
         actionRow.orientation = .horizontal
@@ -92,6 +99,7 @@ final class CleanroomAppDelegate: NSObject, NSApplicationDelegate {
         actionRow.addArrangedSubview(button("Copy Trash Dev Apply", action: #selector(copyTrashDevCommand)))
 
         commandRows.addArrangedSubview(inspectRow)
+        commandRows.addArrangedSubview(reviewRow)
         commandRows.addArrangedSubview(actionRow)
 
         statusLabel = NSTextField(labelWithString: "Ready")
@@ -158,6 +166,10 @@ final class CleanroomAppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func packages() {
         runCommand("packages", title: "Packages")
+    }
+
+    @objc private func snapshots() {
+        runCommand("snapshots", title: "Snapshots")
     }
 
     @objc private func report() {

@@ -84,6 +84,11 @@ python3 -m json.tool "$packages_json" >/dev/null
 grep 'pnpm-store' "$packages_json" >/dev/null
 grep 'cleanroom clean --apply --trash --include-package-stores' "$packages_json" >/dev/null
 rm -f "$packages_json"
+"$BIN" snapshots | grep 'cleanroom local snapshots' >/dev/null
+snapshots_json="$(mktemp)"
+"$BIN" snapshots --json > "$snapshots_json"
+python3 -m json.tool "$snapshots_json" >/dev/null
+rm -f "$snapshots_json"
 "$BIN" doctor | grep 'cleanroom doctor' >/dev/null
 "$BIN" doctor | grep 'cleanroom protect' >/dev/null
 "$BIN" protect | grep 'chrome-login-data' >/dev/null

@@ -153,6 +153,13 @@ cleanroom packages
 cleanroom packages --json
 ```
 
+Review local Time Machine snapshots:
+
+```sh
+cleanroom snapshots
+cleanroom snapshots --json
+```
+
 Machine-readable scan:
 
 ```sh
@@ -359,6 +366,8 @@ Config files use simple `key=value` lines and are never executed as shell.
 `apps` lists `.app` bundle sizes from `/Applications` and `~/Applications`, or a path you provide. It never uninstalls apps.
 
 `packages` inventories npm, Yarn, pnpm, Gradle, CocoaPods, Cargo, and Homebrew stores with preview/apply commands for matching cleanup categories.
+
+`snapshots` lists local Time Machine snapshots before you decide whether to run `cleanroom clean --include-snapshots --apply`.
 
 The project also ships `make install`, `make uninstall`, `make lint`, `make test`, `make package`, `make homebrew-formula`, and `make macos-app` targets for maintainers and package managers.
 
