@@ -11,6 +11,7 @@ cleanroom plan
 cleanroom large
 cleanroom duplicates
 cleanroom downloads
+cleanroom installers
 cleanroom nodes
 cleanroom apps
 cleanroom browsers
@@ -40,6 +41,7 @@ cleanroom plan --json
 cleanroom large --json ~/Documents
 cleanroom duplicates --json ~/Documents
 cleanroom downloads --json
+cleanroom installers --json
 cleanroom nodes --json ~/Documents
 cleanroom apps --json
 cleanroom browsers --json
@@ -67,6 +69,8 @@ cleanroom report --output cleanroom-report.md
 `duplicates --json [PATH]` emits exact duplicate groups with SHA-256 hashes, paths, and estimated possible reclaim. It is intentionally review-only and does not delete anything.
 
 `downloads --json` emits old files in `~/Downloads` with age, modified date, path, and size. It is intentionally review-only and does not delete anything.
+
+`installers --json` emits old downloaded installer files in `~/Downloads` with age, modified date, path, size, and matching preview/apply commands.
 
 `nodes --json [PATH]` emits stale `node_modules` folders with age, size, and the matching preview/apply commands.
 
@@ -133,10 +137,21 @@ cleanroom large ~/Documents --min-mb 250 --limit 50
 cleanroom large ~/Downloads --min-mb 100 --limit 50
 cleanroom duplicates ~/Documents --min-mb 100 --limit 20
 cleanroom downloads --days 30 --limit 50
+cleanroom installers --days 30 --limit 50
 cleanroom nodes ~/Documents --days 45 --limit 30
 ```
 
 Use this when macOS Storage reports a large Documents category. Review the output manually; cleanroom will not delete arbitrary personal files.
+
+## Old Installers
+
+```sh
+cleanroom installers
+cleanroom clean --include-installers --days 30
+cleanroom clean --apply --trash --include-installers --days 30
+```
+
+Use this for old `.dmg`, `.pkg`, `.mpkg`, `.xip`, `.ipsw`, and `.iso` files in `~/Downloads`. The inventory is review-only; cleanup requires the explicit `--include-installers` flag.
 
 ## Applications Storage
 

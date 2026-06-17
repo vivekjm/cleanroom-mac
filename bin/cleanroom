@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.25.0"
+VERSION="0.26.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -29,6 +29,7 @@ INCLUDE_CONTAINERS=0
 INCLUDE_APP_CACHES=0
 INCLUDE_SNAPSHOTS=0
 INCLUDE_USER_TRASH=0
+INCLUDE_INSTALLERS=0
 
 RED="$(printf '\033[31m')"
 GREEN="$(printf '\033[32m')"
@@ -47,6 +48,7 @@ Usage:
   cleanroom large [PATH] [--min-mb N] [--limit N] [--json]
   cleanroom duplicates [PATH] [--min-mb N] [--limit N] [--json]
   cleanroom downloads [--days N] [--limit N] [--json]
+  cleanroom installers [--days N] [--limit N] [--json]
   cleanroom nodes [PATH] [--days N] [--limit N] [--json]
   cleanroom apps [PATH] [--limit N] [--json]
   cleanroom browsers [--json]
@@ -76,6 +78,7 @@ Actions:
   large                List largest files for review without deleting anything.
   duplicates           Find exact duplicate files for review without deleting anything.
   downloads            List old Downloads files for manual review.
+  installers           List old downloaded installer files for review.
   nodes                List stale node_modules folders for review.
   apps                 List largest app bundles for review without uninstalling.
   browsers             Inventory browser profile and cache footprint.
@@ -102,9 +105,9 @@ Options:
   --trash              Move deleted files to ~/.Trash/cleanroom-* instead of rm -rf.
   --yes                Do not prompt before --apply cleanup.
   --verbose            Print every path touched.
-  --json               Emit JSON for overview, scan, plan, large, duplicates, downloads, nodes, apps,
-                       browsers, leftovers, startup, trash, caches, packages, snapshots,
-                       doctor, protect, guard, or rules.
+  --json               Emit JSON for overview, scan, plan, large, duplicates, downloads,
+                       installers, nodes, apps, browsers, leftovers, startup, trash,
+                       caches, packages, snapshots, doctor, protect, guard, or rules.
   --output PATH        Output path for report.
   --log PATH           Write apply audit log here. Default: ~/.local/state/cleanroom/runs/*.log.
   --config PATH        Load config file. Default: ~/.config/cleanroom/config.
@@ -125,6 +128,7 @@ Options:
                        Does not remove profiles, passwords, cookies, bookmarks, or settings wholesale.
   --include-snapshots  Ask Time Machine to thin local snapshots.
   --include-user-trash Empty ~/.Trash during apply. This is irreversible.
+  --include-installers Remove old downloaded installer files from ~/Downloads.
   --include-ai-workspaces
                        Remove generated AI-agent workspace state: recordings, scratch, brain,
                        implicit data, and local conversation caches where known.
@@ -154,6 +158,9 @@ Examples:
   cleanroom downloads
   cleanroom downloads --days 30 --limit 50
   cleanroom downloads --json
+  cleanroom installers
+  cleanroom installers --days 30 --limit 50
+  cleanroom installers --json
   cleanroom nodes
   cleanroom nodes --days 45 --limit 30
   cleanroom nodes --json ~/Documents
@@ -308,6 +315,7 @@ load_config() {
       include_ai_models) truthy "$value" && INCLUDE_AI_MODELS=1 ;;
       include_containers) truthy "$value" && INCLUDE_CONTAINERS=1 ;;
       include_user_trash) truthy "$value" && INCLUDE_USER_TRASH=1 ;;
+      include_installers) truthy "$value" && INCLUDE_INSTALLERS=1 ;;
       trash) truthy "$value" && TRASH=1 ;;
       log_file) LOG_FILE="$(expand_path "$value")" ;;
       exclude) add_exclude "$value" ;;
@@ -960,6 +968,24 @@ clean_node_stale() {
   return 0
 }
 
+clean_installers() {
+  [[ "$INCLUDE_INSTALLERS" -eq 1 ]] || return 0
+  log "${BOLD}Old downloaded installers older than ${DAYS} days${RESET}"
+  local path
+  if [[ "$APPLY" -eq 1 ]]; then
+    installer_find_expr |
+      while IFS= read -r -d '' path; do
+        run_rm "$path"
+      done || true
+  else
+    installer_rows |
+      while IFS=$'\t' read -r kb epoch age_days path; do
+        [[ -z "${path:-}" ]] && continue
+        printf 'would remove %8s  %s\n' "$(human_kb "$kb")" "$path"
+      done
+  fi
+}
+
 clean_user_trash() {
   [[ "$INCLUDE_USER_TRASH" -eq 1 ]] || return 0
   log "${BOLD}User Trash${RESET}"
@@ -1142,6 +1168,88 @@ downloads() {
     printf '%-10s %4sd     %-12s %s\n' "$(human_kb "$kb")" "${age_days:-0}" "$(file_mtime_iso "${epoch:-0}")" "$path"
   done <<<"$rows"
   printf '\nReview these manually in Finder before deleting anything.\n'
+}
+
+installer_find_expr() {
+  [[ -d "$HOME/Downloads" ]] || return 0
+  find "$HOME/Downloads" -maxdepth 1 -type f -mtime +"$DAYS" \( \
+    -iname '*.dmg' -o -iname '*.pkg' -o -iname '*.mpkg' -o -iname '*.xip' \
+    -o -iname '*.ipsw' -o -iname '*.iso' \
+  \) -print0 2>/dev/null
+}
+
+installer_rows() {
+  local now path kb epoch age_days
+  now="$(date '+%s')"
+  installer_find_expr |
+    while IFS= read -r -d '' path; do
+      kb="$(size_kb "$path")"
+      epoch="$(path_mtime_epoch "$path")"
+      if [[ "$epoch" -gt 0 && "$now" -ge "$epoch" ]]; then
+        age_days=$(((now - epoch) / 86400))
+      else
+        age_days=0
+      fi
+      printf '%012d\t%s\t%s\t%s\n' "$kb" "$epoch" "$age_days" "$path"
+    done |
+    sort -rn |
+    head -n "$LIMIT"
+}
+
+installer_total_kb() {
+  local total=0 kb epoch age_days path kb_num
+  while IFS=$'\t' read -r kb epoch age_days path; do
+    [[ -z "${path:-}" ]] && continue
+    kb_num="$(printf '%s\n' "$kb" | sed 's/^0*//; s/^$/0/')"
+    total=$((total + kb_num))
+  done < <(installer_rows)
+  printf '%s\n' "$total"
+}
+
+installers() {
+  local rows root
+  root="$HOME/Downloads"
+  rows="$(installer_rows)"
+
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '['
+    local first=1 kb epoch age_days path kb_num
+    while IFS=$'\t' read -r kb epoch age_days path; do
+      [[ -z "${path:-}" ]] && continue
+      kb_num="$(printf '%s\n' "$kb" | sed 's/^0*//; s/^$/0/')"
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '{"path":"%s","size_kb":%s,"size":"%s","modified_epoch":%s,"modified":"%s","age_days":%s,"preview_command":"%s","apply_command":"%s"}' \
+        "$(printf '%s' "$path" | json_escape)" \
+        "$kb_num" \
+        "$(human_kb "${kb:-0}" | json_escape)" \
+        "${epoch:-0}" \
+        "$(file_mtime_iso "${epoch:-0}" | json_escape)" \
+        "${age_days:-0}" \
+        "$(printf 'cleanroom clean --include-installers --days %s' "$DAYS" | json_escape)" \
+        "$(printf 'cleanroom clean --apply --trash --include-installers --days %s' "$DAYS" | json_escape)"
+    done <<<"$rows"
+    printf ']\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}cleanroom old installers${RESET}"
+  printf 'Review-only list. cleanroom only removes these with --include-installers and --apply.\n'
+  printf 'Path: %s\n' "$root"
+  printf 'Types: dmg, pkg, mpkg, xip, ipsw, iso\n'
+  printf 'Older than: %s days  Limit: %s\n\n' "$DAYS" "$LIMIT"
+  if [[ -z "$rows" ]]; then
+    printf 'No old installer files found.\n'
+    return 0
+  fi
+  printf '%-10s %-9s %-12s %s\n' "size" "age" "modified" "path"
+  local kb epoch age_days path
+  while IFS=$'\t' read -r kb epoch age_days path; do
+    [[ -z "${path:-}" ]] && continue
+    printf '%-10s %4sd     %-12s %s\n' "$(human_kb "$kb")" "${age_days:-0}" "$(file_mtime_iso "${epoch:-0}")" "$path"
+  done <<<"$rows"
+  printf '\nPreview cleanup with: cleanroom clean --include-installers --days %s\n' "$DAYS"
+  printf 'Apply cleanup with: cleanroom clean --apply --trash --include-installers --days %s\n' "$DAYS"
 }
 
 node_roots() {
@@ -2024,7 +2132,7 @@ snapshots() {
 }
 
 plan_rows() {
-  local safe package app node dev ai_workspaces ai_models containers user_trash
+  local safe package app installers node dev ai_workspaces ai_models containers user_trash
   safe="$(sum_existing_kb \
     "~/Library/Caches" "~/.cache" "~/.npm/_cacache" "~/.npm/_logs" "~/.npm/_npx" \
     "~/.yarn/cache" "~/.yarn/berry" "~/.gradle/caches" "~/.gradle/daemon" \
@@ -2033,6 +2141,7 @@ plan_rows() {
     "~/Library/Caches/Homebrew" "~/Library/Logs")"
   package="$(sum_existing_kb "~/Library/pnpm/store" "~/.pnpm-store" "~/.cocoapods/repos" "~/.cargo/registry/cache")"
   app="$(app_cache_kb)"
+  installers="$(installer_total_kb)"
   node="$(stale_node_kb)"
   dev="$(sum_existing_kb \
     "~/Library/Developer/Xcode/iOS DeviceSupport" "~/Library/Developer/Xcode/watchOS DeviceSupport" \
@@ -2046,6 +2155,7 @@ plan_rows() {
 
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$safe" "safe" "Default safe cleanup" "cleanroom clean" "cleanroom clean --apply --trash" "Rebuildable caches and old logs. Recommended first step."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$app" "app-caches" "Safe app cache folders" "cleanroom clean --include-app-caches" "cleanroom clean --apply --trash --include-app-caches" "Nested cache folders only; browser profiles and passwords stay protected."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$installers" "old-installers" "Old downloaded installers" "cleanroom clean --include-installers --days $DAYS" "cleanroom clean --apply --trash --include-installers --days $DAYS" "Downloaded .dmg, .pkg, .mpkg, .xip, .ipsw, and .iso files older than $DAYS days in ~/Downloads."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$package" "package-stores" "Package-manager stores" "cleanroom clean --include-package-stores" "cleanroom clean --apply --trash --include-package-stores" "Rebuildable package stores such as pnpm, CocoaPods, Cargo, and Gradle-related stores."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$node" "node-stale" "Stale node_modules" "cleanroom clean --include-node-stale --days $DAYS" "cleanroom clean --apply --trash --include-node-stale --days $DAYS" "node_modules older than $DAYS days under Desktop, Documents, and Downloads."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$dev" "dev-heavy" "Heavy SDK and simulator artifacts" "cleanroom clean --include-dev-heavy" "cleanroom clean --apply --trash --include-dev-heavy" "Opt-in cleanup that may require re-downloading SDKs or resetting simulator app data."
@@ -2430,6 +2540,7 @@ include_snapshots=false
 include_ai_workspaces=false
 include_ai_models=false
 include_containers=false
+include_installers=false
 
 # Apply safety
 trash=false
@@ -2458,6 +2569,7 @@ interactive() {
   warn "Interactive mode still dry-runs unless --apply is passed."
   ask_yes_no "Include safe app cache folders?" && INCLUDE_APP_CACHES=1
   ask_yes_no "Include package-manager stores?" && INCLUDE_PACKAGE_STORES=1
+  ask_yes_no "Include old downloaded installers older than ${DAYS} days?" && INCLUDE_INSTALLERS=1
   ask_yes_no "Include stale node_modules older than ${DAYS} days?" && INCLUDE_NODE_STALE=1
   ask_yes_no "Include heavy SDK/simulator cleanup?" && INCLUDE_DEV_HEAVY=1
   ask_yes_no "Include local snapshot thinning?" && INCLUDE_SNAPSHOTS=1
@@ -2485,6 +2597,10 @@ Default safe cleanup:
 
 --include-node-stale:
   node_modules older than --days under Desktop/Documents/Downloads.
+
+--include-installers:
+  Old downloaded installer files in ~/Downloads, such as .dmg, .pkg, .mpkg,
+  .xip, .ipsw, and .iso files older than --days.
 
 --include-dev-heavy:
   Xcode device support, unavailable simulators, simulator app data, Android NDK,
@@ -2533,6 +2649,7 @@ clean() {
   clean_package_stores
   clean_app_caches
   clean_dev_heavy
+  clean_installers
   clean_node_stale
   clean_snapshots
   clean_ai_workspaces
@@ -2574,7 +2691,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  overview|scan|plan|large|duplicates|downloads|nodes|apps|browsers|leftovers|startup|trash|caches|packages|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
+  overview|scan|plan|large|duplicates|downloads|installers|nodes|apps|browsers|leftovers|startup|trash|caches|packages|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -2642,6 +2759,7 @@ while [[ "$#" -gt 0 ]]; do
       ;;
     --include-dev-heavy) INCLUDE_DEV_HEAVY=1 ;;
     --include-node-stale) INCLUDE_NODE_STALE=1 ;;
+    --include-installers) INCLUDE_INSTALLERS=1 ;;
     --include-package-stores) INCLUDE_PACKAGE_STORES=1 ;;
     --include-app-caches) INCLUDE_APP_CACHES=1 ;;
     --include-snapshots) INCLUDE_SNAPSHOTS=1 ;;
@@ -2671,6 +2789,7 @@ case "$ACTION" in
   large) large ;;
   duplicates) duplicates ;;
   downloads) downloads ;;
+  installers) installers ;;
   nodes) nodes ;;
   apps) apps ;;
   browsers) browsers ;;

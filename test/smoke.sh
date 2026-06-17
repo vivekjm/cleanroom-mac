@@ -59,6 +59,8 @@ PLIST
 dd if=/dev/zero of="$TEST_HOME/Downloads/big-test.bin" bs=1024 count=2048 >/dev/null 2>&1
 dd if=/dev/zero of="$TEST_HOME/Downloads/old-installer.dmg" bs=1024 count=1024 >/dev/null 2>&1
 touch -t 202001010000 "$TEST_HOME/Downloads/old-installer.dmg"
+dd if=/dev/zero of="$TEST_HOME/Downloads/old-package.pkg" bs=1024 count=1024 >/dev/null 2>&1
+touch -t 202001010000 "$TEST_HOME/Downloads/old-package.pkg"
 dd if=/dev/zero of="$TEST_HOME/Documents/duplicates/copy-a.bin" bs=1024 count=2048 >/dev/null 2>&1
 cp "$TEST_HOME/Documents/duplicates/copy-a.bin" "$TEST_HOME/Documents/duplicates/copy-b.bin"
 dd if=/dev/zero of="$TEST_HOME/Applications/FakeBig.app/Contents/MacOS/fake" bs=1024 count=2048 >/dev/null 2>&1
@@ -110,6 +112,13 @@ python3 -m json.tool "$downloads_json" >/dev/null
 grep 'old-installer.dmg' "$downloads_json" >/dev/null
 grep '"age_days"' "$downloads_json" >/dev/null
 rm -f "$downloads_json"
+"$BIN" installers --days 30 --limit 5 | grep 'old-installer.dmg' >/dev/null
+installers_json="$(mktemp)"
+"$BIN" installers --json --days 30 --limit 5 > "$installers_json"
+python3 -m json.tool "$installers_json" >/dev/null
+grep 'old-package.pkg' "$installers_json" >/dev/null
+grep 'cleanroom clean --apply --trash --include-installers --days 30' "$installers_json" >/dev/null
+rm -f "$installers_json"
 "$BIN" nodes "$HOME/Documents" --days 30 --limit 5 | grep 'node_modules' >/dev/null
 nodes_json="$(mktemp)"
 "$BIN" nodes --json "$HOME/Documents" --days 30 --limit 5 > "$nodes_json"
@@ -243,6 +252,8 @@ rm -f "$trash_log"
 mkdir -p "$HOME/.npm/_cacache"
 printf 'cache again\n' >"$HOME/.npm/_cacache/example.cache"
 printf 'trashed again\n' >"$HOME/.Trash/old-trash.txt"
+dd if=/dev/zero of="$HOME/Downloads/old-installer.dmg" bs=1024 count=1024 >/dev/null 2>&1
+touch -t 202001010000 "$HOME/Downloads/old-installer.dmg"
 
 apply_log="$(mktemp)"
 rm -f "$apply_log"
@@ -256,6 +267,14 @@ grep 'Restore dry-run mode' <<<"$restore_preview" >/dev/null
 grep 'would restore' <<<"$restore_preview" >/dev/null
 "$BIN" restore --log "$apply_log" --apply --yes >/dev/null 2>&1
 test -e "$HOME/.npm/_cacache"
+
+installer_log="$(mktemp)"
+rm -f "$installer_log"
+"$BIN" clean --include-installers --days 30 --apply --trash --yes --log "$installer_log" >/dev/null 2>&1
+grep 'old-package.pkg' "$installer_log" >/dev/null
+test ! -e "$HOME/Downloads/old-package.pkg"
+find "$HOME/.Trash" -name old-package.pkg -print -quit | grep old-package.pkg >/dev/null
+rm -f "$installer_log"
 
 mkdir -p "$HOME/.npm/_cacache"
 printf 'cache again\n' >"$HOME/.npm/_cacache/example.cache"

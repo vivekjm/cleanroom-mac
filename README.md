@@ -17,6 +17,7 @@ macOS Storage often labels hidden user folders as **Documents** or **System Data
 - Chrome/VS Code/Cursor cache folders
 - browser profile and cache footprint
 - app leftovers after manual uninstalls
+- old downloaded installer files
 
 `cleanroom` makes those visible and gives you a cautious way to clean them.
 
@@ -153,6 +154,14 @@ Review old Downloads files:
 cleanroom downloads
 cleanroom downloads --days 30 --limit 50
 cleanroom downloads --json
+```
+
+Review old downloaded installers:
+
+```sh
+cleanroom installers
+cleanroom installers --days 30 --limit 50
+cleanroom installers --json
 ```
 
 Review stale `node_modules` folders:
@@ -330,6 +339,14 @@ Remove stale `node_modules` older than 45 days:
 cleanroom clean --apply --include-node-stale --days 45
 ```
 
+Clean old downloaded installers:
+
+```sh
+cleanroom installers
+cleanroom clean --include-installers --days 30
+cleanroom clean --apply --trash --include-installers --days 30
+```
+
 Empty current user Trash:
 
 ```sh
@@ -439,6 +456,8 @@ Config files use simple `key=value` lines and are never executed as shell.
 `duplicates` hashes files above `--min-mb`, groups exact matches, estimates possible reclaim, and never deletes anything.
 
 `downloads` lists old files in `~/Downloads` for manual review and never deletes them.
+
+`installers` lists old `.dmg`, `.pkg`, `.mpkg`, `.xip`, `.ipsw`, and `.iso` files in `~/Downloads`. Cleanup is opt-in with `--include-installers`.
 
 `nodes` lists stale `node_modules` folders before you decide whether to run `cleanroom clean --include-node-stale --apply`.
 

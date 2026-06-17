@@ -1,4 +1,4 @@
-.TH CLEANROOM 1 "June 2026" "cleanroom 0.25.0" "User Commands"
+.TH CLEANROOM 1 "June 2026" "cleanroom 0.26.0" "User Commands"
 .SH NAME
 cleanroom \- safe-by-default macOS storage cleaner
 .SH SYNOPSIS
@@ -19,6 +19,9 @@ cleanroom \- safe-by-default macOS storage cleaner
 .br
 .B cleanroom
 .RI "downloads [--days n] [--limit n] [--json]"
+.br
+.B cleanroom
+.RI "installers [--days n] [--limit n] [--json]"
 .br
 .B cleanroom
 .RI "nodes [path] [--days n] [--limit n] [--json]"
@@ -101,6 +104,9 @@ Find exact duplicate files for review without deleting anything.
 .TP
 .B downloads
 List old files in ~/Downloads for review without deleting anything.
+.TP
+.B installers
+List old downloaded installer files in ~/Downloads for review.
 .TP
 .B nodes
 List stale node_modules folders for review without deleting anything.
@@ -211,6 +217,9 @@ Remove local container VM disks. This can remove containers and volumes.
 .TP
 .B --include-user-trash
 Empty ~/.Trash during apply. This is irreversible.
+.TP
+.B --include-installers
+Remove old downloaded installer files from ~/Downloads during apply.
 .SH EXAMPLES
 .nf
 cleanroom overview
@@ -219,6 +228,7 @@ cleanroom plan --json
 cleanroom large ~/Documents --min-mb 250 --limit 30
 cleanroom duplicates ~/Documents --min-mb 100 --limit 20
 cleanroom downloads --days 30 --limit 50
+cleanroom installers --days 30 --limit 50
 cleanroom nodes ~/Documents --days 45 --limit 30
 cleanroom apps --limit 30
 cleanroom browsers --json

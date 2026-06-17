@@ -11,6 +11,7 @@ old-logs	default	low-risk	yes	-	~/Library/Logs	Removes log files older than seve
 package-stores	package-stores	rebuildable	no	--include-package-stores	~/Library/pnpm/store; ~/.pnpm-store; ~/.cocoapods/repos; ~/.cargo/registry/cache	Removes rebuildable package manager stores.
 safe-app-caches	app-caches	rebuildable	no	--include-app-caches	Chrome, Brave, Edge, Arc, Code, Cursor, Slack, Comet, Trae nested cache folders	Removes nested cache folders only; does not remove browser profiles, cookies, bookmarks, settings, or password data.
 stale-node-modules	node-stale	rebuildable	no	--include-node-stale	node_modules under Desktop/Documents/Downloads older than --days	Removes stale node_modules folders under common personal project locations.
+old-installers	downloads	opt-in	no	--include-installers	~/Downloads installer files older than --days	Removes old downloaded .dmg, .pkg, .mpkg, .xip, .ipsw, and .iso installer files.
 developer-heavy	dev-heavy	destructive-opt-in	no	--include-dev-heavy	Xcode DeviceSupport; Android NDK/system images; simulator state	Removes heavy SDK and simulator artifacts that may need reinstalling or resetting.
 time-machine-snapshots	snapshots	system-tool	no	--include-snapshots	Local Time Machine snapshots	Asks tmutil to thin local snapshots; not recoverable through cleanroom Trash mode.
 ai-workspaces	ai-workspaces	destructive-opt-in	no	--include-ai-workspaces	~/.gemini generated recordings, scratch, brain, implicit, conversations	Removes generated AI-agent workspace state and local conversation caches where known.
