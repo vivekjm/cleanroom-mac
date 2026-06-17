@@ -13,6 +13,7 @@ RESOURCES_DIR="$CONTENTS/Resources"
 
 rm -rf "$APP_DIR" "$DIST_DIR/Cleanroom.app.zip"
 mkdir -p "$MACOS_DIR" "$RESOURCES_DIR/bin"
+mkdir -p "$RESOURCES_DIR/data"
 
 swiftc \
   -O \
@@ -22,6 +23,7 @@ swiftc \
 
 cp "$ROOT/macos/CleanroomApp/Info.plist" "$CONTENTS/Info.plist"
 cp "$ROOT/bin/cleanroom" "$RESOURCES_DIR/bin/cleanroom"
+cp "$ROOT/data/cleanup-rules.tsv" "$RESOURCES_DIR/data/cleanup-rules.tsv"
 chmod +x "$MACOS_DIR/Cleanroom" "$RESOURCES_DIR/bin/cleanroom"
 
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$CONTENTS/Info.plist"

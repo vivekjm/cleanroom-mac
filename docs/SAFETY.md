@@ -35,6 +35,15 @@ These categories are intentionally excluded from the default cleaner:
 
 Any new rule that can remove personal state, credentials, app profiles, project source, model downloads, or container volumes must be behind an explicit opt-in flag.
 
+The rule catalog lives in `data/cleanup-rules.tsv` and is visible through:
+
+```sh
+cleanroom rules
+cleanroom rules --json
+```
+
+Keep this catalog in sync with cleanup behavior so users and wrappers can inspect risk before running anything.
+
 ## Excludes
 
 Users can protect custom paths with:

@@ -139,6 +139,13 @@ See cleanup categories:
 cleanroom categories
 ```
 
+Inspect the cleanup rule catalog:
+
+```sh
+cleanroom rules
+cleanroom rules --json
+```
+
 Create a config file:
 
 ```sh
@@ -270,6 +277,8 @@ cleanroom restore --log ~/Desktop/cleanroom-run.log --apply
 ## Notes
 
 More examples are in [docs/RECIPES.md](docs/RECIPES.md).
+
+Cleanup rules are cataloged in [data/cleanup-rules.tsv](data/cleanup-rules.tsv). `cleanroom rules --json` exposes the same catalog for wrappers and audits.
 
 Config files use simple `key=value` lines and are never executed as shell.
 

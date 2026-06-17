@@ -8,6 +8,7 @@ STAGE="$DIST_DIR/cleanroom-$VERSION"
 ARCHIVE="$DIST_DIR/cleanroom-$VERSION.tar.gz"
 
 "$ROOT/scripts/check-version.sh" >/dev/null
+"$ROOT/scripts/check-rules.sh" >/dev/null
 
 rm -rf "$STAGE" "$ARCHIVE"
 mkdir -p "$STAGE"
@@ -28,6 +29,7 @@ copy_path "install.sh"
 copy_path "uninstall.sh"
 copy_path "bin"
 copy_path "completions"
+copy_path "data"
 copy_path "man"
 copy_path "docs"
 copy_path "homebrew"

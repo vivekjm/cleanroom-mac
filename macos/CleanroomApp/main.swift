@@ -70,6 +70,7 @@ final class CleanroomAppDelegate: NSObject, NSApplicationDelegate {
         buttonRow.addArrangedSubview(button("Report to Desktop", action: #selector(report)))
         buttonRow.addArrangedSubview(button("Dry Run Dev", action: #selector(dryRunDev)))
         buttonRow.addArrangedSubview(button("History", action: #selector(history)))
+        buttonRow.addArrangedSubview(button("Rules", action: #selector(rules)))
         buttonRow.addArrangedSubview(button("Copy Safe Apply", action: #selector(copySafeApplyCommand)))
         buttonRow.addArrangedSubview(button("Copy Trash Dev Apply", action: #selector(copyTrashDevCommand)))
 
@@ -132,6 +133,10 @@ final class CleanroomAppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func history() {
         runCommand("history", title: "History")
+    }
+
+    @objc private func rules() {
+        runCommand("rules", title: "Rules")
     }
 
     @objc private func copySafeApplyCommand() {

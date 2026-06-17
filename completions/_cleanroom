@@ -11,6 +11,7 @@ _cleanroom() {
     'restore:Restore files moved by Trash mode'
     'interactive:Choose cleanup categories with prompts'
     'doctor:Check platform and safety assumptions'
+    'rules:List cleanup rules and safety levels'
     'categories:Explain cleanup categories'
     'init-config:Write a starter config file'
     'help:Show help'

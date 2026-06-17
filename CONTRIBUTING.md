@@ -9,6 +9,7 @@ Thanks for helping make `cleanroom` safer and more useful.
 - Browser profiles, password databases, Keychains, and personal libraries are protected.
 - Destructive cleanup categories must be explicitly opted into.
 - Prefer deleting rebuildable cache/artifact folders over app data.
+- Keep `data/cleanup-rules.tsv` in sync with cleanup behavior and safety docs.
 
 ## Testing
 

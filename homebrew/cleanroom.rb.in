@@ -9,10 +9,12 @@ class Cleanroom < Formula
     bin.install "bin/cleanroom"
     man1.install "man/cleanroom.1"
     zsh_completion.install "completions/_cleanroom"
+    pkgshare.install "data"
   end
 
   test do
     assert_match version.to_s, shell_output("#{bin}/cleanroom --version")
     assert_match "cleanroom doctor", shell_output("#{bin}/cleanroom doctor")
+    assert_match "safe-app-caches", shell_output("#{bin}/cleanroom rules")
   end
 end

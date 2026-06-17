@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.7.0"
+VERSION="0.8.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -45,6 +45,7 @@ Usage:
   cleanroom restore [--log PATH] [--apply]
   cleanroom interactive [options]
   cleanroom doctor
+  cleanroom rules [--json]
   cleanroom categories
   cleanroom init-config [--config PATH]
   cleanroom help
@@ -57,6 +58,7 @@ Actions:
   restore              Restore files moved by --trash from an apply log. Dry-run unless --apply.
   interactive          Choose cleanup categories in a guided prompt.
   doctor               Check platform, dependencies, permissions, and risky state.
+  rules                List cleanup rules, safety level, opt-in flag, and affected paths.
   categories           Explain cleanup categories and safety levels.
   init-config          Write a starter config file.
 
@@ -104,6 +106,8 @@ Examples:
   cleanroom scan --json
   cleanroom report --output cleanroom-report.md
   cleanroom doctor
+  cleanroom rules
+  cleanroom rules --json
   cleanroom categories
   cleanroom init-config
   cleanroom interactive
@@ -131,6 +135,33 @@ expand_path() {
 
 config_default_path() {
   printf '%s\n' "$HOME/.config/cleanroom/config"
+}
+
+script_dir() {
+  local source="${BASH_SOURCE[0]}"
+  cd "$(dirname "$source")" >/dev/null 2>&1 && pwd
+}
+
+repo_root() {
+  local dir
+  dir="$(script_dir)"
+  if [[ -f "$dir/../data/cleanup-rules.tsv" ]]; then
+    (cd "$dir/.." >/dev/null 2>&1 && pwd)
+  elif [[ -f "$dir/../share/cleanroom/data/cleanup-rules.tsv" ]]; then
+    (cd "$dir/../share/cleanroom" >/dev/null 2>&1 && pwd)
+  else
+    printf '%s\n' "$dir"
+  fi
+}
+
+rules_file() {
+  local root
+  root="$(repo_root)"
+  if [[ -f "$root/data/cleanup-rules.tsv" ]]; then
+    printf '%s\n' "$root/data/cleanup-rules.tsv"
+  else
+    printf '%s\n' ""
+  fi
 }
 
 truthy() {
@@ -820,6 +851,39 @@ report() {
   fi
 }
 
+rules() {
+  local file id category safety default opt_in paths description
+  file="$(rules_file)"
+  [[ -f "$file" ]] || die "Rule catalog not found."
+
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '['
+    local first=1
+    tail -n +2 "$file" | while IFS=$'\t' read -r id category safety default opt_in paths description; do
+      [[ -z "${id:-}" ]] && continue
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '{"id":"%s","category":"%s","safety":"%s","default":%s,"opt_in":"%s","paths":"%s","description":"%s"}' \
+        "$(printf '%s' "$id" | json_escape)" \
+        "$(printf '%s' "$category" | json_escape)" \
+        "$(printf '%s' "$safety" | json_escape)" \
+        "$(if [[ "$default" == "yes" ]]; then echo true; else echo false; fi)" \
+        "$(printf '%s' "$opt_in" | json_escape)" \
+        "$(printf '%s' "$paths" | json_escape)" \
+        "$(printf '%s' "$description" | json_escape)"
+    done
+    printf ']\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}cleanroom rules${RESET}"
+  printf '%-24s %-17s %-20s %-7s %-26s %s\n' "id" "category" "safety" "default" "opt-in" "paths"
+  tail -n +2 "$file" | while IFS=$'\t' read -r id category safety default opt_in paths description; do
+    [[ -z "${id:-}" ]] && continue
+    printf '%-24s %-17s %-20s %-7s %-26s %s\n' "$id" "$category" "$safety" "$default" "${opt_in:--}" "$paths"
+  done
+}
+
 doctor() {
   log "${BOLD}cleanroom doctor${RESET}"
   printf '%-28s %s\n' "version" "$VERSION"
@@ -1032,7 +1096,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  scan|report|clean|history|restore|interactive|doctor|categories|init-config|help)
+  scan|report|clean|history|restore|interactive|doctor|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -1118,6 +1182,7 @@ case "$ACTION" in
   restore) restore ;;
   interactive) interactive ;;
   doctor) doctor ;;
+  rules) rules ;;
   categories) categories ;;
   init-config) init_config ;;
   help) usage ;;

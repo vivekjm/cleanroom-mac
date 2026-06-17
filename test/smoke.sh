@@ -31,6 +31,12 @@ bash -n "$BIN"
 "$BIN" help | grep 'safe macOS storage cleaner' >/dev/null
 "$BIN" categories | grep -- '--include-ai-models' >/dev/null
 "$BIN" categories | grep -- '--trash' >/dev/null
+"$BIN" rules | grep 'safe-app-caches' >/dev/null
+rules_json="$(mktemp)"
+"$BIN" rules --json > "$rules_json"
+python3 -m json.tool "$rules_json" >/dev/null
+grep 'ai-models' "$rules_json" >/dev/null
+rm -f "$rules_json"
 "$BIN" doctor | grep 'cleanroom doctor' >/dev/null
 "$BIN" history 2>&1 | grep 'No cleanroom history found' >/dev/null
 
