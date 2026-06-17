@@ -105,6 +105,7 @@ printf 'browser cache\n' >"$TEST_HOME/Library/Application Support/Google/Chrome/
 printf 'contacts\n' >"$TEST_HOME/Library/Application Support/AddressBook/AddressBook-v22.abcddb"
 printf 'call history\n' >"$TEST_HOME/Library/Application Support/CallHistoryDB/CallHistory.storedata"
 printf 'adobe support\n' >"$TEST_HOME/Library/Application Support/CleanroomTestAdobe/Creative Cloud/state.db"
+dd if=/dev/zero of="$TEST_HOME/Library/Application Support/CleanroomTestAdobe/Creative Cloud/blob.cache" bs=1024 count=64 >/dev/null 2>&1
 printf 'adobe cache\n' >"$TEST_HOME/Library/Caches/com.cleanroomtestadobe.acc/cache.bin"
 printf 'adobe prefs\n' >"$TEST_HOME/Library/Preferences/com.cleanroomtestadobe.acc.plist"
 printf 'keychain\n' >"$TEST_HOME/Library/Keychains/login.keychain-db"
@@ -203,6 +204,7 @@ grep 'ai-models' "$rules_json" >/dev/null
 grep 'old-diagnostics' "$rules_json" >/dev/null
 grep 'toolchain-caches' "$rules_json" >/dev/null
 grep 'stale-python-virtualenvs' "$rules_json" >/dev/null
+grep 'appdata-inventory' "$rules_json" >/dev/null
 grep 'cloud-inventory' "$rules_json" >/dev/null
 grep 'personal-inventory' "$rules_json" >/dev/null
 rm -f "$rules_json"
@@ -264,6 +266,14 @@ apps_json="$(mktemp)"
 python3 -m json.tool "$apps_json" >/dev/null
 grep 'FakeBig' "$apps_json" >/dev/null
 rm -f "$apps_json"
+"$BIN" appdata --limit 20 | grep 'CleanroomTestAdobe' >/dev/null
+appdata_json="$(mktemp)"
+"$BIN" appdata --json --limit 20 > "$appdata_json"
+python3 -m json.tool "$appdata_json" >/dev/null
+grep 'CleanroomTestAdobe' "$appdata_json" >/dev/null
+grep '"status":"allowed"' "$appdata_json" >/dev/null
+grep '"status":"refused-protected"' "$appdata_json" >/dev/null
+rm -f "$appdata_json"
 "$BIN" libraries | grep 'Photos Library' >/dev/null
 libraries_json="$(mktemp)"
 "$BIN" libraries --json > "$libraries_json"

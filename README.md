@@ -23,6 +23,7 @@ macOS Storage often labels hidden user folders as **Documents** or **System Data
 - local AI model downloads and backends
 - Chrome/VS Code/Cursor cache folders
 - browser profile and cache footprint
+- large app support, container, and group-container folders
 - Photos, Music, TV, iMovie, GarageBand, and Logic library footprint
 - app leftovers after manual uninstalls
 - old logs, crash reports, and diagnostic reports
@@ -206,6 +207,14 @@ List large installed apps for manual review:
 cleanroom apps
 cleanroom apps --json /Applications
 cleanroom apps ~/Applications --limit 20
+```
+
+Review large app data folders:
+
+```sh
+cleanroom appdata
+cleanroom appdata --limit 30
+cleanroom appdata --json
 ```
 
 Review protected media and creative libraries:
@@ -568,6 +577,8 @@ Config files use simple `key=value` lines and are never executed as shell.
 `venvs` lists stale Python virtualenv folders before you decide whether to run `cleanroom clean --include-venv-stale --apply`. It only treats folders with `pyvenv.cfg` as virtualenv cleanup candidates.
 
 `apps` lists `.app` bundle sizes from `/Applications` and `~/Applications`, or a path you provide. It never uninstalls apps.
+
+`appdata` ranks top-level Application Support, Containers, Group Containers, HTTPStorages, WebKit, and saved-state folders. It is review-only and includes the central guard status so protected profiles and personal data stand out before you investigate with `leftovers APPNAME`.
 
 `libraries` inventories protected media and creative libraries such as Photos, Photo Booth, Music, iTunes, TV, iMovie, GarageBand, Logic, and Audio Music Apps. It is review-only and helps explain large Documents or media storage without deleting personal projects.
 

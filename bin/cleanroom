@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.38.0"
+VERSION="0.39.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -56,6 +56,7 @@ Usage:
   cleanroom nodes [PATH] [--days N] [--limit N] [--json]
   cleanroom venvs [PATH] [--days N] [--limit N] [--json]
   cleanroom apps [PATH] [--limit N] [--json]
+  cleanroom appdata [--limit N] [--json]
   cleanroom libraries [--json]
   cleanroom cloud [--json]
   cleanroom personal [--json]
@@ -97,6 +98,7 @@ Actions:
   nodes                List stale node_modules folders for review.
   venvs                List stale Python virtualenv folders for review.
   apps                 List largest app bundles for review without uninstalling.
+  appdata              Rank large app support, container, and group container folders.
   libraries            Inventory protected media and creative libraries.
   cloud                Inventory protected cloud-sync storage locations.
   personal             Inventory protected Mail, Messages, Notes, and contacts data.
@@ -131,7 +133,7 @@ Options:
   --yes                Do not prompt before --apply cleanup.
   --verbose            Print every path touched.
   --json               Emit JSON for overview, scan, system-data, plan, large, duplicates,
-                       downloads, installers, nodes, venvs, apps, libraries, cloud, personal,
+                       downloads, installers, nodes, venvs, apps, appdata, libraries, cloud, personal,
                        browsers, leftovers, startup,
                        trash, backups, xcode, caches, diagnostics, packages, homebrew, toolchains,
                        containers, snapshots, doctor, protect, guard, or rules.
@@ -206,6 +208,8 @@ Examples:
   cleanroom venvs --json ~/Documents
   cleanroom apps
   cleanroom apps --json /Applications
+  cleanroom appdata
+  cleanroom appdata --json
   cleanroom libraries
   cleanroom libraries --json
   cleanroom cloud
@@ -1896,6 +1900,77 @@ browsers() {
   done <<<"$rows"
 }
 
+appdata_roots() {
+  printf '%s\t%s\n' "app-support" "~/Library/Application Support"
+  printf '%s\t%s\n' "containers" "~/Library/Containers"
+  printf '%s\t%s\n' "group-containers" "~/Library/Group Containers"
+  printf '%s\t%s\n' "http-storages" "~/Library/HTTPStorages"
+  printf '%s\t%s\n' "saved-state" "~/Library/Saved Application State"
+  printf '%s\t%s\n' "webkit" "~/Library/WebKit"
+  printf '%s\t%s\n' "local-app-support" "/Library/Application Support"
+}
+
+appdata_rows() {
+  local category root_template root path kb
+  while IFS=$'\t' read -r category root_template; do
+    root="$(expand_path "$root_template")"
+    [[ -d "$root" ]] || continue
+    while IFS= read -r -d '' path; do
+      kb="$(size_kb "$path")"
+      printf '%012d\t%s\t%s\n' "$kb" "$category" "$path"
+    done < <(find "$root" -mindepth 1 -maxdepth 1 -type d -print0 2>/dev/null)
+  done < <(appdata_roots) | sort -rn | head -n "$LIMIT"
+  true
+}
+
+appdata() {
+  local rows
+  rows="$(appdata_rows)"
+
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '['
+    local first=1 kb category path kb_num status reason line
+    while IFS=$'\t' read -r kb category path; do
+      [[ -z "${path:-}" ]] && continue
+      kb_num="$(printf '%s\n' "$kb" | sed 's/^0*//; s/^$/0/')"
+      line="$(guard_status "$path")"
+      status="${line%%$'\t'*}"
+      reason="${line#*$'\t'}"
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '{"path":"%s","name":"%s","category":"%s","size_kb":%s,"size":"%s","status":"%s","reason":"%s","preview_command":"%s"}' \
+        "$(printf '%s' "$path" | json_escape)" \
+        "$(basename "$path" | json_escape)" \
+        "$(printf '%s' "$category" | json_escape)" \
+        "$kb_num" \
+        "$(human_kb "${kb:-0}" | json_escape)" \
+        "$(printf '%s' "$status" | json_escape)" \
+        "$(printf '%s' "$reason" | json_escape)" \
+        "$(printf 'cleanroom leftovers %s' "$(basename "$path")" | json_escape)"
+    done <<<"$rows"
+    printf ']\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}cleanroom app data folders${RESET}"
+  printf 'Review-only inventory. cleanroom does not remove broad app data folders from this command.\n\n'
+  if [[ -z "$rows" ]]; then
+    printf 'No app data folders found.\n'
+    return 0
+  fi
+  printf '%-10s %-18s %-18s %s\n' "size" "category" "status" "path"
+  local kb category path status reason line
+  while IFS=$'\t' read -r kb category path; do
+    [[ -z "${path:-}" ]] && continue
+    line="$(guard_status "$path")"
+    status="${line%%$'\t'*}"
+    reason="${line#*$'\t'}"
+    printf '%-10s %-18s %-18s %s\n' "$(human_kb "$kb")" "$category" "$status" "$path"
+    printf '  %s\n' "$reason"
+    printf '  inspect: cleanroom leftovers %s\n' "$(basename "$path")"
+  done <<<"$rows"
+}
+
 lower_text() {
   printf '%s' "$1" | tr '[:upper:]' '[:lower:]'
 }
@@ -3019,6 +3094,7 @@ overview() {
   printf 'cleanroom large ~/Documents --min-mb 250 --limit 50\n'
   printf 'cleanroom downloads --days 30 --limit 50\n'
   printf 'cleanroom venvs --days 30 --limit 50\n'
+  printf 'cleanroom appdata --limit 30\n'
   printf 'cleanroom libraries\n'
   printf 'cleanroom trash\n'
   printf 'cleanroom startup\n'
@@ -3662,7 +3738,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  overview|scan|system-data|plan|large|duplicates|downloads|installers|nodes|venvs|virtualenvs|apps|libraries|cloud|personal|browsers|leftovers|backups|xcode|startup|trash|caches|diagnostics|packages|homebrew|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
+  overview|scan|system-data|plan|large|duplicates|downloads|installers|nodes|venvs|virtualenvs|apps|appdata|libraries|cloud|personal|browsers|leftovers|backups|xcode|startup|trash|caches|diagnostics|packages|homebrew|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -3768,6 +3844,7 @@ case "$ACTION" in
   nodes) nodes ;;
   venvs|virtualenvs) venvs ;;
   apps) apps ;;
+  appdata) appdata ;;
   libraries) libraries ;;
   cloud) cloud ;;
   personal) personal ;;

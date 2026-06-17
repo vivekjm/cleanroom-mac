@@ -16,6 +16,7 @@ cleanroom installers
 cleanroom nodes
 cleanroom venvs
 cleanroom apps
+cleanroom appdata
 cleanroom libraries
 cleanroom cloud
 cleanroom personal
@@ -57,6 +58,7 @@ cleanroom installers --json
 cleanroom nodes --json ~/Documents
 cleanroom venvs --json ~/Documents
 cleanroom apps --json
+cleanroom appdata --json
 cleanroom libraries --json
 cleanroom cloud --json
 cleanroom personal --json
@@ -101,6 +103,8 @@ cleanroom report --output cleanroom-report.md
 `venvs --json [PATH]` emits stale Python virtualenv folders with age, size, `pyvenv.cfg` marker path, and the matching preview/apply commands.
 
 `apps --json [PATH]` emits app bundle sizes for `/Applications`, `~/Applications`, or a provided path. It is intentionally review-only and does not uninstall anything.
+
+`appdata --json` emits large top-level app support/container folders with size and guard status. It is intentionally review-only and does not remove app state.
 
 `libraries --json` emits protected Photos, Music, TV, iMovie, GarageBand, Logic, and related creative library sizes. It is intentionally review-only and does not delete personal media or projects.
 
@@ -217,6 +221,7 @@ cleanroom downloads --days 30 --limit 50
 cleanroom installers --days 30 --limit 50
 cleanroom nodes ~/Documents --days 45 --limit 30
 cleanroom venvs ~/Documents --days 45 --limit 30
+cleanroom appdata --limit 30
 cleanroom libraries
 cleanroom cloud
 cleanroom personal

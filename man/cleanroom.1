@@ -1,4 +1,4 @@
-.TH CLEANROOM 1 "June 2026" "cleanroom 0.38.0" "User Commands"
+.TH CLEANROOM 1 "June 2026" "cleanroom 0.39.0" "User Commands"
 .SH NAME
 cleanroom \- safe-by-default macOS storage cleaner
 .SH SYNOPSIS
@@ -34,6 +34,9 @@ cleanroom \- safe-by-default macOS storage cleaner
 .br
 .B cleanroom
 .RI "apps [path] [--limit n] [--json]"
+.br
+.B cleanroom
+.RI "appdata [--limit n] [--json]"
 .br
 .B cleanroom
 .RI "libraries [--json]"
@@ -152,6 +155,10 @@ List stale Python virtualenv folders for review without deleting anything.
 .TP
 .B apps
 List largest app bundles for review without uninstalling anything.
+.TP
+.B appdata
+Rank large app support, container, group-container, HTTP storage, WebKit, and
+saved-state folders with central guard status.
 .TP
 .B libraries
 Inventory protected media and creative libraries such as Photos, Music, TV,
@@ -317,6 +324,7 @@ cleanroom installers --days 30 --limit 50
 cleanroom nodes ~/Documents --days 45 --limit 30
 cleanroom venvs ~/Documents --days 45 --limit 30
 cleanroom apps --limit 30
+cleanroom appdata --limit 30
 cleanroom libraries --json
 cleanroom cloud --json
 cleanroom personal --json
