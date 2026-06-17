@@ -122,6 +122,14 @@ cleanroom plan
 cleanroom plan --json
 ```
 
+Find large files for manual review:
+
+```sh
+cleanroom large
+cleanroom large ~/Documents --min-mb 250 --limit 30
+cleanroom large --json ~/Downloads
+```
+
 Machine-readable scan:
 
 ```sh
@@ -320,6 +328,8 @@ Config files use simple `key=value` lines and are never executed as shell.
 `restore` only restores entries that were moved by `--trash` and still exist in the cleanroom Trash folder. It skips destinations that already exist.
 
 `plan` estimates cleanup opportunities and prints copyable dry-run commands plus explicit apply commands. It does not delete anything.
+
+`large` lists large files for review and never deletes them. Use it when macOS reports high Documents storage and you need to find videos, archives, disk images, datasets, or project artifacts manually.
 
 The project also ships `make install`, `make uninstall`, `make lint`, `make test`, `make package`, `make homebrew-formula`, and `make macos-app` targets for maintainers and package managers.
 

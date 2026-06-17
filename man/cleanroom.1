@@ -1,4 +1,4 @@
-.TH CLEANROOM 1 "June 2026" "cleanroom 0.11.0" "User Commands"
+.TH CLEANROOM 1 "June 2026" "cleanroom 0.12.0" "User Commands"
 .SH NAME
 cleanroom \- safe-by-default macOS storage cleaner
 .SH SYNOPSIS
@@ -7,6 +7,9 @@ cleanroom \- safe-by-default macOS storage cleaner
 .br
 .B cleanroom
 .RI "plan [--json]"
+.br
+.B cleanroom
+.RI "large [path] [--min-mb n] [--limit n] [--json]"
 .br
 .B cleanroom
 .RI "report [--output path]"
@@ -47,6 +50,9 @@ Show disk usage, cleanup candidates, largest home folders, and large files.
 .TP
 .B plan
 Rank safe cleanup opportunities and show copyable commands.
+.TP
+.B large
+List large files for review without deleting anything.
 .TP
 .B report
 Generate a Markdown cleanup report.
@@ -94,7 +100,10 @@ deleting them immediately.
 Write the apply audit log to a specific file.
 .TP
 .B --limit " n"
-Number of history entries to show.
+Number of history entries or large files to show.
+.TP
+.B --min-mb " n"
+Minimum file size for the large command. Defaults to 500.
 .TP
 .B --yes
 Skip confirmation prompts.
@@ -126,6 +135,7 @@ Remove local container VM disks. This can remove containers and volumes.
 .nf
 cleanroom scan
 cleanroom plan --json
+cleanroom large ~/Documents --min-mb 250 --limit 30
 cleanroom report --output cleanroom-report.md
 cleanroom clean --preset dev
 cleanroom clean --preset dev --apply --trash

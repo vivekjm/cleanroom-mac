@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.11.0"
+VERSION="0.12.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
 JSON=0
 DAYS=30
 LIMIT=20
+MIN_MB=500
 ACTION="scan"
 CONFIG_FILE=""
 CONFIG_LOADED=0
@@ -41,6 +42,7 @@ cleanroom - safe macOS storage cleaner
 Usage:
   cleanroom scan [options]
   cleanroom plan [--json]
+  cleanroom large [PATH] [--min-mb N] [--limit N] [--json]
   cleanroom report [--output PATH]
   cleanroom clean [options]
   cleanroom history [--limit N]
@@ -57,6 +59,7 @@ Usage:
 Actions:
   scan                 Show disk usage and likely cleanup candidates.
   plan                 Rank safe cleanup opportunities and show copyable commands.
+  large                List largest files for review without deleting anything.
   report               Write a Markdown cleanup report. Prints to stdout by default.
   clean                Clean safe rebuildable caches. Dry-run unless --apply is passed.
   history              List recent apply logs.
@@ -74,13 +77,14 @@ Options:
   --trash              Move deleted files to ~/.Trash/cleanroom-* instead of rm -rf.
   --yes                Do not prompt before --apply cleanup.
   --verbose            Print every path touched.
-  --json               Emit JSON for scan, plan, protect, or rules.
+  --json               Emit JSON for scan, plan, large, protect, guard, or rules.
   --output PATH        Output path for report.
   --log PATH           Write apply audit log here. Default: ~/.local/state/cleanroom/runs/*.log.
   --config PATH        Load config file. Default: ~/.config/cleanroom/config.
   --exclude PATH       Never remove this path. Can be passed multiple times.
   --days N             Age threshold for stale node_modules. Default: 30.
-  --limit N            Number of history entries to show. Default: 20.
+  --limit N            Number of history entries or large files to show. Default: 20.
+  --min-mb N           Minimum file size for large-file discovery. Default: 500.
   --preset NAME        Enable a useful group: safe, dev, deep.
                        safe: default rebuildable caches.
                        dev: safe + app caches + package stores + stale node_modules.
@@ -113,6 +117,8 @@ Examples:
   cleanroom scan --json
   cleanroom plan
   cleanroom plan --json
+  cleanroom large ~/Documents --min-mb 250 --limit 30
+  cleanroom large --json ~/Downloads
   cleanroom report --output cleanroom-report.md
   cleanroom doctor
   cleanroom protect
@@ -898,6 +904,60 @@ scan() {
     xargs -0 du -h 2>/dev/null | sort -h | tail -30 || true
 }
 
+large_rows() {
+  local root="$1"
+  find "$root" -xdev -type f -size "+${MIN_MB}M" -print0 2>/dev/null |
+    while IFS= read -r -d '' path; do
+      printf '%012d\t%s\n' "$(size_kb "$path")" "$path"
+    done |
+    sort -rn |
+    head -n "$LIMIT"
+}
+
+large() {
+  local root
+  if [[ "${#PATH_ARGS[@]}" -gt 0 ]]; then
+    root="$(expand_path "${PATH_ARGS[0]}")"
+  else
+    root="$HOME"
+  fi
+  [[ -e "$root" ]] || die "large path not found: $root"
+
+  local rows
+  rows="$(large_rows "$root")"
+
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '['
+    local first=1 kb kb_num path
+    while IFS=$'\t' read -r kb path; do
+      [[ -z "${path:-}" ]] && continue
+      kb_num="$(printf '%s\n' "$kb" | sed 's/^0*//; s/^$/0/')"
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '{"path":"%s","size_kb":%s,"size":"%s"}' \
+        "$(printf '%s' "$path" | json_escape)" \
+        "$kb_num" \
+        "$(human_kb "${kb:-0}" | json_escape)"
+    done <<<"$rows"
+    printf ']\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}cleanroom large files${RESET}"
+  printf 'Review-only list. cleanroom does not delete these files.\n'
+  printf 'Path: %s\n' "$root"
+  printf 'Minimum: %sMB  Limit: %s\n\n' "$MIN_MB" "$LIMIT"
+  if [[ -z "$rows" ]]; then
+    printf 'No files found over %sMB.\n' "$MIN_MB"
+    return 0
+  fi
+  local kb path
+  while IFS=$'\t' read -r kb path; do
+    [[ -z "${path:-}" ]] && continue
+    printf '%8s  %s\n' "$(human_kb "$kb")" "$path"
+  done <<<"$rows"
+}
+
 plan_rows() {
   local safe package app node dev ai_workspaces ai_models containers
   safe="$(sum_existing_kb \
@@ -1403,7 +1463,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  scan|plan|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
+  scan|plan|large|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -1464,6 +1524,11 @@ while [[ "$#" -gt 0 ]]; do
       [[ "${1:-}" =~ ^[0-9]+$ ]] || die "--limit requires a number"
       LIMIT="$1"
       ;;
+    --min-mb)
+      shift
+      [[ "${1:-}" =~ ^[0-9]+$ ]] || die "--min-mb requires a number"
+      MIN_MB="$1"
+      ;;
     --include-dev-heavy) INCLUDE_DEV_HEAVY=1 ;;
     --include-node-stale) INCLUDE_NODE_STALE=1 ;;
     --include-package-stores) INCLUDE_PACKAGE_STORES=1 ;;
@@ -1477,7 +1542,7 @@ while [[ "$#" -gt 0 ]]; do
     -h|--help) usage; exit 0 ;;
     -v|--version) echo "$VERSION"; exit 0 ;;
     *)
-      if [[ "$ACTION" == "guard" ]]; then
+      if [[ "$ACTION" == "guard" || "$ACTION" == "large" ]]; then
         PATH_ARGS+=("$1")
       else
         die "Unknown option: $1"
@@ -1490,6 +1555,7 @@ done
 case "$ACTION" in
   scan) scan ;;
   plan) plan ;;
+  large) large ;;
   report) report ;;
   clean) clean ;;
   history) history ;;

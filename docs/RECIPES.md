@@ -7,6 +7,7 @@ Common `cleanroom` workflows.
 ```sh
 cleanroom scan
 cleanroom plan
+cleanroom large
 cleanroom doctor
 cleanroom protect
 cleanroom guard ~/Library/Application\ Support/Google/Chrome
@@ -23,6 +24,7 @@ cleanroom clean
 ```sh
 cleanroom scan --json
 cleanroom plan --json
+cleanroom large --json ~/Documents
 cleanroom protect --json
 cleanroom guard --json ~/Library/Application\ Support/Google/Chrome
 cleanroom rules --json
@@ -32,6 +34,8 @@ cleanroom report --output cleanroom-report.md
 `scan --json` emits disk and candidate sizes as JSON for wrappers, dashboards, or future GUI frontends.
 
 `plan --json` emits ranked cleanup recommendations with estimated reclaim size, preview commands, and explicit apply commands.
+
+`large --json [PATH]` emits large files above `--min-mb` for review. It is intentionally review-only and does not delete anything.
 
 `protect --json` emits protected personal-state paths and whether they are present. This is useful for GUI wrappers and safety reviews before trying new cleanup rules.
 
@@ -50,6 +54,15 @@ cleanroom clean --preset dev --apply --trash
 ```
 
 Good for package stores, stale `node_modules`, and safe app caches.
+
+## Documents Storage
+
+```sh
+cleanroom large ~/Documents --min-mb 250 --limit 50
+cleanroom large ~/Downloads --min-mb 100 --limit 50
+```
+
+Use this when macOS Storage reports a large Documents category. Review the output manually; cleanroom will not delete arbitrary personal files.
 
 ## Config File
 
