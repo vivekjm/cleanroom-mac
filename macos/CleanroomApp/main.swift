@@ -77,6 +77,7 @@ final class CleanroomAppDelegate: NSObject, NSApplicationDelegate {
 
         inspectRow.addArrangedSubview(button("Overview", action: #selector(overview)))
         inspectRow.addArrangedSubview(button("Scan", action: #selector(scan)))
+        inspectRow.addArrangedSubview(button("System Data", action: #selector(systemData)))
         inspectRow.addArrangedSubview(button("Plan", action: #selector(plan)))
         inspectRow.addArrangedSubview(button("Report to Desktop", action: #selector(report)))
         inspectRow.addArrangedSubview(button("History", action: #selector(history)))
@@ -164,6 +165,10 @@ final class CleanroomAppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func scan() {
         runCommand("scan", title: "Scan")
+    }
+
+    @objc private func systemData() {
+        runCommand("system-data", title: "System Data")
     }
 
     @objc private func plan() {

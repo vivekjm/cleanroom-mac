@@ -1,4 +1,4 @@
-.TH CLEANROOM 1 "June 2026" "cleanroom 0.32.0" "User Commands"
+.TH CLEANROOM 1 "June 2026" "cleanroom 0.33.0" "User Commands"
 .SH NAME
 cleanroom \- safe-by-default macOS storage cleaner
 .SH SYNOPSIS
@@ -7,6 +7,9 @@ cleanroom \- safe-by-default macOS storage cleaner
 .br
 .B cleanroom
 .RI "scan [options]"
+.br
+.B cleanroom
+.RI "system-data [--json]"
 .br
 .B cleanroom
 .RI "plan [--json]"
@@ -107,6 +110,9 @@ Show a read-only storage dashboard with disk state, summaries, and next steps.
 .TP
 .B scan
 Show disk usage, cleanup candidates, largest home folders, and large files.
+.TP
+.B system-data
+Break common macOS System Data locations into review-only buckets with next commands.
 .TP
 .B plan
 Rank safe cleanup opportunities and show copyable commands.
@@ -264,6 +270,7 @@ Remove old downloaded installer files from ~/Downloads during apply.
 .nf
 cleanroom overview
 cleanroom scan
+cleanroom system-data
 cleanroom plan --json
 cleanroom large ~/Documents --min-mb 250 --limit 30
 cleanroom duplicates ~/Documents --min-mb 100 --limit 20

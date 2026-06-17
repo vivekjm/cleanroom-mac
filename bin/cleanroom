@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.32.0"
+VERSION="0.33.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -46,6 +46,7 @@ cleanroom - safe macOS storage cleaner
 Usage:
   cleanroom overview [--json]
   cleanroom scan [options]
+  cleanroom system-data [--json]
   cleanroom plan [--json]
   cleanroom large [PATH] [--min-mb N] [--limit N] [--json]
   cleanroom duplicates [PATH] [--min-mb N] [--limit N] [--json]
@@ -81,6 +82,7 @@ Usage:
 Actions:
   overview             Show a read-only storage dashboard and next steps.
   scan                 Show disk usage and likely cleanup candidates.
+  system-data          Break down common macOS System Data buckets.
   plan                 Rank safe cleanup opportunities and show copyable commands.
   large                List largest files for review without deleting anything.
   duplicates           Find exact duplicate files for review without deleting anything.
@@ -117,9 +119,9 @@ Options:
   --trash              Move deleted files to ~/.Trash/cleanroom-* instead of rm -rf.
   --yes                Do not prompt before --apply cleanup.
   --verbose            Print every path touched.
-  --json               Emit JSON for overview, scan, plan, large, duplicates, downloads,
-                       installers, nodes, apps, browsers, leftovers, startup, trash,
-                       backups, xcode, caches, diagnostics, packages, toolchains,
+  --json               Emit JSON for overview, scan, system-data, plan, large, duplicates,
+                       downloads, installers, nodes, apps, browsers, leftovers, startup,
+                       trash, backups, xcode, caches, diagnostics, packages, toolchains,
                        containers, snapshots, doctor, protect, guard, or rules.
   --output PATH        Output path for report.
   --log PATH           Write apply audit log here. Default: ~/.local/state/cleanroom/runs/*.log.
@@ -167,6 +169,8 @@ Examples:
   cleanroom overview --json
   cleanroom scan
   cleanroom scan --json
+  cleanroom system-data
+  cleanroom system-data --json
   cleanroom plan
   cleanroom plan --json
   cleanroom large ~/Documents --min-mb 250 --limit 30
@@ -1133,6 +1137,60 @@ scan() {
   printf '\n%s\n' "${BOLD}Largest user files over 500MB${RESET}"
   find "$HOME" -xdev -type f -size +500M -print0 2>/dev/null |
     xargs -0 du -h 2>/dev/null | sort -h | tail -30 || true
+}
+
+system_data_rows() {
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "application-support" "Application Support" "~/Library/Application Support" "review" "cleanroom leftovers APPNAME" "manual review" "Large app support folders often appear as System Data. Review by app name; cleanroom does not remove the whole folder."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "caches" "User Caches" "~/Library/Caches; ~/.cache" "rebuildable" "cleanroom caches" "cleanroom clean --apply --trash" "Standard user caches and rebuildable app caches."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "developer" "Developer Data" "~/Library/Developer" "mixed" "cleanroom xcode" "cleanroom clean --apply --trash --include-dev-heavy" "Xcode, simulator, DerivedData, DeviceSupport, and archives."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "android" "Android SDK" "~/Library/Android" "dev-heavy" "cleanroom clean --include-dev-heavy" "cleanroom clean --apply --trash --include-dev-heavy" "Android SDK caches, NDKs, system images, and temporary SDK downloads."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "containers" "Container Storage" "~/.colima; ~/.lima; ~/.local/share/containers; ~/.local/share/podman; ~/Library/Containers/com.docker.docker/Data/vms" "high-impact" "cleanroom containers" "cleanroom clean --apply --trash --include-containers" "Docker Desktop, Colima, Lima, and Podman container storage."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "diagnostics" "Logs and Diagnostics" "~/Library/Logs; ~/Library/DiagnosticReports; ~/Library/Application Support/CrashReporter" "low-risk" "cleanroom diagnostics" "cleanroom clean --apply --trash --include-diagnostics --days $DAYS" "User logs, diagnostic reports, and crash reports."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "mobile-backups" "Device Backups" "~/Library/Application Support/MobileSync/Backup" "protected" "cleanroom backups" "manual review" "Local iPhone and iPad backups are protected because they may be the only copy of device data."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "group-containers" "Group Containers" "~/Library/Group Containers" "review" "cleanroom leftovers APPNAME" "manual review" "Shared app containers can hold account data and should be reviewed by app or vendor."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "http-storages" "HTTPStorages" "~/Library/HTTPStorages" "review" "cleanroom leftovers APPNAME" "manual review" "Per-app HTTP storage and cookies. Review carefully; cleanroom does not remove this wholesale."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "saved-state" "Saved Application State" "~/Library/Saved Application State" "review" "cleanroom leftovers APPNAME" "manual review" "Window/session state for apps. Usually small, but useful when investigating leftovers."
+}
+
+system_data() {
+  local rows
+  rows="$(system_data_rows)"
+
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '['
+    local first=1 id title paths category preview apply description kb
+    while IFS=$'\t' read -r id title paths category preview apply description; do
+      [[ -z "${id:-}" ]] && continue
+      kb="$(paths_field_kb "$paths")"
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '{"id":"%s","title":"%s","paths":"%s","category":"%s","size_kb":%s,"size":"%s","preview_command":"%s","apply_command":"%s","description":"%s"}' \
+        "$(printf '%s' "$id" | json_escape)" \
+        "$(printf '%s' "$title" | json_escape)" \
+        "$(printf '%s' "$paths" | json_escape)" \
+        "$(printf '%s' "$category" | json_escape)" \
+        "$kb" \
+        "$(human_kb "$kb" | json_escape)" \
+        "$(printf '%s' "$preview" | json_escape)" \
+        "$(printf '%s' "$apply" | json_escape)" \
+        "$(printf '%s' "$description" | json_escape)"
+    done <<<"$rows"
+    printf ']\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}cleanroom System Data breakdown${RESET}"
+  printf 'Review-only inventory of common folders macOS may count as System Data.\n\n'
+  printf '%-10s %-22s %-12s %s\n' "size" "id" "category" "next command"
+  local id title paths category preview apply description kb
+  while IFS=$'\t' read -r id title paths category preview apply description; do
+    [[ -z "${id:-}" ]] && continue
+    kb="$(paths_field_kb "$paths")"
+    printf '%-10s %-22s %-12s %s\n' "$(human_kb "$kb")" "$id" "$category" "$preview"
+    printf '  apply: %s\n' "$apply"
+    printf '  paths: %s\n' "$paths"
+    printf '  %s\n' "$description"
+  done <<<"$rows"
 }
 
 large_rows() {
@@ -2575,6 +2633,7 @@ overview() {
 
   printf '\n%s\n' "${BOLD}Useful next commands${RESET}"
   printf 'cleanroom plan\n'
+  printf 'cleanroom system-data\n'
   printf 'cleanroom large ~/Documents --min-mb 250 --limit 50\n'
   printf 'cleanroom downloads --days 30 --limit 50\n'
   printf 'cleanroom trash\n'
@@ -3205,7 +3264,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  overview|scan|plan|large|duplicates|downloads|installers|nodes|apps|browsers|leftovers|backups|xcode|startup|trash|caches|diagnostics|packages|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
+  overview|scan|system-data|plan|large|duplicates|downloads|installers|nodes|apps|browsers|leftovers|backups|xcode|startup|trash|caches|diagnostics|packages|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -3301,6 +3360,7 @@ done
 case "$ACTION" in
   overview) overview ;;
   scan) scan ;;
+  system-data) system_data ;;
   plan) plan ;;
   large) large ;;
   duplicates) duplicates ;;

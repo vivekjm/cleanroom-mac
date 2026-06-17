@@ -6,6 +6,7 @@ _cleanroom() {
   commands=(
     'overview:Show read-only storage dashboard'
     'scan:Show disk usage and cleanup candidates'
+    'system-data:Break down common System Data buckets'
     'plan:Rank cleanup opportunities'
     'large:List large files for review'
     'duplicates:Find exact duplicate files for review'

@@ -143,6 +143,14 @@ grep '"container_kb"' "$overview_json" >/dev/null
 grep '"diagnostic_kb"' "$overview_json" >/dev/null
 grep '"recommendations"' "$overview_json" >/dev/null
 rm -f "$overview_json"
+"$BIN" system-data | grep 'System Data breakdown' >/dev/null
+system_data_json="$(mktemp)"
+"$BIN" system-data --json > "$system_data_json"
+python3 -m json.tool "$system_data_json" >/dev/null
+grep 'mobile-backups' "$system_data_json" >/dev/null
+grep '"category":"protected"' "$system_data_json" >/dev/null
+grep 'cleanroom containers' "$system_data_json" >/dev/null
+rm -f "$system_data_json"
 "$BIN" rules | grep 'safe-app-caches' >/dev/null
 rules_json="$(mktemp)"
 "$BIN" rules --json > "$rules_json"

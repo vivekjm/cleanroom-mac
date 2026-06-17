@@ -7,6 +7,7 @@ Common `cleanroom` workflows.
 ```sh
 cleanroom overview
 cleanroom scan
+cleanroom system-data
 cleanroom plan
 cleanroom large
 cleanroom duplicates
@@ -42,6 +43,7 @@ cleanroom clean
 ```sh
 cleanroom overview --json
 cleanroom scan --json
+cleanroom system-data --json
 cleanroom plan --json
 cleanroom large --json ~/Documents
 cleanroom duplicates --json ~/Documents
@@ -71,6 +73,8 @@ cleanroom report --output cleanroom-report.md
 `overview --json` emits a compact dashboard with disk state, summary counts, and top cleanup recommendations.
 
 `scan --json` emits disk and candidate sizes as JSON for wrappers, dashboards, or future GUI frontends.
+
+`system-data --json` emits grouped System Data buckets with sizes, safety categories, and next-step commands.
 
 `plan --json` emits ranked cleanup recommendations with estimated reclaim size, preview commands, and explicit apply commands.
 
@@ -365,6 +369,7 @@ This can remove local container VM disks, images, and volumes. Review `cleanroom
 ## “System Data” Looks Wrong
 
 ```sh
+cleanroom system-data
 cleanroom scan
 cleanroom snapshots
 ```
