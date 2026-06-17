@@ -15,6 +15,7 @@ mkdir -p \
   "$TEST_HOME/Library/Logs" \
   "$TEST_HOME/Library/Developer/Xcode/DerivedData" \
   "$TEST_HOME/Library/Application Support/Google/Chrome/Default" \
+  "$TEST_HOME/Library/Application Support/Google/Chrome/Default/Cache" \
   "$TEST_HOME/Library/Keychains" \
   "$TEST_HOME/.npm/_cacache" \
   "$TEST_HOME/.cache" \
@@ -25,6 +26,7 @@ printf 'cache\n' >"$TEST_HOME/Library/Caches/example.cache"
 printf 'log\n' >"$TEST_HOME/Library/Logs/example.log"
 printf 'model\n' >"$TEST_HOME/.lmstudio/models/example.gguf"
 printf 'login data\n' >"$TEST_HOME/Library/Application Support/Google/Chrome/Default/Login Data"
+printf 'browser cache\n' >"$TEST_HOME/Library/Application Support/Google/Chrome/Default/Cache/example.cache"
 printf 'keychain\n' >"$TEST_HOME/Library/Keychains/login.keychain-db"
 export HOME="$TEST_HOME"
 
@@ -55,6 +57,16 @@ python3 -m json.tool "$protect_json" >/dev/null
 grep '"status":"present"' "$protect_json" >/dev/null
 grep 'chrome-login-data' "$protect_json" >/dev/null
 rm -f "$protect_json"
+"$BIN" guard "$HOME/Library/Application Support/Google/Chrome" | grep 'refused-protected' >/dev/null
+"$BIN" guard "$HOME/Library/Application Support/Google/Chrome/Default" | grep 'refused-protected' >/dev/null
+"$BIN" guard "$HOME/Library/Application Support/Google/Chrome/Default/Login Data" | grep 'refused-protected' >/dev/null
+"$BIN" guard "$HOME/Library/Application Support/Google/Chrome/Default/Cache" | grep 'allowed' >/dev/null
+guard_json="$(mktemp)"
+"$BIN" guard --json "$HOME/Library/Application Support/Google/Chrome" "$HOME/Library/Application Support/Google/Chrome/Default/Cache" > "$guard_json"
+python3 -m json.tool "$guard_json" >/dev/null
+grep '"status":"refused-protected"' "$guard_json" >/dev/null
+grep '"status":"allowed"' "$guard_json" >/dev/null
+rm -f "$guard_json"
 "$BIN" history 2>&1 | grep 'No cleanroom history found' >/dev/null
 
 config_file="$(mktemp)"

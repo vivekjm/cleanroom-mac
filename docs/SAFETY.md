@@ -53,6 +53,24 @@ Use this audit when reviewing browser profiles, saved-password-adjacent files, K
 
 Keep both catalogs in sync with cleanup behavior so users and wrappers can inspect risk before running anything.
 
+## Guard Checks
+
+Before deleting any direct path, cleanroom checks:
+
+- broad dangerous paths such as `/`, `$HOME`, `~/Library`, `~/Documents`, `~/Desktop`, and `~/Downloads`
+- exact protected catalog paths
+- ancestor folders that would contain a protected catalog path
+- user-provided excludes
+
+You can inspect the same decision with:
+
+```sh
+cleanroom guard ~/Library/Application\ Support/Google/Chrome
+cleanroom guard --json ~/Library/Application\ Support/Google/Chrome/Default/Login\ Data
+```
+
+Nested cache folders can still be allowed when they do not contain a protected catalog path. For example, a browser `Cache` folder can be removable while the profile folder and `Login Data` stay refused.
+
 ## Excludes
 
 Users can protect custom paths with:

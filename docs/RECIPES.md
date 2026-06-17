@@ -9,6 +9,7 @@ cleanroom scan
 cleanroom plan
 cleanroom doctor
 cleanroom protect
+cleanroom guard ~/Library/Application\ Support/Google/Chrome
 cleanroom categories
 cleanroom rules
 cleanroom init-config
@@ -23,6 +24,7 @@ cleanroom clean
 cleanroom scan --json
 cleanroom plan --json
 cleanroom protect --json
+cleanroom guard --json ~/Library/Application\ Support/Google/Chrome
 cleanroom rules --json
 cleanroom report --output cleanroom-report.md
 ```
@@ -32,6 +34,8 @@ cleanroom report --output cleanroom-report.md
 `plan --json` emits ranked cleanup recommendations with estimated reclaim size, preview commands, and explicit apply commands.
 
 `protect --json` emits protected personal-state paths and whether they are present. This is useful for GUI wrappers and safety reviews before trying new cleanup rules.
+
+`guard --json PATH...` emits the central safety decision for paths you pass in: allowed, excluded, refused as dangerous, or refused as protected.
 
 `rules --json` emits cleanup rule metadata, including safety level, default status, opt-in flag, paths, and description.
 

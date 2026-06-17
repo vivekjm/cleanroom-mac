@@ -147,6 +147,13 @@ cleanroom protect
 cleanroom protect --json
 ```
 
+Check whether a specific path is blocked by cleanroom's safety guard:
+
+```sh
+cleanroom guard ~/Library/Application\ Support/Google/Chrome
+cleanroom guard --json ~/Library/Application\ Support/Google/Chrome/Default/Login\ Data
+```
+
 See cleanup categories:
 
 ```sh
@@ -295,6 +302,8 @@ More examples are in [docs/RECIPES.md](docs/RECIPES.md).
 Cleanup rules are cataloged in [data/cleanup-rules.tsv](data/cleanup-rules.tsv). `cleanroom rules --json` exposes the same catalog for wrappers and audits.
 
 Protected personal-state paths are cataloged in [data/protected-paths.tsv](data/protected-paths.tsv). `cleanroom protect --json` exposes detected browser profile, credential, Photos, Mail, iCloud, Messages, and Contacts paths that cleanroom will not remove wholesale.
+
+`cleanroom guard PATH...` uses the same central guard as applied cleanup. It refuses broad dangerous paths, protected catalog paths, and any ancestor folder that would contain protected catalog entries.
 
 Config files use simple `key=value` lines and are never executed as shell.
 

@@ -1,4 +1,4 @@
-.TH CLEANROOM 1 "June 2026" "cleanroom 0.10.0" "User Commands"
+.TH CLEANROOM 1 "June 2026" "cleanroom 0.11.0" "User Commands"
 .SH NAME
 cleanroom \- safe-by-default macOS storage cleaner
 .SH SYNOPSIS
@@ -22,6 +22,9 @@ cleanroom \- safe-by-default macOS storage cleaner
 .br
 .B cleanroom
 .RI "protect [--json]"
+.br
+.B cleanroom
+.RI "guard path... [--json]"
 .br
 .B cleanroom
 .RI "rules [--json]"
@@ -69,6 +72,9 @@ Check platform, dependencies, disk state, and protected data assumptions.
 .B protect
 Audit protected personal data and app profile paths that cleanroom will not
 remove wholesale.
+.TP
+.B guard
+Explain whether specific paths are removable by cleanroom's central safety guard.
 .TP
 .B categories
 Explain cleanup categories and safety levels.
@@ -126,6 +132,7 @@ cleanroom clean --preset dev --apply --trash
 cleanroom history
 cleanroom restore --log ~/.local/state/cleanroom/runs/RUN.log
 cleanroom protect --json
+cleanroom guard ~/Library/Application\\ Support/Google/Chrome
 cleanroom rules --json
 cleanroom interactive
 .fi

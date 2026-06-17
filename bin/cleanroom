@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.10.0"
+VERSION="0.11.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -16,6 +16,7 @@ LOG_FILE=""
 TRASH=0
 RUN_ID="$(date '+%Y%m%d-%H%M%S')-$$"
 EXCLUDES=()
+PATH_ARGS=()
 INCLUDE_DEV_HEAVY=0
 INCLUDE_NODE_STALE=0
 INCLUDE_GEMINI=0
@@ -47,6 +48,7 @@ Usage:
   cleanroom interactive [options]
   cleanroom doctor
   cleanroom protect [--json]
+  cleanroom guard PATH... [--json]
   cleanroom rules [--json]
   cleanroom categories
   cleanroom init-config [--config PATH]
@@ -62,6 +64,7 @@ Actions:
   interactive          Choose cleanup categories in a guided prompt.
   doctor               Check platform, dependencies, permissions, and risky state.
   protect              Audit protected personal data that cleanroom will not remove.
+  guard                Explain whether specific paths are removable by cleanroom.
   rules                List cleanup rules, safety level, opt-in flag, and affected paths.
   categories           Explain cleanup categories and safety levels.
   init-config          Write a starter config file.
@@ -114,6 +117,7 @@ Examples:
   cleanroom doctor
   cleanroom protect
   cleanroom protect --json
+  cleanroom guard ~/Library/Application\ Support/Google/Chrome
   cleanroom rules
   cleanroom rules --json
   cleanroom categories
@@ -564,6 +568,29 @@ is_dangerous_path() {
   return 1
 }
 
+protected_removal_reason() {
+  local path="$1"
+  local file id type protected_path reason expanded protected_canonical path_canonical
+  file="$(protected_file)"
+  [[ -f "$file" ]] || return 1
+  path_canonical="$(canonical_existing_path "$path")"
+
+  while IFS=$'\t' read -r id type protected_path reason; do
+    [[ -z "${id:-}" ]] && continue
+    expanded="$(expand_path "$protected_path")"
+    protected_canonical="$(canonical_existing_path "$expanded")"
+    if [[ "$path_canonical" == "$protected_canonical" || "$protected_canonical" == "$path_canonical/"* ]]; then
+      printf '%s: %s\n' "$id" "$reason"
+      return 0
+    fi
+  done < <(tail -n +2 "$file")
+  return 1
+}
+
+is_protected_removal_path() {
+  protected_removal_reason "$1" >/dev/null
+}
+
 trash_path() {
   local path="$1"
   local trash_dir base target n
@@ -587,6 +614,13 @@ delete_path() {
   if is_dangerous_path "$path"; then
     warn "refusing dangerous path: $path"
     record_apply "remove" "refused-dangerous" "0" "$path" ""
+    return 0
+  fi
+  local protected_reason
+  protected_reason="$(protected_removal_reason "$path" || true)"
+  if [[ -n "$protected_reason" ]]; then
+    warn "refusing protected path: $path ($protected_reason)"
+    record_apply "remove" "refused-protected" "0" "$path" ""
     return 0
   fi
   kb="$(size_kb "$path")"
@@ -1085,6 +1119,77 @@ protect() {
   done
 }
 
+guard_status() {
+  local path="$1"
+  local reason
+  if is_dangerous_path "$path"; then
+    printf '%s\t%s\n' "refused-dangerous" "Broad system, home, Library, or personal folder paths are never removed directly."
+    return 0
+  fi
+  reason="$(protected_removal_reason "$path" || true)"
+  if [[ -n "$reason" ]]; then
+    printf '%s\t%s\n' "refused-protected" "$reason"
+    return 0
+  fi
+  if is_excluded "$path"; then
+    printf '%s\t%s\n' "excluded" "Matched a user-provided --exclude or config exclude."
+    return 0
+  fi
+  printf '%s\t%s\n' "allowed" "No built-in guard blocks this path; cleanup still requires a matching rule and --apply."
+}
+
+guard() {
+  [[ "${#PATH_ARGS[@]}" -gt 0 ]] || die "guard requires at least one path"
+
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '['
+    local first=1 path expanded exists_flag kb status reason line
+    for path in "${PATH_ARGS[@]}"; do
+      expanded="$(expand_path "$path")"
+      if [[ -e "$expanded" ]]; then
+        exists_flag=true
+        kb="$(size_kb "$expanded")"
+      else
+        exists_flag=false
+        kb=0
+      fi
+      line="$(guard_status "$expanded")"
+      status="${line%%$'\t'*}"
+      reason="${line#*$'\t'}"
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '{"path":"%s","exists":%s,"size_kb":%s,"size":"%s","status":"%s","reason":"%s"}' \
+        "$(printf '%s' "$expanded" | json_escape)" \
+        "$exists_flag" \
+        "$kb" \
+        "$(human_kb "$kb" | json_escape)" \
+        "$(printf '%s' "$status" | json_escape)" \
+        "$(printf '%s' "$reason" | json_escape)"
+    done
+    printf ']\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}cleanroom guard${RESET}"
+  printf '%-18s %-8s %-8s %s\n' "status" "exists" "size" "path"
+  local path expanded exists_label kb status reason line
+  for path in "${PATH_ARGS[@]}"; do
+    expanded="$(expand_path "$path")"
+    if [[ -e "$expanded" ]]; then
+      exists_label=yes
+      kb="$(size_kb "$expanded")"
+    else
+      exists_label=no
+      kb=0
+    fi
+    line="$(guard_status "$expanded")"
+    status="${line%%$'\t'*}"
+    reason="${line#*$'\t'}"
+    printf '%-18s %-8s %-8s %s\n' "$status" "$exists_label" "$(human_kb "$kb")" "$expanded"
+    printf '  %s\n' "$reason"
+  done
+}
+
 doctor() {
   log "${BOLD}cleanroom doctor${RESET}"
   printf '%-28s %s\n' "version" "$VERSION"
@@ -1298,7 +1403,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  scan|plan|report|clean|history|restore|interactive|doctor|protect|rules|categories|init-config|help)
+  scan|plan|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -1371,7 +1476,13 @@ while [[ "$#" -gt 0 ]]; do
     --include-lmstudio) INCLUDE_LMSTUDIO=1; INCLUDE_AI_MODELS=1 ;;
     -h|--help) usage; exit 0 ;;
     -v|--version) echo "$VERSION"; exit 0 ;;
-    *) die "Unknown option: $1" ;;
+    *)
+      if [[ "$ACTION" == "guard" ]]; then
+        PATH_ARGS+=("$1")
+      else
+        die "Unknown option: $1"
+      fi
+      ;;
   esac
   shift
 done
@@ -1386,6 +1497,7 @@ case "$ACTION" in
   interactive) interactive ;;
   doctor) doctor ;;
   protect) protect ;;
+  guard) guard ;;
   rules) rules ;;
   categories) categories ;;
   init-config) init_config ;;

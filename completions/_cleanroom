@@ -13,6 +13,7 @@ _cleanroom() {
     'interactive:Choose cleanup categories with prompts'
     'doctor:Check platform and safety assumptions'
     'protect:Audit protected personal data'
+    'guard:Check whether paths are removable'
     'rules:List cleanup rules and safety levels'
     'categories:Explain cleanup categories'
     'init-config:Write a starter config file'
