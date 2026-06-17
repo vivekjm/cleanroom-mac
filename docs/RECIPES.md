@@ -13,6 +13,7 @@ cleanroom duplicates
 cleanroom nodes
 cleanroom apps
 cleanroom startup
+cleanroom trash
 cleanroom caches
 cleanroom packages
 cleanroom snapshots
@@ -38,6 +39,7 @@ cleanroom duplicates --json ~/Documents
 cleanroom nodes --json ~/Documents
 cleanroom apps --json
 cleanroom startup --json
+cleanroom trash --json
 cleanroom caches --json
 cleanroom packages --json
 cleanroom snapshots --json
@@ -63,6 +65,8 @@ cleanroom report --output cleanroom-report.md
 `apps --json [PATH]` emits app bundle sizes for `/Applications`, `~/Applications`, or a provided path. It is intentionally review-only and does not uninstall anything.
 
 `startup --json` emits LaunchAgents and LaunchDaemons with scope, type, status, label, program, and path. It is intentionally review-only and does not unload, disable, or remove anything.
+
+`trash --json` emits current `~/.Trash` size and top-level items. Emptying Trash requires `cleanroom clean --include-user-trash --apply`.
 
 `caches --json` emits safe and opt-in cache bucket sizes with the matching preview and apply commands.
 
@@ -138,6 +142,16 @@ cleanroom startup --json
 ```
 
 Review LaunchAgents and LaunchDaemons before removing vendor tools manually. cleanroom does not unload, disable, or remove startup items.
+
+## Current Trash
+
+```sh
+cleanroom trash
+cleanroom clean --include-user-trash
+cleanroom clean --include-user-trash --apply
+```
+
+`--include-user-trash` empties `~/.Trash` and is irreversible. It is not included in presets.
 
 ## Config File
 

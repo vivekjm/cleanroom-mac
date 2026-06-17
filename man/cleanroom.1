@@ -1,4 +1,4 @@
-.TH CLEANROOM 1 "June 2026" "cleanroom 0.21.0" "User Commands"
+.TH CLEANROOM 1 "June 2026" "cleanroom 0.22.0" "User Commands"
 .SH NAME
 cleanroom \- safe-by-default macOS storage cleaner
 .SH SYNOPSIS
@@ -25,6 +25,9 @@ cleanroom \- safe-by-default macOS storage cleaner
 .br
 .B cleanroom
 .RI "startup [--json]"
+.br
+.B cleanroom
+.RI "trash [--json]"
 .br
 .B cleanroom
 .RI "caches [--json]"
@@ -95,6 +98,9 @@ List largest app bundles for review without uninstalling anything.
 .TP
 .B startup
 List LaunchAgents and LaunchDaemons for review without unloading or removing anything.
+.TP
+.B trash
+Inventory current user Trash contents without emptying Trash.
 .TP
 .B caches
 Inventory safe and opt-in cache buckets with preview/apply commands.
@@ -182,6 +188,9 @@ Remove downloaded local AI model stores.
 .TP
 .B --include-containers
 Remove local container VM disks. This can remove containers and volumes.
+.TP
+.B --include-user-trash
+Empty ~/.Trash during apply. This is irreversible.
 .SH EXAMPLES
 .nf
 cleanroom overview
@@ -192,6 +201,7 @@ cleanroom duplicates ~/Documents --min-mb 100 --limit 20
 cleanroom nodes ~/Documents --days 45 --limit 30
 cleanroom apps --limit 30
 cleanroom startup --json
+cleanroom trash --json
 cleanroom caches --json
 cleanroom packages --json
 cleanroom snapshots --json
@@ -199,6 +209,7 @@ cleanroom report --output cleanroom-report.md
 cleanroom doctor --json
 cleanroom clean --preset dev
 cleanroom clean --preset dev --apply --trash
+cleanroom clean --include-user-trash --apply
 cleanroom history
 cleanroom restore --log ~/.local/state/cleanroom/runs/RUN.log
 cleanroom protect --json

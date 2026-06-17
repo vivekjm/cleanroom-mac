@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.21.0"
+VERSION="0.22.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -28,6 +28,7 @@ INCLUDE_PACKAGE_STORES=0
 INCLUDE_CONTAINERS=0
 INCLUDE_APP_CACHES=0
 INCLUDE_SNAPSHOTS=0
+INCLUDE_USER_TRASH=0
 
 RED="$(printf '\033[31m')"
 GREEN="$(printf '\033[32m')"
@@ -48,6 +49,7 @@ Usage:
   cleanroom nodes [PATH] [--days N] [--limit N] [--json]
   cleanroom apps [PATH] [--limit N] [--json]
   cleanroom startup [--json]
+  cleanroom trash [--json]
   cleanroom caches [--json]
   cleanroom packages [--json]
   cleanroom snapshots [--json]
@@ -73,6 +75,7 @@ Actions:
   nodes                List stale node_modules folders for review.
   apps                 List largest app bundles for review without uninstalling.
   startup              List LaunchAgents and LaunchDaemons for review.
+  trash                Inventory current user Trash contents.
   caches               Inventory safe and opt-in cache buckets.
   packages             Inventory package-manager caches and stores.
   snapshots            List local Time Machine snapshots for review.
@@ -94,7 +97,7 @@ Options:
   --yes                Do not prompt before --apply cleanup.
   --verbose            Print every path touched.
   --json               Emit JSON for overview, scan, plan, large, duplicates, nodes, apps,
-                       startup, caches, packages, snapshots, doctor, protect, guard, or rules.
+                       startup, trash, caches, packages, snapshots, doctor, protect, guard, or rules.
   --output PATH        Output path for report.
   --log PATH           Write apply audit log here. Default: ~/.local/state/cleanroom/runs/*.log.
   --config PATH        Load config file. Default: ~/.config/cleanroom/config.
@@ -114,6 +117,7 @@ Options:
   --include-app-caches Include safe cache folders inside Google/Chrome, VS Code, Cursor, Slack, etc.
                        Does not remove profiles, passwords, cookies, bookmarks, or settings wholesale.
   --include-snapshots  Ask Time Machine to thin local snapshots.
+  --include-user-trash Empty ~/.Trash during apply. This is irreversible.
   --include-ai-workspaces
                        Remove generated AI-agent workspace state: recordings, scratch, brain,
                        implicit data, and local conversation caches where known.
@@ -147,6 +151,8 @@ Examples:
   cleanroom apps --json /Applications
   cleanroom startup
   cleanroom startup --json
+  cleanroom trash
+  cleanroom trash --json
   cleanroom caches
   cleanroom caches --json
   cleanroom packages
@@ -171,6 +177,8 @@ Examples:
   cleanroom restore --log ~/.local/state/cleanroom/runs/RUN.log
   cleanroom restore --log ~/.local/state/cleanroom/runs/RUN.log --apply
   cleanroom clean --apply --include-app-caches
+  cleanroom clean --include-user-trash
+  cleanroom clean --apply --include-user-trash
   cleanroom clean --apply --include-dev-heavy --include-node-stale --days 45
 EOF
 }
@@ -285,6 +293,7 @@ load_config() {
       include_ai_workspaces) truthy "$value" && INCLUDE_AI_WORKSPACES=1 ;;
       include_ai_models) truthy "$value" && INCLUDE_AI_MODELS=1 ;;
       include_containers) truthy "$value" && INCLUDE_CONTAINERS=1 ;;
+      include_user_trash) truthy "$value" && INCLUDE_USER_TRASH=1 ;;
       trash) truthy "$value" && TRASH=1 ;;
       log_file) LOG_FILE="$(expand_path "$value")" ;;
       exclude) add_exclude "$value" ;;
@@ -453,6 +462,7 @@ confirm_apply() {
   warn "Protected data like browser passwords and Keychains is not deleted."
   [[ "$INCLUDE_AI_MODELS" -eq 1 ]] && warn "AI model cleanup removes downloaded model files."
   [[ "$INCLUDE_CONTAINERS" -eq 1 ]] && warn "Container cleanup can remove local container VM disks and volumes."
+  [[ "$INCLUDE_USER_TRASH" -eq 1 ]] && warn "User Trash cleanup permanently empties ~/.Trash."
   printf 'Continue? Type "clean" to proceed: '
   local answer
   read -r answer
@@ -686,6 +696,29 @@ delete_path() {
   return 0
 }
 
+delete_user_trash_child() {
+  local path="$1"
+  local trash_dir="$HOME/.Trash"
+  local kb
+  [[ -e "$path" ]] || return 0
+  case "$path" in
+    "$trash_dir"/*) ;;
+    *)
+      warn "refusing non-Trash path during Trash cleanup: $path"
+      record_apply "empty-trash" "refused" "0" "$path" ""
+      return 0
+      ;;
+  esac
+  kb="$(size_kb "$path")"
+  if rm -rf "$path" 2>/dev/null; then
+    record_apply "empty-trash" "ok" "$kb" "$path" ""
+    [[ "$VERBOSE" -eq 1 ]] && log "emptied $(human_kb "$kb")  $path"
+  else
+    warn "Could not empty Trash item: $path"
+    record_apply "empty-trash" "failed" "$kb" "$path" ""
+  fi
+}
+
 run_rm() {
   local path="$1"
   path="$(expand_path "$path")"
@@ -901,6 +934,22 @@ clean_node_stale() {
       done
   done
   return 0
+}
+
+clean_user_trash() {
+  [[ "$INCLUDE_USER_TRASH" -eq 1 ]] || return 0
+  log "${BOLD}User Trash${RESET}"
+  local dir="$HOME/.Trash"
+  [[ -d "$dir" ]] || return 0
+  if [[ "$APPLY" -eq 1 ]]; then
+    [[ "$TRASH" -eq 1 ]] && warn "--trash is ignored for --include-user-trash because items are already in Trash."
+    find "$dir" -mindepth 1 -maxdepth 1 -print0 2>/dev/null |
+      while IFS= read -r -d '' path; do
+        delete_user_trash_child "$path"
+      done || true
+  else
+    print_size "~/.Trash"
+  fi
 }
 
 scan() {
@@ -1341,6 +1390,59 @@ startup() {
   printf '\nReview login items in System Settings > General > Login Items.\n'
 }
 
+trash_rows() {
+  local dir="$HOME/.Trash"
+  [[ -d "$dir" ]] || return 0
+  find "$dir" -mindepth 1 -maxdepth 1 -print0 2>/dev/null |
+    while IFS= read -r -d '' path; do
+      printf '%012d\t%s\n' "$(size_kb "$path")" "$path"
+    done |
+    sort -rn |
+    awk -v limit="$LIMIT" 'NR <= limit' || true
+}
+
+trash_total_kb() {
+  size_kb "~/.Trash"
+}
+
+trash() {
+  local rows total
+  rows="$(trash_rows || true)"
+  total="$(trash_total_kb)"
+
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '{"total_kb":%s,"total":"%s","items":[' "$total" "$(human_kb "$total" | json_escape)"
+    local first=1 kb kb_num path
+    while IFS=$'\t' read -r kb path; do
+      [[ -z "${path:-}" ]] && continue
+      kb_num="$(printf '%s\n' "$kb" | sed 's/^0*//; s/^$/0/')"
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '{"path":"%s","size_kb":%s,"size":"%s"}' \
+        "$(printf '%s' "$path" | json_escape)" \
+        "$kb_num" \
+        "$(human_kb "${kb:-0}" | json_escape)"
+    done <<<"$rows"
+    printf ']}\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}cleanroom Trash${RESET}"
+  printf 'Review-only inventory. Emptying Trash is opt-in and irreversible.\n'
+  printf 'Total: %s  Limit: %s\n\n' "$(human_kb "$total")" "$LIMIT"
+  if [[ -z "$rows" ]]; then
+    printf 'Trash is empty.\n'
+    return 0
+  fi
+  local kb path
+  while IFS=$'\t' read -r kb path; do
+    [[ -z "${path:-}" ]] && continue
+    printf '%8s  %s\n' "$(human_kb "$kb")" "$path"
+  done <<<"$rows"
+  printf '\nPreview emptying Trash with: cleanroom clean --include-user-trash\n'
+  printf 'Empty Trash with: cleanroom clean --include-user-trash --apply\n'
+}
+
 package_rows() {
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "npm-cache" "npm" "~/.npm/_cacache; ~/.npm/_logs; ~/.npm/_npx" "default" "cleanroom clean" "cleanroom clean --apply --trash"
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "yarn-cache" "yarn" "~/.yarn/cache; ~/.yarn/berry" "default" "cleanroom clean" "cleanroom clean --apply --trash"
@@ -1514,20 +1616,23 @@ app_bundle_count() {
 }
 
 overview() {
-  local plan_rows_sorted package_total protected_count snapshots app_count startup_items
+  local plan_rows_sorted package_total protected_count snapshots app_count startup_items trash_total
   plan_rows_sorted="$(plan_rows | sort -rn | head -5)"
   package_total="$(package_total_kb)"
   protected_count="$(protected_present_count)"
   snapshots="$(snapshot_count)"
   app_count="$(app_bundle_count)"
   startup_items="$(startup_count)"
+  trash_total="$(trash_total_kb)"
 
   if [[ "$JSON" -eq 1 ]]; then
     printf '{'
     disk_json
-    printf ',"summary":{"package_store_kb":%s,"package_store":"%s","protected_present":%s,"snapshot_count":%s,"app_bundle_count":%s,"startup_item_count":%s}' \
+    printf ',"summary":{"package_store_kb":%s,"package_store":"%s","trash_kb":%s,"trash":"%s","protected_present":%s,"snapshot_count":%s,"app_bundle_count":%s,"startup_item_count":%s}' \
       "$package_total" \
       "$(human_kb "$package_total" | json_escape)" \
+      "$trash_total" \
+      "$(human_kb "$trash_total" | json_escape)" \
       "$protected_count" \
       "$snapshots" \
       "$app_count" \
@@ -1557,6 +1662,7 @@ overview() {
   disk_line
   printf '\n%s\n' "${BOLD}Summary${RESET}"
   printf '%-24s %s\n' "package stores" "$(human_kb "$package_total")"
+  printf '%-24s %s\n' "Trash" "$(human_kb "$trash_total")"
   printf '%-24s %s\n' "protected paths present" "$protected_count"
   printf '%-24s %s\n' "local snapshots" "$snapshots"
   printf '%-24s %s\n' "app bundles" "$app_count"
@@ -1573,6 +1679,7 @@ overview() {
   printf '\n%s\n' "${BOLD}Useful next commands${RESET}"
   printf 'cleanroom plan\n'
   printf 'cleanroom large ~/Documents --min-mb 250 --limit 50\n'
+  printf 'cleanroom trash\n'
   printf 'cleanroom startup\n'
   printf 'cleanroom packages\n'
   printf 'cleanroom protect\n'
@@ -1618,7 +1725,7 @@ snapshots() {
 }
 
 plan_rows() {
-  local safe package app node dev ai_workspaces ai_models containers
+  local safe package app node dev ai_workspaces ai_models containers user_trash
   safe="$(sum_existing_kb \
     "~/Library/Caches" "~/.cache" "~/.npm/_cacache" "~/.npm/_logs" "~/.npm/_npx" \
     "~/.yarn/cache" "~/.yarn/berry" "~/.gradle/caches" "~/.gradle/daemon" \
@@ -1636,6 +1743,7 @@ plan_rows() {
   ai_workspaces="$(sum_existing_kb "~/.gemini")"
   ai_models="$(sum_existing_kb "~/.lmstudio/models" "~/.lmstudio/extensions/backends" "~/.ollama/models" "~/.cache/huggingface/hub" "~/.cache/modelscope" "~/.cache/torch/hub" "~/.cache/whisper")"
   containers="$(sum_existing_kb "~/.colima" "~/.lima" "~/Library/Containers/com.docker.docker/Data/vms")"
+  user_trash="$(trash_total_kb)"
 
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$safe" "safe" "Default safe cleanup" "cleanroom clean" "cleanroom clean --apply --trash" "Rebuildable caches and old logs. Recommended first step."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$app" "app-caches" "Safe app cache folders" "cleanroom clean --include-app-caches" "cleanroom clean --apply --trash --include-app-caches" "Nested cache folders only; browser profiles and passwords stay protected."
@@ -1645,6 +1753,7 @@ plan_rows() {
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$ai_workspaces" "ai-workspaces" "Generated AI workspace state" "cleanroom clean --include-ai-workspaces" "cleanroom clean --apply --trash --include-ai-workspaces" "Generated recordings, scratch, brain, implicit data, and conversation caches where known."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$ai_models" "ai-models" "Downloaded local AI models" "cleanroom clean --include-ai-models" "cleanroom clean --apply --trash --include-ai-models" "Large model stores and backend extensions that may need to be downloaded again."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$containers" "containers" "Container VM disks" "cleanroom clean --include-containers" "cleanroom clean --apply --trash --include-containers" "High-impact opt-in cleanup that can remove local containers, images, and volumes."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$user_trash" "user-trash" "Current user Trash" "cleanroom trash" "cleanroom clean --include-user-trash --apply" "Already-deleted user Trash contents. Emptying Trash is explicit and irreversible."
 }
 
 plan() {
@@ -2056,6 +2165,7 @@ interactive() {
   ask_yes_no "Include AI-agent workspace cleanup?" && INCLUDE_AI_WORKSPACES=1
   ask_yes_no "Include downloaded AI model cleanup?" && INCLUDE_AI_MODELS=1
   ask_yes_no "Include container VM disk cleanup?" && INCLUDE_CONTAINERS=1
+  ask_yes_no "Empty current user Trash?" && INCLUDE_USER_TRASH=1
   clean
 }
 
@@ -2093,6 +2203,9 @@ Default safe cleanup:
   Local container VM disks for Colima/Lima/Docker Desktop. This can remove containers,
   images, and volumes.
 
+--include-user-trash:
+  Empty ~/.Trash. This is irreversible and intentionally not included in presets.
+
 --trash:
   Move cleanroom path removals to ~/.Trash/cleanroom-* during --apply runs.
   Commands delegated to system tools, such as snapshot thinning or simulator reset,
@@ -2126,6 +2239,7 @@ clean() {
   clean_ai_workspaces
   clean_ai_models
   clean_containers
+  clean_user_trash
   printf '\n%s\n' "${BOLD}After${RESET}"
   disk_line
   [[ "$APPLY" -eq 1 && "$TRASH" -eq 1 ]] && warn "Review ~/.Trash/cleanroom-$RUN_ID before emptying Trash."
@@ -2161,7 +2275,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  overview|scan|plan|large|duplicates|nodes|apps|startup|caches|packages|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
+  overview|scan|plan|large|duplicates|nodes|apps|startup|trash|caches|packages|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -2232,6 +2346,7 @@ while [[ "$#" -gt 0 ]]; do
     --include-package-stores) INCLUDE_PACKAGE_STORES=1 ;;
     --include-app-caches) INCLUDE_APP_CACHES=1 ;;
     --include-snapshots) INCLUDE_SNAPSHOTS=1 ;;
+    --include-user-trash) INCLUDE_USER_TRASH=1 ;;
     --include-ai-workspaces) INCLUDE_AI_WORKSPACES=1 ;;
     --include-ai-models) INCLUDE_AI_MODELS=1 ;;
     --include-containers) INCLUDE_CONTAINERS=1 ;;
@@ -2259,6 +2374,7 @@ case "$ACTION" in
   nodes) nodes ;;
   apps) apps ;;
   startup) startup ;;
+  trash) trash ;;
   caches) caches ;;
   packages) packages ;;
   snapshots) snapshots ;;

@@ -168,6 +168,13 @@ cleanroom startup
 cleanroom startup --json
 ```
 
+Review current Trash:
+
+```sh
+cleanroom trash
+cleanroom trash --json
+```
+
 Inventory safe and opt-in cache buckets:
 
 ```sh
@@ -299,6 +306,14 @@ Remove stale `node_modules` older than 45 days:
 cleanroom clean --apply --include-node-stale --days 45
 ```
 
+Empty current user Trash:
+
+```sh
+cleanroom trash
+cleanroom clean --include-user-trash
+cleanroom clean --include-user-trash --apply
+```
+
 Clean rebuildable package-manager stores:
 
 ```sh
@@ -404,6 +419,8 @@ Config files use simple `key=value` lines and are never executed as shell.
 `apps` lists `.app` bundle sizes from `/Applications` and `~/Applications`, or a path you provide. It never uninstalls apps.
 
 `startup` lists LaunchAgents and LaunchDaemons for review. It never unloads, disables, or removes startup items.
+
+`trash` inventories current `~/.Trash` contents. `--include-user-trash` empties Trash only when explicitly requested, and it is intentionally not included in presets.
 
 `packages` inventories npm, Yarn, pnpm, Gradle, CocoaPods, Cargo, and Homebrew stores with preview/apply commands for matching cleanup categories.
 

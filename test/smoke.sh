@@ -22,6 +22,7 @@ mkdir -p \
   "$TEST_HOME/Library/pnpm/store" \
   "$TEST_HOME/.cache" \
   "$TEST_HOME/.lmstudio/models" \
+  "$TEST_HOME/.Trash" \
   "$TEST_HOME/Applications/FakeBig.app/Contents/MacOS" \
   "$TEST_HOME/Downloads" \
   "$TEST_HOME/Documents/duplicates" \
@@ -34,6 +35,7 @@ printf 'model\n' >"$TEST_HOME/.lmstudio/models/example.gguf"
 printf 'login data\n' >"$TEST_HOME/Library/Application Support/Google/Chrome/Default/Login Data"
 printf 'browser cache\n' >"$TEST_HOME/Library/Application Support/Google/Chrome/Default/Cache/example.cache"
 printf 'keychain\n' >"$TEST_HOME/Library/Keychains/login.keychain-db"
+printf 'trashed\n' >"$TEST_HOME/.Trash/old-trash.txt"
 printf 'old dependency\n' >"$TEST_HOME/Documents/example/node_modules/package.txt"
 touch -t 202001010000 "$TEST_HOME/Documents/example/node_modules" "$TEST_HOME/Documents/example/node_modules/package.txt"
 cat >"$TEST_HOME/Library/LaunchAgents/com.example.cleanroom-test.plist" <<'PLIST'
@@ -113,6 +115,12 @@ python3 -m json.tool "$startup_json" >/dev/null
 grep 'com.example.cleanroom-test' "$startup_json" >/dev/null
 grep '"type":"LaunchAgent"' "$startup_json" >/dev/null
 rm -f "$startup_json"
+"$BIN" trash | grep 'old-trash.txt' >/dev/null
+trash_json="$(mktemp)"
+"$BIN" trash --json > "$trash_json"
+python3 -m json.tool "$trash_json" >/dev/null
+grep 'old-trash.txt' "$trash_json" >/dev/null
+rm -f "$trash_json"
 "$BIN" packages | grep 'pnpm-store' >/dev/null
 packages_json="$(mktemp)"
 "$BIN" packages --json > "$packages_json"
@@ -189,6 +197,20 @@ grep 'Dry-run mode' <<<"$deep_output" >/dev/null
 
 excluded_output="$("$BIN" clean --include-ai-models --exclude "$HOME/.lmstudio" 2>&1)"
 grep 'Dry-run mode' <<<"$excluded_output" >/dev/null
+
+trash_dry_output="$("$BIN" clean --include-user-trash 2>&1)"
+grep 'Dry-run mode' <<<"$trash_dry_output" >/dev/null
+grep '.Trash' <<<"$trash_dry_output" >/dev/null
+
+trash_log="$(mktemp)"
+rm -f "$trash_log"
+"$BIN" clean --include-user-trash --apply --yes --log "$trash_log" >/dev/null 2>&1
+grep 'empty-trash	ok' "$trash_log" >/dev/null
+test ! -e "$HOME/.Trash/old-trash.txt"
+rm -f "$trash_log"
+mkdir -p "$HOME/.npm/_cacache"
+printf 'cache again\n' >"$HOME/.npm/_cacache/example.cache"
+printf 'trashed again\n' >"$HOME/.Trash/old-trash.txt"
 
 apply_log="$(mktemp)"
 rm -f "$apply_log"
