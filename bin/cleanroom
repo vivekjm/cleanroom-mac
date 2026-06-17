@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.13.0"
+VERSION="0.14.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -44,6 +44,7 @@ Usage:
   cleanroom plan [--json]
   cleanroom large [PATH] [--min-mb N] [--limit N] [--json]
   cleanroom duplicates [PATH] [--min-mb N] [--limit N] [--json]
+  cleanroom apps [PATH] [--limit N] [--json]
   cleanroom report [--output PATH]
   cleanroom clean [options]
   cleanroom history [--limit N]
@@ -62,6 +63,7 @@ Actions:
   plan                 Rank safe cleanup opportunities and show copyable commands.
   large                List largest files for review without deleting anything.
   duplicates           Find exact duplicate files for review without deleting anything.
+  apps                 List largest app bundles for review without uninstalling.
   report               Write a Markdown cleanup report. Prints to stdout by default.
   clean                Clean safe rebuildable caches. Dry-run unless --apply is passed.
   history              List recent apply logs.
@@ -79,7 +81,7 @@ Options:
   --trash              Move deleted files to ~/.Trash/cleanroom-* instead of rm -rf.
   --yes                Do not prompt before --apply cleanup.
   --verbose            Print every path touched.
-  --json               Emit JSON for scan, plan, large, duplicates, protect, guard, or rules.
+  --json               Emit JSON for scan, plan, large, duplicates, apps, protect, guard, or rules.
   --output PATH        Output path for report.
   --log PATH           Write apply audit log here. Default: ~/.local/state/cleanroom/runs/*.log.
   --config PATH        Load config file. Default: ~/.config/cleanroom/config.
@@ -123,6 +125,8 @@ Examples:
   cleanroom large --json ~/Downloads
   cleanroom duplicates ~/Documents --min-mb 100
   cleanroom duplicates --json ~/Downloads
+  cleanroom apps
+  cleanroom apps --json /Applications
   cleanroom report --output cleanroom-report.md
   cleanroom doctor
   cleanroom protect
@@ -1075,6 +1079,64 @@ duplicates() {
   fi
 }
 
+app_roots() {
+  if [[ "${#PATH_ARGS[@]}" -gt 0 ]]; then
+    printf '%s\n' "$(expand_path "${PATH_ARGS[0]}")"
+  else
+    printf '%s\n' "/Applications"
+    printf '%s\n' "$HOME/Applications"
+  fi
+}
+
+app_rows() {
+  local root="$1"
+  [[ -d "$root" ]] || return 0
+  find "$root" -maxdepth 2 -type d -name '*.app' -prune -print0 2>/dev/null |
+    while IFS= read -r -d '' path; do
+      printf '%012d\t%s\t%s\n' "$(size_kb "$path")" "$(basename "$path" .app)" "$path"
+    done
+}
+
+apps() {
+  local rows
+  rows="$(
+    while IFS= read -r root; do
+      app_rows "$root"
+    done < <(app_roots) | sort -rn | head -n "$LIMIT"
+  )"
+
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '['
+    local first=1 kb kb_num name path
+    while IFS=$'\t' read -r kb name path; do
+      [[ -z "${path:-}" ]] && continue
+      kb_num="$(printf '%s\n' "$kb" | sed 's/^0*//; s/^$/0/')"
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '{"name":"%s","path":"%s","size_kb":%s,"size":"%s"}' \
+        "$(printf '%s' "$name" | json_escape)" \
+        "$(printf '%s' "$path" | json_escape)" \
+        "$kb_num" \
+        "$(human_kb "${kb:-0}" | json_escape)"
+    done <<<"$rows"
+    printf ']\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}cleanroom app bundles${RESET}"
+  printf 'Review-only list. cleanroom does not uninstall apps.\n'
+  printf 'Limit: %s\n\n' "$LIMIT"
+  if [[ -z "$rows" ]]; then
+    printf 'No app bundles found.\n'
+    return 0
+  fi
+  local kb name path
+  while IFS=$'\t' read -r kb name path; do
+    [[ -z "${path:-}" ]] && continue
+    printf '%8s  %s\n  %s\n' "$(human_kb "$kb")" "$name" "$path"
+  done <<<"$rows"
+}
+
 plan_rows() {
   local safe package app node dev ai_workspaces ai_models containers
   safe="$(sum_existing_kb \
@@ -1580,7 +1642,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  scan|plan|large|duplicates|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
+  scan|plan|large|duplicates|apps|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -1659,7 +1721,7 @@ while [[ "$#" -gt 0 ]]; do
     -h|--help) usage; exit 0 ;;
     -v|--version) echo "$VERSION"; exit 0 ;;
     *)
-      if [[ "$ACTION" == "guard" || "$ACTION" == "large" || "$ACTION" == "duplicates" ]]; then
+      if [[ "$ACTION" == "guard" || "$ACTION" == "large" || "$ACTION" == "duplicates" || "$ACTION" == "apps" ]]; then
         PATH_ARGS+=("$1")
       else
         die "Unknown option: $1"
@@ -1674,6 +1736,7 @@ case "$ACTION" in
   plan) plan ;;
   large) large ;;
   duplicates) duplicates ;;
+  apps) apps ;;
   report) report ;;
   clean) clean ;;
   history) history ;;

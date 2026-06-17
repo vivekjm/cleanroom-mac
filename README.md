@@ -138,6 +138,14 @@ cleanroom duplicates ~/Documents --min-mb 100 --limit 20
 cleanroom duplicates --json ~/Downloads
 ```
 
+List large installed apps for manual review:
+
+```sh
+cleanroom apps
+cleanroom apps --json /Applications
+cleanroom apps ~/Applications --limit 20
+```
+
 Machine-readable scan:
 
 ```sh
@@ -340,6 +348,8 @@ Config files use simple `key=value` lines and are never executed as shell.
 `large` lists large files for review and never deletes them. Use it when macOS reports high Documents storage and you need to find videos, archives, disk images, datasets, or project artifacts manually.
 
 `duplicates` hashes files above `--min-mb`, groups exact matches, estimates possible reclaim, and never deletes anything.
+
+`apps` lists `.app` bundle sizes from `/Applications` and `~/Applications`, or a path you provide. It never uninstalls apps.
 
 The project also ships `make install`, `make uninstall`, `make lint`, `make test`, `make package`, `make homebrew-formula`, and `make macos-app` targets for maintainers and package managers.
 

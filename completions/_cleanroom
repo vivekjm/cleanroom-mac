@@ -8,6 +8,7 @@ _cleanroom() {
     'plan:Rank cleanup opportunities'
     'large:List large files for review'
     'duplicates:Find exact duplicate files for review'
+    'apps:List large app bundles for review'
     'report:Write a Markdown cleanup report'
     'clean:Preview or apply cleanup'
     'history:List recent apply logs'

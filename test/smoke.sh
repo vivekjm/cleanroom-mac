@@ -20,6 +20,7 @@ mkdir -p \
   "$TEST_HOME/.npm/_cacache" \
   "$TEST_HOME/.cache" \
   "$TEST_HOME/.lmstudio/models" \
+  "$TEST_HOME/Applications/FakeBig.app/Contents/MacOS" \
   "$TEST_HOME/Downloads" \
   "$TEST_HOME/Documents/duplicates" \
   "$TEST_HOME/Documents/example/node_modules"
@@ -33,6 +34,7 @@ printf 'keychain\n' >"$TEST_HOME/Library/Keychains/login.keychain-db"
 dd if=/dev/zero of="$TEST_HOME/Downloads/big-test.bin" bs=1024 count=2048 >/dev/null 2>&1
 dd if=/dev/zero of="$TEST_HOME/Documents/duplicates/copy-a.bin" bs=1024 count=2048 >/dev/null 2>&1
 cp "$TEST_HOME/Documents/duplicates/copy-a.bin" "$TEST_HOME/Documents/duplicates/copy-b.bin"
+dd if=/dev/zero of="$TEST_HOME/Applications/FakeBig.app/Contents/MacOS/fake" bs=1024 count=2048 >/dev/null 2>&1
 export HOME="$TEST_HOME"
 
 bash -n "$BIN"
@@ -67,6 +69,12 @@ python3 -m json.tool "$duplicates_json" >/dev/null
 grep 'potential_reclaim_kb' "$duplicates_json" >/dev/null
 grep 'copy-b.bin' "$duplicates_json" >/dev/null
 rm -f "$duplicates_json"
+"$BIN" apps "$HOME/Applications" --limit 5 | grep 'FakeBig' >/dev/null
+apps_json="$(mktemp)"
+"$BIN" apps --json "$HOME/Applications" --limit 5 > "$apps_json"
+python3 -m json.tool "$apps_json" >/dev/null
+grep 'FakeBig' "$apps_json" >/dev/null
+rm -f "$apps_json"
 "$BIN" doctor | grep 'cleanroom doctor' >/dev/null
 "$BIN" doctor | grep 'cleanroom protect' >/dev/null
 "$BIN" protect | grep 'chrome-login-data' >/dev/null
