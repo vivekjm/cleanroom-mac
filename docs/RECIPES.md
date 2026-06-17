@@ -16,6 +16,7 @@ cleanroom nodes
 cleanroom apps
 cleanroom browsers
 cleanroom leftovers adobe
+cleanroom backups
 cleanroom startup
 cleanroom trash
 cleanroom caches
@@ -46,6 +47,7 @@ cleanroom nodes --json ~/Documents
 cleanroom apps --json
 cleanroom browsers --json
 cleanroom leftovers adobe --json
+cleanroom backups --json
 cleanroom startup --json
 cleanroom trash --json
 cleanroom caches --json
@@ -79,6 +81,8 @@ cleanroom report --output cleanroom-report.md
 `browsers --json` emits browser profile size, cache size, protected status, and matching preview/apply commands. It is intentionally review-only and does not delete profiles, passwords, cookies, bookmarks, or sessions.
 
 `leftovers --json QUERY...` emits matching app support, cache, preference, container, WebKit, log, and launch-item paths for manual review. It is intentionally review-only and does not delete anything.
+
+`backups --json` emits local iPhone and iPad backup sizes and device metadata when available. It is intentionally review-only and protected.
 
 `startup --json` emits LaunchAgents and LaunchDaemons with scope, type, status, label, program, and path. It is intentionally review-only and does not unload, disable, or remove anything.
 
@@ -182,6 +186,16 @@ cleanroom clean --apply --trash --include-app-caches
 ```
 
 Use this when browser storage is large but you need profiles, passwords, bookmarks, cookies, and sessions preserved. `browsers` shows both protected profile size and cache size; the cleanup command only targets known cache folders.
+
+## Device Backups
+
+```sh
+cleanroom backups
+cleanroom backups --json
+cleanroom guard ~/Library/Application\ Support/MobileSync/Backup
+```
+
+Use this when System Data is large and you suspect local iPhone or iPad backups. cleanroom treats MobileSync backups as protected personal data and does not delete them.
 
 ## Slow Startup / Background Items
 

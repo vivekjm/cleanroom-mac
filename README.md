@@ -18,6 +18,7 @@ macOS Storage often labels hidden user folders as **Documents** or **System Data
 - browser profile and cache footprint
 - app leftovers after manual uninstalls
 - old downloaded installer files
+- local iPhone and iPad backups
 
 `cleanroom` makes those visible and gives you a cautious way to clean them.
 
@@ -192,6 +193,13 @@ Find app leftovers by app or vendor name:
 ```sh
 cleanroom leftovers adobe
 cleanroom leftovers zoom --json
+```
+
+Review local iPhone/iPad backups:
+
+```sh
+cleanroom backups
+cleanroom backups --json
 ```
 
 Review startup and background launch items:
@@ -466,6 +474,8 @@ Config files use simple `key=value` lines and are never executed as shell.
 `browsers` separates safe browser cache candidates from protected profile storage. It reports Chrome, Brave, Edge, Arc, Firefox, and Safari profile sizes, but cleanup commands still remove only cache folders and never profiles, passwords, cookies, bookmarks, or sessions.
 
 `leftovers` searches common support, cache, preference, container, WebKit, log, and launch-item locations for an app or vendor name. It is review-only and never deletes matches, because complete app removal can require vendor uninstallers and account-specific cleanup.
+
+`backups` inventories local iPhone and iPad backups under MobileSync. It is review-only and protected because those backups may be the only copy of device data.
 
 `startup` lists LaunchAgents and LaunchDaemons for review. It never unloads, disables, or removes startup items.
 

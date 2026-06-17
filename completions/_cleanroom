@@ -15,6 +15,7 @@ _cleanroom() {
     'apps:List large app bundles for review'
     'browsers:Inventory browser profile and cache footprint'
     'leftovers:Find app leftovers by search term'
+    'backups:Inventory local iPhone/iPad backups'
     'startup:List LaunchAgents and LaunchDaemons'
     'trash:Inventory current user Trash'
     'caches:Inventory cache buckets'

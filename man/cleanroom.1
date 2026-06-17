@@ -1,4 +1,4 @@
-.TH CLEANROOM 1 "June 2026" "cleanroom 0.26.0" "User Commands"
+.TH CLEANROOM 1 "June 2026" "cleanroom 0.27.0" "User Commands"
 .SH NAME
 cleanroom \- safe-by-default macOS storage cleaner
 .SH SYNOPSIS
@@ -34,6 +34,9 @@ cleanroom \- safe-by-default macOS storage cleaner
 .br
 .B cleanroom
 .RI "leftovers query... [--limit n] [--json]"
+.br
+.B cleanroom
+.RI "backups [--json]"
 .br
 .B cleanroom
 .RI "startup [--json]"
@@ -121,6 +124,9 @@ passwords, cookies, bookmarks, sessions, or settings.
 .B leftovers
 Find app or vendor leftovers in common support, cache, preference, container,
 WebKit, log, and launch-item locations for manual review.
+.TP
+.B backups
+Inventory local iPhone and iPad backups for review without deleting them.
 .TP
 .B startup
 List LaunchAgents and LaunchDaemons for review without unloading or removing anything.
@@ -233,6 +239,7 @@ cleanroom nodes ~/Documents --days 45 --limit 30
 cleanroom apps --limit 30
 cleanroom browsers --json
 cleanroom leftovers adobe --limit 50
+cleanroom backups --json
 cleanroom startup --json
 cleanroom trash --json
 cleanroom caches --json

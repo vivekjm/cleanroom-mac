@@ -81,6 +81,7 @@ final class CleanroomAppDelegate: NSObject, NSApplicationDelegate {
         inspectRow.addArrangedSubview(button("Report to Desktop", action: #selector(report)))
         inspectRow.addArrangedSubview(button("History", action: #selector(history)))
         inspectRow.addArrangedSubview(button("Protected Data", action: #selector(protect)))
+        inspectRow.addArrangedSubview(button("Backups", action: #selector(backups)))
         inspectRow.addArrangedSubview(button("Startup Items", action: #selector(startup)))
         inspectRow.addArrangedSubview(button("Trash", action: #selector(trash)))
         inspectRow.addArrangedSubview(button("Guard Chrome", action: #selector(guardChrome)))
@@ -246,6 +247,10 @@ final class CleanroomAppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func protect() {
         runCommand("protect", title: "Protected Data")
+    }
+
+    @objc private func backups() {
+        runCommand("backups", title: "Backups")
     }
 
     @objc private func startup() {

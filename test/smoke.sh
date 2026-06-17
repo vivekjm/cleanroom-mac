@@ -15,6 +15,7 @@ mkdir -p \
   "$TEST_HOME/Library/LaunchAgents" \
   "$TEST_HOME/Library/Logs" \
   "$TEST_HOME/Library/Developer/Xcode/DerivedData" \
+  "$TEST_HOME/Library/Application Support/MobileSync/Backup/FakeDeviceBackup" \
   "$TEST_HOME/Library/Application Support/Google/Chrome/Default" \
   "$TEST_HOME/Library/Application Support/Google/Chrome/Default/Cache" \
   "$TEST_HOME/Library/Application Support/CleanroomTestAdobe/Creative Cloud" \
@@ -56,6 +57,21 @@ cat >"$TEST_HOME/Library/LaunchAgents/com.example.cleanroom-test.plist" <<'PLIST
 </dict>
 </plist>
 PLIST
+cat >"$TEST_HOME/Library/Application Support/MobileSync/Backup/FakeDeviceBackup/Info.plist" <<'PLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "https://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Device Name</key>
+  <string>Vivek Test iPhone</string>
+  <key>Product Name</key>
+  <string>iPhone</string>
+  <key>Last Backup Date</key>
+  <date>2026-06-01T10:00:00Z</date>
+</dict>
+</plist>
+PLIST
+dd if=/dev/zero of="$TEST_HOME/Library/Application Support/MobileSync/Backup/FakeDeviceBackup/Manifest.db" bs=1024 count=1024 >/dev/null 2>&1
 dd if=/dev/zero of="$TEST_HOME/Downloads/big-test.bin" bs=1024 count=2048 >/dev/null 2>&1
 dd if=/dev/zero of="$TEST_HOME/Downloads/old-installer.dmg" bs=1024 count=1024 >/dev/null 2>&1
 touch -t 202001010000 "$TEST_HOME/Downloads/old-installer.dmg"
@@ -149,6 +165,13 @@ grep '"queries"' "$leftovers_json" >/dev/null
 grep 'com.cleanroomtestadobe.acc' "$leftovers_json" >/dev/null
 grep '"category":"preferences"' "$leftovers_json" >/dev/null
 rm -f "$leftovers_json"
+"$BIN" backups | grep 'Vivek Test iPhone' >/dev/null
+backups_json="$(mktemp)"
+"$BIN" backups --json > "$backups_json"
+python3 -m json.tool "$backups_json" >/dev/null
+grep 'Vivek Test iPhone' "$backups_json" >/dev/null
+grep '"protected":true' "$backups_json" >/dev/null
+rm -f "$backups_json"
 "$BIN" startup | grep 'com.example.cleanroom-test' >/dev/null
 startup_json="$(mktemp)"
 "$BIN" startup --json > "$startup_json"
@@ -200,11 +223,13 @@ rm -f "$protect_json"
 "$BIN" guard "$HOME/Library/Application Support/Google/Chrome/Default" | grep 'refused-protected' >/dev/null
 "$BIN" guard "$HOME/Library/Application Support/Google/Chrome/Default/Login Data" | grep 'refused-protected' >/dev/null
 "$BIN" guard "$HOME/Library/Application Support/Google/Chrome/Default/Cache" | grep 'allowed' >/dev/null
+"$BIN" guard "$HOME/Library/Application Support/MobileSync/Backup" | grep 'refused-protected' >/dev/null
 guard_json="$(mktemp)"
-"$BIN" guard --json "$HOME/Library/Application Support/Google/Chrome" "$HOME/Library/Application Support/Google/Chrome/Default/Cache" > "$guard_json"
+"$BIN" guard --json "$HOME/Library/Application Support/Google/Chrome" "$HOME/Library/Application Support/Google/Chrome/Default/Cache" "$HOME/Library/Application Support/MobileSync/Backup" > "$guard_json"
 python3 -m json.tool "$guard_json" >/dev/null
 grep '"status":"refused-protected"' "$guard_json" >/dev/null
 grep '"status":"allowed"' "$guard_json" >/dev/null
+grep 'MobileSync' "$guard_json" >/dev/null
 rm -f "$guard_json"
 "$BIN" history 2>&1 | grep 'No cleanroom history found' >/dev/null
 

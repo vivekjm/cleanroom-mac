@@ -12,3 +12,4 @@ mail	mail	~/Library/Mail	Contains local Mail data and account state.
 icloud-drive	cloud-documents	~/Library/Mobile Documents	Contains iCloud Drive and app cloud document state.
 messages	messages	~/Library/Messages	Contains Messages chats, attachments, and account state.
 contacts	contacts	~/Library/Application Support/AddressBook	Contains Contacts database and related state.
+mobile-device-backups	backups	~/Library/Application Support/MobileSync/Backup	Contains local iPhone and iPad backups that may be the only copy of device data.

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.26.0"
+VERSION="0.27.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -53,6 +53,7 @@ Usage:
   cleanroom apps [PATH] [--limit N] [--json]
   cleanroom browsers [--json]
   cleanroom leftovers QUERY... [--limit N] [--json]
+  cleanroom backups [--json]
   cleanroom startup [--json]
   cleanroom trash [--json]
   cleanroom caches [--json]
@@ -83,6 +84,7 @@ Actions:
   apps                 List largest app bundles for review without uninstalling.
   browsers             Inventory browser profile and cache footprint.
   leftovers            Find app leftovers by search term for manual review.
+  backups              Inventory local iPhone/iPad backups for review.
   startup              List LaunchAgents and LaunchDaemons for review.
   trash                Inventory current user Trash contents.
   caches               Inventory safe and opt-in cache buckets.
@@ -107,7 +109,7 @@ Options:
   --verbose            Print every path touched.
   --json               Emit JSON for overview, scan, plan, large, duplicates, downloads,
                        installers, nodes, apps, browsers, leftovers, startup, trash,
-                       caches, packages, snapshots, doctor, protect, guard, or rules.
+                       backups, caches, packages, snapshots, doctor, protect, guard, or rules.
   --output PATH        Output path for report.
   --log PATH           Write apply audit log here. Default: ~/.local/state/cleanroom/runs/*.log.
   --config PATH        Load config file. Default: ~/.config/cleanroom/config.
@@ -170,6 +172,8 @@ Examples:
   cleanroom browsers --json
   cleanroom leftovers adobe
   cleanroom leftovers zoom --json
+  cleanroom backups
+  cleanroom backups --json
   cleanroom startup
   cleanroom startup --json
   cleanroom trash
@@ -1045,7 +1049,7 @@ large_rows() {
       printf '%012d\t%s\n' "$(size_kb "$path")" "$path"
     done |
     sort -rn |
-    head -n "$LIMIT"
+    head -n "$LIMIT" || true
 }
 
 large() {
@@ -1125,7 +1129,7 @@ downloads_rows() {
       printf '%012d\t%s\t%s\t%s\n' "$kb" "$epoch" "$age_days" "$path"
     done |
     sort -rn |
-    head -n "$LIMIT"
+    head -n "$LIMIT" || true
 }
 
 downloads() {
@@ -1700,6 +1704,76 @@ leftovers() {
     printf '%-10s %-20s %-16s %s\n' "$(human_kb "$kb")" "$category" "$matched" "$path"
   done <<<"$rows"
   printf '\nReview matches manually. Vendor uninstallers or app settings may be required for complete removal.\n'
+}
+
+backup_value() {
+  local file="$1"
+  local key="$2"
+  [[ -f "$file" ]] || { printf '\n'; return 0; }
+  plutil -extract "$key" raw -o - "$file" 2>/dev/null || true
+}
+
+backup_rows() {
+  local root="$HOME/Library/Application Support/MobileSync/Backup"
+  [[ -d "$root" ]] || return 0
+  local path info kb epoch device product last_backup
+  while IFS= read -r -d '' path; do
+    info="$path/Info.plist"
+    kb="$(size_kb "$path")"
+    epoch="$(path_mtime_epoch "$path")"
+    device="$(backup_value "$info" "Device Name")"
+    product="$(backup_value "$info" "Product Name")"
+    last_backup="$(backup_value "$info" "Last Backup Date")"
+    [[ -n "$device" ]] || device="$(basename "$path")"
+    printf '%012d\t%s\t%s\t%s\t%s\t%s\n' "$kb" "$epoch" "$device" "$product" "$last_backup" "$path"
+  done < <(find "$root" -mindepth 1 -maxdepth 1 -type d -print0 2>/dev/null) |
+    sort -rn |
+    head -n "$LIMIT"
+  return 0
+}
+
+backups() {
+  local rows root
+  root="$HOME/Library/Application Support/MobileSync/Backup"
+  rows="$(backup_rows)"
+
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '['
+    local first=1 kb epoch device product last_backup path kb_num
+    while IFS=$'\t' read -r kb epoch device product last_backup path; do
+      [[ -z "${path:-}" ]] && continue
+      kb_num="$(printf '%s\n' "$kb" | sed 's/^0*//; s/^$/0/')"
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '{"path":"%s","device_name":"%s","product_name":"%s","last_backup":"%s","size_kb":%s,"size":"%s","modified_epoch":%s,"modified":"%s","protected":true}' \
+        "$(printf '%s' "$path" | json_escape)" \
+        "$(printf '%s' "$device" | json_escape)" \
+        "$(printf '%s' "$product" | json_escape)" \
+        "$(printf '%s' "$last_backup" | json_escape)" \
+        "$kb_num" \
+        "$(human_kb "${kb:-0}" | json_escape)" \
+        "${epoch:-0}" \
+        "$(file_mtime_iso "${epoch:-0}" | json_escape)"
+    done <<<"$rows"
+    printf ']\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}cleanroom local iPhone/iPad backups${RESET}"
+  printf 'Review-only inventory. cleanroom does not delete local device backups.\n'
+  printf 'Path: %s\n\n' "$root"
+  if [[ -z "$rows" ]]; then
+    printf 'No local MobileSync backups found.\n'
+    return 0
+  fi
+  printf '%-10s %-12s %-24s %-20s %s\n' "size" "modified" "device" "product" "path"
+  local kb epoch device product last_backup path
+  while IFS=$'\t' read -r kb epoch device product last_backup path; do
+    [[ -z "${path:-}" ]] && continue
+    printf '%-10s %-12s %-24s %-20s %s\n' "$(human_kb "$kb")" "$(file_mtime_iso "${epoch:-0}")" "$device" "$product" "$path"
+    [[ -n "$last_backup" ]] && printf '  last backup: %s\n' "$last_backup"
+  done <<<"$rows"
+  printf '\nManage these through Finder or Apple Devices after confirming you have another backup.\n'
 }
 
 plist_value() {
@@ -2504,6 +2578,7 @@ doctor() {
     "$HOME/Library/Application Support/Google/Chrome"
     "$HOME/Library/Mail"
     "$HOME/Library/Mobile Documents"
+    "$HOME/Library/Application Support/MobileSync/Backup"
     "$HOME/Pictures/Photos Library.photoslibrary"
   )
   local p
@@ -2691,7 +2766,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  overview|scan|plan|large|duplicates|downloads|installers|nodes|apps|browsers|leftovers|startup|trash|caches|packages|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
+  overview|scan|plan|large|duplicates|downloads|installers|nodes|apps|browsers|leftovers|backups|startup|trash|caches|packages|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -2794,6 +2869,7 @@ case "$ACTION" in
   apps) apps ;;
   browsers) browsers ;;
   leftovers) leftovers ;;
+  backups) backups ;;
   startup) startup ;;
   trash) trash ;;
   caches) caches ;;
