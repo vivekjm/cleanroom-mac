@@ -39,6 +39,10 @@ mkdir -p \
   "$TEST_HOME/Library/Caches/com.cleanroomtestadobe.acc" \
   "$TEST_HOME/Library/Preferences" \
   "$TEST_HOME/Library/Keychains" \
+  "$TEST_HOME/Library/Mobile Documents" \
+  "$TEST_HOME/Library/CloudStorage/Dropbox-Test" \
+  "$TEST_HOME/Dropbox" \
+  "$TEST_HOME/Sync" \
   "$TEST_HOME/Pictures/Photos Library.photoslibrary" \
   "$TEST_HOME/Music/Music Library.musiclibrary" \
   "$TEST_HOME/Movies/iMovie Library.imovielibrary" \
@@ -94,6 +98,10 @@ printf 'adobe support\n' >"$TEST_HOME/Library/Application Support/CleanroomTestA
 printf 'adobe cache\n' >"$TEST_HOME/Library/Caches/com.cleanroomtestadobe.acc/cache.bin"
 printf 'adobe prefs\n' >"$TEST_HOME/Library/Preferences/com.cleanroomtestadobe.acc.plist"
 printf 'keychain\n' >"$TEST_HOME/Library/Keychains/login.keychain-db"
+printf 'icloud doc\n' >"$TEST_HOME/Library/Mobile Documents/document.txt"
+printf 'cloudstorage doc\n' >"$TEST_HOME/Library/CloudStorage/Dropbox-Test/document.txt"
+printf 'dropbox doc\n' >"$TEST_HOME/Dropbox/document.txt"
+printf 'sync doc\n' >"$TEST_HOME/Sync/document.txt"
 printf 'photo library\n' >"$TEST_HOME/Pictures/Photos Library.photoslibrary/database"
 printf 'music library\n' >"$TEST_HOME/Music/Music Library.musiclibrary/Library.musicdb"
 printf 'imovie library\n' >"$TEST_HOME/Movies/iMovie Library.imovielibrary/CurrentVersion.flexolibrary"
@@ -166,6 +174,7 @@ system_data_json="$(mktemp)"
 python3 -m json.tool "$system_data_json" >/dev/null
 grep 'mobile-backups' "$system_data_json" >/dev/null
 grep 'media-libraries' "$system_data_json" >/dev/null
+grep 'cloud-sync' "$system_data_json" >/dev/null
 grep '"category":"protected"' "$system_data_json" >/dev/null
 grep 'cleanroom containers' "$system_data_json" >/dev/null
 rm -f "$system_data_json"
@@ -177,6 +186,7 @@ grep 'ai-models' "$rules_json" >/dev/null
 grep 'old-diagnostics' "$rules_json" >/dev/null
 grep 'toolchain-caches' "$rules_json" >/dev/null
 grep 'stale-python-virtualenvs' "$rules_json" >/dev/null
+grep 'cloud-inventory' "$rules_json" >/dev/null
 rm -f "$rules_json"
 "$BIN" plan | grep 'cleanroom plan' >/dev/null
 plan_json="$(mktemp)"
@@ -243,6 +253,13 @@ python3 -m json.tool "$libraries_json" >/dev/null
 grep 'iMovie Library' "$libraries_json" >/dev/null
 grep '"protected":true' "$libraries_json" >/dev/null
 rm -f "$libraries_json"
+"$BIN" cloud | grep 'iCloud Drive' >/dev/null
+cloud_json="$(mktemp)"
+"$BIN" cloud --json > "$cloud_json"
+python3 -m json.tool "$cloud_json" >/dev/null
+grep 'cloudstorage' "$cloud_json" >/dev/null
+grep '"protected":true' "$cloud_json" >/dev/null
+rm -f "$cloud_json"
 "$BIN" browsers | grep 'Google Chrome' >/dev/null
 "$BIN" browsers | grep 'protected' >/dev/null
 browsers_json="$(mktemp)"
@@ -383,18 +400,21 @@ python3 -m json.tool "$protect_json" >/dev/null
 grep '"status":"present"' "$protect_json" >/dev/null
 grep 'chrome-login-data' "$protect_json" >/dev/null
 grep 'imovie-library' "$protect_json" >/dev/null
+grep 'cloudstorage' "$protect_json" >/dev/null
 rm -f "$protect_json"
 "$BIN" guard "$HOME/Library/Application Support/Google/Chrome" | grep 'refused-protected' >/dev/null
 "$BIN" guard "$HOME/Library/Application Support/Google/Chrome/Default" | grep 'refused-protected' >/dev/null
 "$BIN" guard "$HOME/Library/Application Support/Google/Chrome/Default/Login Data" | grep 'refused-protected' >/dev/null
 "$BIN" guard "$HOME/Library/Application Support/Google/Chrome/Default/Cache" | grep 'allowed' >/dev/null
 "$BIN" guard "$HOME/Library/Application Support/MobileSync/Backup" | grep 'refused-protected' >/dev/null
+"$BIN" guard "$HOME/Library/CloudStorage" | grep 'refused-protected' >/dev/null
 guard_json="$(mktemp)"
-"$BIN" guard --json "$HOME/Library/Application Support/Google/Chrome" "$HOME/Library/Application Support/Google/Chrome/Default/Cache" "$HOME/Library/Application Support/MobileSync/Backup" > "$guard_json"
+"$BIN" guard --json "$HOME/Library/Application Support/Google/Chrome" "$HOME/Library/Application Support/Google/Chrome/Default/Cache" "$HOME/Library/Application Support/MobileSync/Backup" "$HOME/Library/CloudStorage" > "$guard_json"
 python3 -m json.tool "$guard_json" >/dev/null
 grep '"status":"refused-protected"' "$guard_json" >/dev/null
 grep '"status":"allowed"' "$guard_json" >/dev/null
 grep 'MobileSync' "$guard_json" >/dev/null
+grep 'CloudStorage' "$guard_json" >/dev/null
 rm -f "$guard_json"
 "$BIN" history 2>&1 | grep 'No cleanroom history found' >/dev/null
 

@@ -17,6 +17,7 @@ cleanroom nodes
 cleanroom venvs
 cleanroom apps
 cleanroom libraries
+cleanroom cloud
 cleanroom browsers
 cleanroom leftovers adobe
 cleanroom backups
@@ -56,6 +57,7 @@ cleanroom nodes --json ~/Documents
 cleanroom venvs --json ~/Documents
 cleanroom apps --json
 cleanroom libraries --json
+cleanroom cloud --json
 cleanroom browsers --json
 cleanroom leftovers adobe --json
 cleanroom backups --json
@@ -99,6 +101,8 @@ cleanroom report --output cleanroom-report.md
 `apps --json [PATH]` emits app bundle sizes for `/Applications`, `~/Applications`, or a provided path. It is intentionally review-only and does not uninstall anything.
 
 `libraries --json` emits protected Photos, Music, TV, iMovie, GarageBand, Logic, and related creative library sizes. It is intentionally review-only and does not delete personal media or projects.
+
+`cloud --json` emits protected iCloud Drive, File Provider CloudStorage, Dropbox, Google Drive, OneDrive, Box, and Sync sizes. It is intentionally review-only and does not delete synced data.
 
 `browsers --json` emits browser profile size, cache size, protected status, and matching preview/apply commands. It is intentionally review-only and does not delete profiles, passwords, cookies, bookmarks, or sessions.
 
@@ -210,9 +214,10 @@ cleanroom installers --days 30 --limit 50
 cleanroom nodes ~/Documents --days 45 --limit 30
 cleanroom venvs ~/Documents --days 45 --limit 30
 cleanroom libraries
+cleanroom cloud
 ```
 
-Use this when macOS Storage reports a large Documents category. Review the output manually; cleanroom will not delete arbitrary personal files or protected media libraries.
+Use this when macOS Storage reports a large Documents category. Review the output manually; cleanroom will not delete arbitrary personal files, protected media libraries, or cloud-sync folders.
 
 ## Old Installers
 

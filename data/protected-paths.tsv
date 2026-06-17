@@ -19,6 +19,12 @@ logic-library	media-library	~/Music/Logic	Contains Logic projects, recordings, a
 audio-music-apps	media-library	~/Music/Audio Music Apps	Contains loops, plug-ins, presets, and audio assets.
 mail	mail	~/Library/Mail	Contains local Mail data and account state.
 icloud-drive	cloud-documents	~/Library/Mobile Documents	Contains iCloud Drive and app cloud document state.
+cloudstorage	cloud-documents	~/Library/CloudStorage	Contains modern File Provider cloud roots such as Dropbox, Google Drive, OneDrive, Box, and similar synced folders.
+dropbox-home	cloud-documents	~/Dropbox	Contains Dropbox synced files; local deletes may sync remotely.
+google-drive-home	cloud-documents	~/Google Drive	Contains legacy Google Drive synced files; local deletes may sync remotely.
+onedrive-home	cloud-documents	~/OneDrive	Contains OneDrive synced files; local deletes may sync remotely.
+box-home	cloud-documents	~/Box	Contains Box synced files; local deletes may sync remotely.
+syncthing-home	cloud-documents	~/Sync	Contains commonly used Syncthing synced files; local deletes may sync to peers.
 messages	messages	~/Library/Messages	Contains Messages chats, attachments, and account state.
 contacts	contacts	~/Library/Application Support/AddressBook	Contains Contacts database and related state.
 mobile-device-backups	backups	~/Library/Application Support/MobileSync/Backup	Contains local iPhone and iPad backups that may be the only copy of device data.

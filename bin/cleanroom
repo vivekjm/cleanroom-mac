@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.36.0"
+VERSION="0.37.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -57,6 +57,7 @@ Usage:
   cleanroom venvs [PATH] [--days N] [--limit N] [--json]
   cleanroom apps [PATH] [--limit N] [--json]
   cleanroom libraries [--json]
+  cleanroom cloud [--json]
   cleanroom browsers [--json]
   cleanroom leftovers QUERY... [--limit N] [--json] [--apply --trash]
   cleanroom backups [--json]
@@ -96,6 +97,7 @@ Actions:
   venvs                List stale Python virtualenv folders for review.
   apps                 List largest app bundles for review without uninstalling.
   libraries            Inventory protected media and creative libraries.
+  cloud                Inventory protected cloud-sync storage locations.
   browsers             Inventory browser profile and cache footprint.
   leftovers            Find app leftovers by search term. Apply requires --trash.
   backups              Inventory local iPhone/iPad backups for review.
@@ -127,7 +129,7 @@ Options:
   --yes                Do not prompt before --apply cleanup.
   --verbose            Print every path touched.
   --json               Emit JSON for overview, scan, system-data, plan, large, duplicates,
-                       downloads, installers, nodes, venvs, apps, libraries, browsers, leftovers, startup,
+                       downloads, installers, nodes, venvs, apps, libraries, cloud, browsers, leftovers, startup,
                        trash, backups, xcode, caches, diagnostics, packages, homebrew, toolchains,
                        containers, snapshots, doctor, protect, guard, or rules.
   --output PATH        Output path for report.
@@ -172,7 +174,7 @@ Options:
 
 Safety:
   cleanroom does NOT delete browser profiles, password databases, Keychains, Photos libraries,
-  Mail, iCloud Drive, or app profile folders by default.
+  Mail, cloud-sync folders, iCloud Drive, or app profile folders by default.
 
 Examples:
   cleanroom overview
@@ -203,6 +205,8 @@ Examples:
   cleanroom apps --json /Applications
   cleanroom libraries
   cleanroom libraries --json
+  cleanroom cloud
+  cleanroom cloud --json
   cleanroom browsers
   cleanroom browsers --json
   cleanroom leftovers adobe
@@ -1197,6 +1201,7 @@ system_data_rows() {
   printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "diagnostics" "Logs and Diagnostics" "~/Library/Logs; ~/Library/DiagnosticReports; ~/Library/Application Support/CrashReporter" "low-risk" "cleanroom diagnostics" "cleanroom clean --apply --trash --include-diagnostics --days $DAYS" "User logs, diagnostic reports, and crash reports."
   printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "mobile-backups" "Device Backups" "~/Library/Application Support/MobileSync/Backup" "protected" "cleanroom backups" "manual review" "Local iPhone and iPad backups are protected because they may be the only copy of device data."
   printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "media-libraries" "Media Libraries" "~/Pictures/Photos Library.photoslibrary; ~/Music/Music Library.musiclibrary; ~/Music/iTunes; ~/Movies/TV Library.tvlibrary; ~/Movies/iMovie Library.imovielibrary; ~/Music/GarageBand" "protected" "cleanroom libraries" "manual review" "Photos, Music, TV, iMovie, and GarageBand libraries are protected personal media."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "cloud-sync" "Cloud Sync Storage" "~/Library/Mobile Documents; ~/Library/CloudStorage; ~/Dropbox; ~/Google Drive; ~/OneDrive; ~/Box" "protected" "cleanroom cloud" "manual review" "Cloud-synced folders can remove files remotely if changed locally, so cleanroom only inventories them."
   printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "group-containers" "Group Containers" "~/Library/Group Containers" "review" "cleanroom leftovers APPNAME" "manual review" "Shared app containers can hold account data and should be reviewed by app or vendor."
   printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "http-storages" "HTTPStorages" "~/Library/HTTPStorages" "review" "cleanroom leftovers APPNAME" "manual review" "Per-app HTTP storage and cookies. Review carefully; cleanroom does not remove this wholesale."
   printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "saved-state" "Saved Application State" "~/Library/Saved Application State" "review" "cleanroom leftovers APPNAME" "manual review" "Window/session state for apps. Usually small, but useful when investigating leftovers."
@@ -2117,6 +2122,58 @@ libraries() {
   printf '\nUse this to explain large Documents/Media storage. Manage libraries in their owning apps or after verified backups.\n'
 }
 
+cloud_rows() {
+  printf '%s\t%s\t%s\t%s\t%s\n' "icloud-drive" "iCloud Drive" "icloud" "~/Library/Mobile Documents" "Manage through Finder/iCloud settings. Local deletions can affect iCloud data."
+  printf '%s\t%s\t%s\t%s\t%s\n' "cloudstorage" "File Provider CloudStorage" "file-provider" "~/Library/CloudStorage" "Modern Dropbox, Google Drive, OneDrive, Box, and provider roots often live here."
+  printf '%s\t%s\t%s\t%s\t%s\n' "dropbox-home" "Dropbox" "dropbox" "~/Dropbox" "Legacy Dropbox folder. Review sync settings before changing files."
+  printf '%s\t%s\t%s\t%s\t%s\n' "google-drive-home" "Google Drive" "google-drive" "~/Google Drive" "Legacy Google Drive folder. Review Drive for desktop settings first."
+  printf '%s\t%s\t%s\t%s\t%s\n' "onedrive-home" "OneDrive" "onedrive" "~/OneDrive" "Legacy OneDrive folder. Review OneDrive sync settings first."
+  printf '%s\t%s\t%s\t%s\t%s\n' "box-home" "Box" "box" "~/Box" "Legacy Box folder. Review Box Drive settings first."
+  printf '%s\t%s\t%s\t%s\t%s\n' "syncthing" "Syncthing" "syncthing" "~/Sync" "Common Syncthing root. Local deletions can sync to peers."
+}
+
+cloud() {
+  local rows
+  rows="$(cloud_rows)"
+
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '['
+    local first=1 id title provider path guidance expanded kb
+    while IFS=$'\t' read -r id title provider path guidance; do
+      [[ -z "${id:-}" ]] && continue
+      expanded="$(expand_path "$path")"
+      kb="$(size_kb "$expanded")"
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '{"id":"%s","title":"%s","provider":"%s","path":"%s","exists":%s,"size_kb":%s,"size":"%s","protected":true,"guidance":"%s"}' \
+        "$(printf '%s' "$id" | json_escape)" \
+        "$(printf '%s' "$title" | json_escape)" \
+        "$(printf '%s' "$provider" | json_escape)" \
+        "$(printf '%s' "$expanded" | json_escape)" \
+        "$(if [[ -e "$expanded" ]]; then echo true; else echo false; fi)" \
+        "$kb" \
+        "$(human_kb "$kb" | json_escape)" \
+        "$(printf '%s' "$guidance" | json_escape)"
+    done <<<"$rows"
+    printf ']\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}cleanroom protected cloud storage${RESET}"
+  printf 'Review-only inventory. cleanroom does not delete cloud-sync folders because local deletes may sync remotely.\n\n'
+  printf '%-10s %-14s %-24s %s\n' "size" "provider" "location" "path"
+  local id title provider path guidance expanded kb
+  while IFS=$'\t' read -r id title provider path guidance; do
+    [[ -z "${id:-}" ]] && continue
+    expanded="$(expand_path "$path")"
+    [[ -e "$expanded" ]] || continue
+    kb="$(size_kb "$expanded")"
+    printf '%-10s %-14s %-24s %s\n' "$(human_kb "$kb")" "$provider" "$title" "$expanded"
+    printf '  %s\n' "$guidance"
+  done <<<"$rows"
+  printf '\nUse this to explain large Documents/iCloud/CloudStorage usage. Change files through the provider UI or after verified backups.\n'
+}
+
 backup_value() {
   local file="$1"
   local key="$2"
@@ -2910,6 +2967,7 @@ overview() {
   printf 'cleanroom homebrew\n'
   printf 'cleanroom toolchains\n'
   printf 'cleanroom containers\n'
+  printf 'cleanroom cloud\n'
   printf 'cleanroom diagnostics\n'
   printf 'cleanroom protect\n'
 }
@@ -3544,7 +3602,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  overview|scan|system-data|plan|large|duplicates|downloads|installers|nodes|venvs|virtualenvs|apps|libraries|browsers|leftovers|backups|xcode|startup|trash|caches|diagnostics|packages|homebrew|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
+  overview|scan|system-data|plan|large|duplicates|downloads|installers|nodes|venvs|virtualenvs|apps|libraries|cloud|browsers|leftovers|backups|xcode|startup|trash|caches|diagnostics|packages|homebrew|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -3651,6 +3709,7 @@ case "$ACTION" in
   venvs|virtualenvs) venvs ;;
   apps) apps ;;
   libraries) libraries ;;
+  cloud) cloud ;;
   browsers) browsers ;;
   leftovers) leftovers ;;
   backups) backups ;;

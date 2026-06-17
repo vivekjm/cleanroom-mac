@@ -14,6 +14,7 @@ macOS Storage often labels hidden user folders as **Documents** or **System Data
 - npm, Yarn, pnpm, Gradle, CocoaPods stores
 - Homebrew caches, Cellar, Caskroom, logs, and service data
 - Go, Python, SwiftPM, Maven, Composer, Ruby, uv, and Poetry toolchain caches
+- iCloud Drive, CloudStorage, Dropbox, Google Drive, OneDrive, Box, and Syncthing footprint
 - Docker Desktop, Colima, Lima, and Podman container storage
 - old `node_modules`
 - stale Python virtualenv folders
@@ -41,6 +42,7 @@ By default, `cleanroom` does **not** delete:
 - Music, TV, iMovie, GarageBand, and Logic libraries
 - Mail
 - iCloud Drive
+- cloud-sync folders such as Dropbox, Google Drive, OneDrive, Box, and Syncthing
 - arbitrary files in Documents/Desktop/Downloads
 
 The default `clean` action is also a dry-run. You must pass `--apply` to delete.
@@ -209,6 +211,13 @@ Review protected media and creative libraries:
 ```sh
 cleanroom libraries
 cleanroom libraries --json
+```
+
+Review protected cloud-sync storage:
+
+```sh
+cleanroom cloud
+cleanroom cloud --json
 ```
 
 Review Homebrew storage:
@@ -507,7 +516,7 @@ More examples are in [docs/RECIPES.md](docs/RECIPES.md).
 
 Cleanup rules are cataloged in [data/cleanup-rules.tsv](data/cleanup-rules.tsv). `cleanroom rules --json` exposes the same catalog for wrappers and audits.
 
-Protected personal-state paths are cataloged in [data/protected-paths.tsv](data/protected-paths.tsv). `cleanroom protect --json` exposes detected browser profile, credential, Photos, Mail, iCloud, Messages, and Contacts paths that cleanroom will not remove wholesale.
+Protected personal-state paths are cataloged in [data/protected-paths.tsv](data/protected-paths.tsv). `cleanroom protect --json` exposes detected browser profile, credential, Photos, Mail, cloud-sync, iCloud, Messages, and Contacts paths that cleanroom will not remove wholesale.
 
 `cleanroom guard PATH...` uses the same central guard as applied cleanup. It refuses broad dangerous paths, protected catalog paths, and any ancestor folder that would contain protected catalog entries.
 
@@ -552,6 +561,8 @@ Config files use simple `key=value` lines and are never executed as shell.
 `apps` lists `.app` bundle sizes from `/Applications` and `~/Applications`, or a path you provide. It never uninstalls apps.
 
 `libraries` inventories protected media and creative libraries such as Photos, Photo Booth, Music, iTunes, TV, iMovie, GarageBand, Logic, and Audio Music Apps. It is review-only and helps explain large Documents or media storage without deleting personal projects.
+
+`cloud` inventories protected cloud-sync folders such as iCloud Drive, File Provider CloudStorage, Dropbox, Google Drive, OneDrive, Box, and Sync. It is review-only because local deletes can affect remote cloud or peer data.
 
 `browsers` separates safe browser cache candidates from protected profile storage. It reports Chrome, Brave, Edge, Arc, Firefox, and Safari profile sizes, but cleanup commands still remove only cache folders and never profiles, passwords, cookies, bookmarks, or sessions.
 
