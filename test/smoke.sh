@@ -15,6 +15,10 @@ mkdir -p \
   "$TEST_HOME/Library/LaunchAgents" \
   "$TEST_HOME/Library/Logs" \
   "$TEST_HOME/Library/Developer/Xcode/DerivedData" \
+  "$TEST_HOME/Library/Developer/Xcode/Archives/2026-06-01/FakeApp.xcarchive" \
+  "$TEST_HOME/Library/Developer/Xcode/iOS DeviceSupport/18.0" \
+  "$TEST_HOME/Library/Developer/CoreSimulator/Caches" \
+  "$TEST_HOME/Library/Developer/CoreSimulator/Devices/FakeSimulator/data" \
   "$TEST_HOME/Library/Application Support/MobileSync/Backup/FakeDeviceBackup" \
   "$TEST_HOME/Library/Application Support/Google/Chrome/Default" \
   "$TEST_HOME/Library/Application Support/Google/Chrome/Default/Cache" \
@@ -35,6 +39,11 @@ mkdir -p \
 printf 'cache\n' >"$TEST_HOME/Library/Caches/example.cache"
 printf 'pnpm\n' >"$TEST_HOME/Library/pnpm/store/example"
 printf 'log\n' >"$TEST_HOME/Library/Logs/example.log"
+printf 'derived data\n' >"$TEST_HOME/Library/Developer/Xcode/DerivedData/build.db"
+printf 'archive\n' >"$TEST_HOME/Library/Developer/Xcode/Archives/2026-06-01/FakeApp.xcarchive/Info.plist"
+printf 'support\n' >"$TEST_HOME/Library/Developer/Xcode/iOS DeviceSupport/18.0/Symbols"
+printf 'sim cache\n' >"$TEST_HOME/Library/Developer/CoreSimulator/Caches/cache.db"
+printf 'sim data\n' >"$TEST_HOME/Library/Developer/CoreSimulator/Devices/FakeSimulator/data/app.db"
 printf 'model\n' >"$TEST_HOME/.lmstudio/models/example.gguf"
 printf 'login data\n' >"$TEST_HOME/Library/Application Support/Google/Chrome/Default/Login Data"
 printf 'browser cache\n' >"$TEST_HOME/Library/Application Support/Google/Chrome/Default/Cache/example.cache"
@@ -172,6 +181,14 @@ python3 -m json.tool "$backups_json" >/dev/null
 grep 'Vivek Test iPhone' "$backups_json" >/dev/null
 grep '"protected":true' "$backups_json" >/dev/null
 rm -f "$backups_json"
+"$BIN" xcode | grep 'Xcode Archives' >/dev/null
+xcode_json="$(mktemp)"
+"$BIN" xcode --json > "$xcode_json"
+python3 -m json.tool "$xcode_json" >/dev/null
+grep '"id":"xcode-archives"' "$xcode_json" >/dev/null
+grep '"safety":"review-only"' "$xcode_json" >/dev/null
+grep 'cleanroom clean --apply --trash --include-dev-heavy' "$xcode_json" >/dev/null
+rm -f "$xcode_json"
 "$BIN" startup | grep 'com.example.cleanroom-test' >/dev/null
 startup_json="$(mktemp)"
 "$BIN" startup --json > "$startup_json"

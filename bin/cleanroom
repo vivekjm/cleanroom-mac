@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.27.0"
+VERSION="0.28.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -54,6 +54,7 @@ Usage:
   cleanroom browsers [--json]
   cleanroom leftovers QUERY... [--limit N] [--json]
   cleanroom backups [--json]
+  cleanroom xcode [--json]
   cleanroom startup [--json]
   cleanroom trash [--json]
   cleanroom caches [--json]
@@ -85,6 +86,7 @@ Actions:
   browsers             Inventory browser profile and cache footprint.
   leftovers            Find app leftovers by search term for manual review.
   backups              Inventory local iPhone/iPad backups for review.
+  xcode                Inventory Xcode build, archive, DeviceSupport, and simulator storage.
   startup              List LaunchAgents and LaunchDaemons for review.
   trash                Inventory current user Trash contents.
   caches               Inventory safe and opt-in cache buckets.
@@ -109,7 +111,7 @@ Options:
   --verbose            Print every path touched.
   --json               Emit JSON for overview, scan, plan, large, duplicates, downloads,
                        installers, nodes, apps, browsers, leftovers, startup, trash,
-                       backups, caches, packages, snapshots, doctor, protect, guard, or rules.
+                       backups, xcode, caches, packages, snapshots, doctor, protect, guard, or rules.
   --output PATH        Output path for report.
   --log PATH           Write apply audit log here. Default: ~/.local/state/cleanroom/runs/*.log.
   --config PATH        Load config file. Default: ~/.config/cleanroom/config.
@@ -174,6 +176,8 @@ Examples:
   cleanroom leftovers zoom --json
   cleanroom backups
   cleanroom backups --json
+  cleanroom xcode
+  cleanroom xcode --json
   cleanroom startup
   cleanroom startup --json
   cleanroom trash
@@ -1776,6 +1780,64 @@ backups() {
   printf '\nManage these through Finder or Apple Devices after confirming you have another backup.\n'
 }
 
+xcode_rows() {
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "derived-data" "DerivedData" "rebuildable" "~/Library/Developer/Xcode/DerivedData" "cleanroom clean" "cleanroom clean --apply --trash" "Xcode build intermediates and indexes. Usually safe to rebuild."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "simulator-caches" "Simulator Caches" "rebuildable" "~/Library/Developer/CoreSimulator/Caches" "cleanroom clean" "cleanroom clean --apply --trash" "CoreSimulator cache data. Recreated by simulator tooling."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "ios-device-support" "iOS DeviceSupport" "dev-heavy" "~/Library/Developer/Xcode/iOS DeviceSupport" "cleanroom clean --include-dev-heavy" "cleanroom clean --apply --trash --include-dev-heavy" "Symbols and support files for connected iOS versions. Xcode may recreate or redownload them."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "watchos-device-support" "watchOS DeviceSupport" "dev-heavy" "~/Library/Developer/Xcode/watchOS DeviceSupport" "cleanroom clean --include-dev-heavy" "cleanroom clean --apply --trash --include-dev-heavy" "watchOS support files that may be recreated by Xcode."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "tvos-device-support" "tvOS DeviceSupport" "dev-heavy" "~/Library/Developer/Xcode/tvOS DeviceSupport" "cleanroom clean --include-dev-heavy" "cleanroom clean --apply --trash --include-dev-heavy" "tvOS support files that may be recreated by Xcode."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "simulator-devices" "Simulator Devices" "high-impact" "~/Library/Developer/CoreSimulator/Devices" "cleanroom clean --include-dev-heavy" "cleanroom clean --apply --trash --include-dev-heavy" "Simulator app data can be reset by the dev-heavy flow. Review before applying."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "xcode-archives" "Xcode Archives" "review-only" "~/Library/Developer/Xcode/Archives" "open Xcode Organizer" "manual review" "Signed app archives and dSYMs. Do not delete blindly; review in Xcode Organizer or backups first."
+}
+
+xcode() {
+  local rows
+  rows="$(
+    local id title safety path_template preview apply notes path kb
+    while IFS=$'\t' read -r id title safety path_template preview apply notes; do
+      path="$(expand_path "$path_template")"
+      kb="$(size_kb "$path")"
+      printf '%012d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$kb" "$id" "$title" "$safety" "$path" "$preview" "$apply" "$notes"
+    done < <(xcode_rows) | sort -rn
+  )"
+
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '['
+    local first=1 kb id title safety path preview apply notes kb_num
+    while IFS=$'\t' read -r kb id title safety path preview apply notes; do
+      [[ -z "${id:-}" ]] && continue
+      kb_num="$(printf '%s\n' "$kb" | sed 's/^0*//; s/^$/0/')"
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '{"id":"%s","title":"%s","safety":"%s","path":"%s","present":%s,"size_kb":%s,"size":"%s","preview_command":"%s","apply_command":"%s","notes":"%s"}' \
+        "$(printf '%s' "$id" | json_escape)" \
+        "$(printf '%s' "$title" | json_escape)" \
+        "$(printf '%s' "$safety" | json_escape)" \
+        "$(printf '%s' "$path" | json_escape)" \
+        "$(if [[ -e "$path" ]]; then echo true; else echo false; fi)" \
+        "$kb_num" \
+        "$(human_kb "${kb:-0}" | json_escape)" \
+        "$(printf '%s' "$preview" | json_escape)" \
+        "$(printf '%s' "$apply" | json_escape)" \
+        "$(printf '%s' "$notes" | json_escape)"
+    done <<<"$rows"
+    printf ']\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}cleanroom Xcode storage${RESET}"
+  printf 'Review-only inventory. Cleanup commands are dry-runs unless --apply is passed.\n\n'
+  printf '%-10s %-22s %-12s %s\n' "size" "item" "safety" "path"
+  local kb id title safety path preview apply notes
+  while IFS=$'\t' read -r kb id title safety path preview apply notes; do
+    [[ -z "${id:-}" ]] && continue
+    printf '%-10s %-22s %-12s %s\n' "$(human_kb "$kb")" "$title" "$safety" "$path"
+    printf '  preview: %s\n' "$preview"
+    printf '  apply: %s\n' "$apply"
+    printf '  %s\n' "$notes"
+  done <<<"$rows"
+}
+
 plist_value() {
   local file="$1"
   local key="$2"
@@ -2766,7 +2828,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  overview|scan|plan|large|duplicates|downloads|installers|nodes|apps|browsers|leftovers|backups|startup|trash|caches|packages|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
+  overview|scan|plan|large|duplicates|downloads|installers|nodes|apps|browsers|leftovers|backups|xcode|startup|trash|caches|packages|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -2870,6 +2932,7 @@ case "$ACTION" in
   browsers) browsers ;;
   leftovers) leftovers ;;
   backups) backups ;;
+  xcode) xcode ;;
   startup) startup ;;
   trash) trash ;;
   caches) caches ;;

@@ -9,6 +9,7 @@ It scans the places that commonly bloat macOS storage, then cleans only rebuilda
 macOS Storage often labels hidden user folders as **Documents** or **System Data**. In real machines this can include:
 
 - Xcode and simulator artifacts
+- Xcode Archives and DeviceSupport
 - Android SDK NDK/system images
 - npm, Yarn, pnpm, Gradle, CocoaPods stores
 - old `node_modules`
@@ -200,6 +201,13 @@ Review local iPhone/iPad backups:
 ```sh
 cleanroom backups
 cleanroom backups --json
+```
+
+Review Xcode and simulator storage:
+
+```sh
+cleanroom xcode
+cleanroom xcode --json
 ```
 
 Review startup and background launch items:
@@ -476,6 +484,8 @@ Config files use simple `key=value` lines and are never executed as shell.
 `leftovers` searches common support, cache, preference, container, WebKit, log, and launch-item locations for an app or vendor name. It is review-only and never deletes matches, because complete app removal can require vendor uninstallers and account-specific cleanup.
 
 `backups` inventories local iPhone and iPad backups under MobileSync. It is review-only and protected because those backups may be the only copy of device data.
+
+`xcode` inventories DerivedData, simulator caches, DeviceSupport, simulator devices, and Xcode Archives. It separates rebuildable caches from review-only archives and high-impact simulator data.
 
 `startup` lists LaunchAgents and LaunchDaemons for review. It never unloads, disables, or removes startup items.
 

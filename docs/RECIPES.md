@@ -17,6 +17,7 @@ cleanroom apps
 cleanroom browsers
 cleanroom leftovers adobe
 cleanroom backups
+cleanroom xcode
 cleanroom startup
 cleanroom trash
 cleanroom caches
@@ -48,6 +49,7 @@ cleanroom apps --json
 cleanroom browsers --json
 cleanroom leftovers adobe --json
 cleanroom backups --json
+cleanroom xcode --json
 cleanroom startup --json
 cleanroom trash --json
 cleanroom caches --json
@@ -83,6 +85,8 @@ cleanroom report --output cleanroom-report.md
 `leftovers --json QUERY...` emits matching app support, cache, preference, container, WebKit, log, and launch-item paths for manual review. It is intentionally review-only and does not delete anything.
 
 `backups --json` emits local iPhone and iPad backup sizes and device metadata when available. It is intentionally review-only and protected.
+
+`xcode --json` emits Xcode storage buckets such as DerivedData, simulator caches, DeviceSupport, simulator devices, and Xcode Archives with safety labels and matching cleanup guidance.
 
 `startup --json` emits LaunchAgents and LaunchDaemons with scope, type, status, label, program, and path. It is intentionally review-only and does not unload, disable, or remove anything.
 
@@ -132,6 +136,13 @@ Inspect package stores first:
 ```sh
 cleanroom packages
 cleanroom clean --include-package-stores
+```
+
+Inspect Xcode storage first:
+
+```sh
+cleanroom xcode
+cleanroom xcode --json
 ```
 
 ## Documents Storage
@@ -196,6 +207,16 @@ cleanroom guard ~/Library/Application\ Support/MobileSync/Backup
 ```
 
 Use this when System Data is large and you suspect local iPhone or iPad backups. cleanroom treats MobileSync backups as protected personal data and does not delete them.
+
+## Xcode Storage
+
+```sh
+cleanroom xcode
+cleanroom clean
+cleanroom clean --include-dev-heavy
+```
+
+Use this when Developer or System Data storage is large. DerivedData and simulator caches are rebuildable. DeviceSupport and simulator app data are opt-in. Xcode Archives are review-only because they can contain signed release archives and dSYMs.
 
 ## Slow Startup / Background Items
 
