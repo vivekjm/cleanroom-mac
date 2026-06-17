@@ -32,6 +32,7 @@ bash -n "$BIN"
 "$BIN" categories | grep -- '--include-ai-models' >/dev/null
 "$BIN" categories | grep -- '--trash' >/dev/null
 "$BIN" doctor | grep 'cleanroom doctor' >/dev/null
+"$BIN" history 2>&1 | grep 'No cleanroom history found' >/dev/null
 
 config_file="$(mktemp)"
 rm -f "$config_file"
@@ -69,6 +70,18 @@ grep 'mode=trash' "$apply_log" >/dev/null
 grep 'trash	ok' "$apply_log" >/dev/null
 test ! -e "$HOME/.npm/_cacache"
 find "$HOME/.Trash" -name _cacache -print -quit | grep _cacache >/dev/null
+restore_preview="$("$BIN" restore --log "$apply_log" 2>&1)"
+grep 'Restore dry-run mode' <<<"$restore_preview" >/dev/null
+grep 'would restore' <<<"$restore_preview" >/dev/null
+"$BIN" restore --log "$apply_log" --apply --yes >/dev/null 2>&1
+test -e "$HOME/.npm/_cacache"
+
+mkdir -p "$HOME/.npm/_cacache"
+printf 'cache again\n' >"$HOME/.npm/_cacache/example.cache"
+PATH="/usr/bin:/bin:/usr/sbin:/sbin" "$BIN" clean --apply --trash --yes >/dev/null 2>&1
+"$BIN" history --limit 1 | grep 'trash_entries=' >/dev/null
+"$BIN" restore --apply --yes >/dev/null 2>&1
+test -e "$HOME/.npm/_cacache"
 rm -f "$apply_log"
 
 rm -f "$config_file"

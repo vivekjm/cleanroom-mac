@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.6.0"
+VERSION="0.7.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
 JSON=0
 DAYS=30
+LIMIT=20
 ACTION="scan"
 CONFIG_FILE=""
 CONFIG_LOADED=0
@@ -40,6 +41,8 @@ Usage:
   cleanroom scan [options]
   cleanroom report [--output PATH]
   cleanroom clean [options]
+  cleanroom history [--limit N]
+  cleanroom restore [--log PATH] [--apply]
   cleanroom interactive [options]
   cleanroom doctor
   cleanroom categories
@@ -50,6 +53,8 @@ Actions:
   scan                 Show disk usage and likely cleanup candidates.
   report               Write a Markdown cleanup report. Prints to stdout by default.
   clean                Clean safe rebuildable caches. Dry-run unless --apply is passed.
+  history              List recent apply logs.
+  restore              Restore files moved by --trash from an apply log. Dry-run unless --apply.
   interactive          Choose cleanup categories in a guided prompt.
   doctor               Check platform, dependencies, permissions, and risky state.
   categories           Explain cleanup categories and safety levels.
@@ -66,6 +71,7 @@ Options:
   --config PATH        Load config file. Default: ~/.config/cleanroom/config.
   --exclude PATH       Never remove this path. Can be passed multiple times.
   --days N             Age threshold for stale node_modules. Default: 30.
+  --limit N            Number of history entries to show. Default: 20.
   --preset NAME        Enable a useful group: safe, dev, deep.
                        safe: default rebuildable caches.
                        dev: safe + app caches + package stores + stale node_modules.
@@ -104,6 +110,9 @@ Examples:
   cleanroom clean
   cleanroom clean --preset dev
   cleanroom clean --apply --trash --preset dev
+  cleanroom history
+  cleanroom restore --log ~/.local/state/cleanroom/runs/RUN.log
+  cleanroom restore --log ~/.local/state/cleanroom/runs/RUN.log --apply
   cleanroom clean --apply --include-app-caches
   cleanroom clean --apply --include-dev-heavy --include-node-stale --days 45
 EOF
@@ -312,6 +321,17 @@ default_log_file() {
   printf '%s\n' "$HOME/.local/state/cleanroom/runs/$RUN_ID.log"
 }
 
+log_dir() {
+  printf '%s\n' "$HOME/.local/state/cleanroom/runs"
+}
+
+latest_log_file() {
+  local dir
+  dir="$(log_dir)"
+  [[ -d "$dir" ]] || return 1
+  find "$dir" -type f -name '*.log' -exec ls -t {} + 2>/dev/null | head -1
+}
+
 ensure_apply_log() {
   [[ "$APPLY" -eq 1 ]] || return 0
   [[ -n "$LOG_FILE" ]] || LOG_FILE="$(default_log_file)"
@@ -326,6 +346,89 @@ ensure_apply_log() {
       printf 'timestamp\taction\tstatus\tsize_kb\tpath\ttarget\n'
     } >>"$LOG_FILE"
   fi
+}
+
+history() {
+  local dir count file
+  dir="$(log_dir)"
+  if [[ ! -d "$dir" ]]; then
+    warn "No cleanroom history found: $dir"
+    return 0
+  fi
+  count=0
+  printf '%s\n' "${BOLD}cleanroom history${RESET}"
+  find "$dir" -type f -name '*.log' -exec ls -t {} + 2>/dev/null |
+    while IFS= read -r file; do
+      [[ -f "$file" ]] || continue
+      count=$((count + 1))
+      [[ "$count" -gt "$LIMIT" ]] && break
+      local started mode entries
+      started="$(awk -F= '/^started_at=/{print $2; exit}' "$file")"
+      mode="$(awk -F= '/^mode=/{print $2; exit}' "$file")"
+      entries="$(awk -F '\t' '$2 == "trash" && $3 == "ok" {count++} END {print count + 0}' "$file")"
+      printf '%s  mode=%s  trash_entries=%s\n  %s\n' "${started:-unknown}" "${mode:-unknown}" "$entries" "$file"
+    done
+}
+
+restore() {
+  local file restored skipped missing collisions line timestamp action status size path target
+  if [[ -n "$LOG_FILE" ]]; then
+    file="$LOG_FILE"
+  else
+    file="$(latest_log_file || true)"
+  fi
+  [[ -n "${file:-}" ]] || die "No apply logs found. Pass --log PATH."
+  file="$(expand_path "$file")"
+  [[ -f "$file" ]] || die "Restore log not found: $file"
+
+  if [[ "$APPLY" -eq 1 ]]; then
+    [[ "$ASSUME_YES" -eq 1 ]] || {
+      warn "About to restore Trash-mode entries from: $file"
+      printf 'Continue? Type "restore" to proceed: '
+      local answer
+      read -r answer
+      [[ "$answer" == "restore" ]] || die "Cancelled."
+    }
+    warn "Restore apply mode enabled."
+  else
+    warn "Restore dry-run mode. Pass --apply to move files back."
+  fi
+
+  restored=0
+  skipped=0
+  missing=0
+  collisions=0
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    [[ -z "$line" || "$line" == \#* || "$line" == timestamp$'\t'* ]] && continue
+    IFS=$'\t' read -r timestamp action status size path target <<<"$line"
+    [[ "$action" == "trash" && "$status" == "ok" ]] || continue
+    [[ -n "${path:-}" && -n "${target:-}" ]] || { skipped=$((skipped + 1)); continue; }
+    if [[ ! -e "$target" ]]; then
+      missing=$((missing + 1))
+      [[ "$VERBOSE" -eq 1 ]] && warn "missing trash item: $target"
+      continue
+    fi
+    if [[ -e "$path" ]]; then
+      collisions=$((collisions + 1))
+      warn "not restoring because destination exists: $path"
+      continue
+    fi
+    if [[ "$APPLY" -eq 1 ]]; then
+      mkdir -p "$(dirname "$path")"
+      if mv "$target" "$path"; then
+        restored=$((restored + 1))
+        [[ "$VERBOSE" -eq 1 ]] && log "restored $target -> $path"
+      else
+        warn "restore failed: $target -> $path"
+        skipped=$((skipped + 1))
+      fi
+    else
+      printf 'would restore %8s  %s -> %s\n' "$(human_kb "${size:-0}")" "$target" "$path"
+      restored=$((restored + 1))
+    fi
+  done <"$file"
+
+  printf 'restore summary: restored=%s missing=%s collisions=%s skipped=%s\n' "$restored" "$missing" "$collisions" "$skipped"
 }
 
 record_apply() {
@@ -929,7 +1032,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  scan|report|clean|interactive|doctor|categories|init-config|help)
+  scan|report|clean|history|restore|interactive|doctor|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -985,6 +1088,11 @@ while [[ "$#" -gt 0 ]]; do
       [[ "${1:-}" =~ ^[0-9]+$ ]] || die "--days requires a number"
       DAYS="$1"
       ;;
+    --limit)
+      shift
+      [[ "${1:-}" =~ ^[0-9]+$ ]] || die "--limit requires a number"
+      LIMIT="$1"
+      ;;
     --include-dev-heavy) INCLUDE_DEV_HEAVY=1 ;;
     --include-node-stale) INCLUDE_NODE_STALE=1 ;;
     --include-package-stores) INCLUDE_PACKAGE_STORES=1 ;;
@@ -1006,6 +1114,8 @@ case "$ACTION" in
   scan) scan ;;
   report) report ;;
   clean) clean ;;
+  history) history ;;
+  restore) restore ;;
   interactive) interactive ;;
   doctor) doctor ;;
   categories) categories ;;

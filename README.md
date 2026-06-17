@@ -35,6 +35,8 @@ The default `clean` action is also a dry-run. You must pass `--apply` to delete.
 
 For safer applied runs, pass `--trash` to move cleanroom-managed path removals into `~/.Trash/cleanroom-*` instead of deleting them immediately. Applied runs also write an audit log under `~/.local/state/cleanroom/runs/` by default.
 
+Trash-mode runs can be inspected with `cleanroom history` and restored with `cleanroom restore --log PATH`.
+
 ## Install
 
 From this repo:
@@ -230,6 +232,19 @@ Write an apply log to a specific path:
 cleanroom clean --apply --trash --log ~/Desktop/cleanroom-run.log
 ```
 
+List recent cleanup runs:
+
+```sh
+cleanroom history
+```
+
+Preview or apply restore from a Trash-mode run:
+
+```sh
+cleanroom restore --log ~/Desktop/cleanroom-run.log
+cleanroom restore --log ~/Desktop/cleanroom-run.log --apply
+```
+
 ## Notes
 
 More examples are in [docs/RECIPES.md](docs/RECIPES.md).
@@ -245,6 +260,8 @@ Config files use simple `key=value` lines and are never executed as shell.
 `--include-containers` removes local container VM disks for known runtimes such as Colima/Lima and Docker Desktop. This can remove local containers and volumes.
 
 `--trash` applies to paths that `cleanroom` removes directly. System commands delegated to macOS or developer tools, such as Time Machine snapshot thinning or simulator reset, may still be irreversible.
+
+`restore` only restores entries that were moved by `--trash` and still exist in the cleanroom Trash folder. It skips destinations that already exist.
 
 The project also ships `make install`, `make uninstall`, `make lint`, and `make test` targets for maintainers and package managers.
 

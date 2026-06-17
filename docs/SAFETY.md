@@ -57,6 +57,8 @@ Excludes apply centrally to deletion helpers and should be respected by new clea
 
 Use `--trash` to move cleanroom-managed path removals to `~/.Trash/cleanroom-*` instead of deleting them immediately. Applied runs write an audit log under `~/.local/state/cleanroom/runs/` unless `--log` is provided.
 
+Use `cleanroom history` to find recent logs, and `cleanroom restore --log PATH` to preview restoring Trash-mode entries. Add `--apply` only after reviewing the restore preview.
+
 All direct path removals should go through the central deletion helpers. They enforce excludes, refuse dangerous broad paths such as the home directory and top-level personal folders, support Trash mode, and write audit log entries.
 
 Trash mode is a recovery aid, not a backup. System commands delegated to macOS or developer tools, such as Time Machine snapshot thinning or simulator reset, may still be irreversible.

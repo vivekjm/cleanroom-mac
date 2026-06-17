@@ -65,9 +65,24 @@ Every applied run writes an audit log:
 
 ```sh
 ls ~/.local/state/cleanroom/runs
+cleanroom history
 ```
 
 Use `--log PATH` when you want the run log somewhere specific.
+
+Preview a restore:
+
+```sh
+cleanroom restore --log ~/Desktop/cleanroom-run.log
+```
+
+Apply a restore:
+
+```sh
+cleanroom restore --log ~/Desktop/cleanroom-run.log --apply
+```
+
+Restore only works for entries moved by `--trash` that still exist in the cleanroom Trash folder. Existing destination paths are skipped.
 
 ## Interactive Mode
 

@@ -1,4 +1,4 @@
-.TH CLEANROOM 1 "June 2026" "cleanroom 0.6.0" "User Commands"
+.TH CLEANROOM 1 "June 2026" "cleanroom 0.7.0" "User Commands"
 .SH NAME
 cleanroom \- safe-by-default macOS storage cleaner
 .SH SYNOPSIS
@@ -10,6 +10,12 @@ cleanroom \- safe-by-default macOS storage cleaner
 .br
 .B cleanroom
 .RI "clean [options]"
+.br
+.B cleanroom
+.RI "history [--limit n]"
+.br
+.B cleanroom
+.RI "restore [--log path] [--apply]"
 .br
 .B cleanroom
 .RI "interactive [options]"
@@ -33,6 +39,12 @@ Generate a Markdown cleanup report.
 .B clean
 Preview or apply cleanup.
 .TP
+.B history
+List recent apply logs.
+.TP
+.B restore
+Restore files moved by --trash from an apply log. Dry-run by default.
+.TP
 .B interactive
 Prompt for cleanup categories and then run the same clean flow.
 .TP
@@ -55,6 +67,9 @@ deleting them immediately.
 .TP
 .B --log " path"
 Write the apply audit log to a specific file.
+.TP
+.B --limit " n"
+Number of history entries to show.
 .TP
 .B --yes
 Skip confirmation prompts.
@@ -88,6 +103,8 @@ cleanroom scan
 cleanroom report --output cleanroom-report.md
 cleanroom clean --preset dev
 cleanroom clean --preset dev --apply --trash
+cleanroom history
+cleanroom restore --log ~/.local/state/cleanroom/runs/RUN.log
 cleanroom interactive
 .fi
 .SH SAFETY
