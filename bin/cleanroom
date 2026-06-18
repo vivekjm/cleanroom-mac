@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.39.0"
+VERSION="0.40.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -64,6 +64,7 @@ Usage:
   cleanroom leftovers QUERY... [--limit N] [--json] [--apply --trash]
   cleanroom backups [--json]
   cleanroom xcode [--json]
+  cleanroom android [--json]
   cleanroom startup [--json]
   cleanroom trash [--json]
   cleanroom caches [--json]
@@ -106,6 +107,7 @@ Actions:
   leftovers            Find app leftovers by search term. Apply requires --trash.
   backups              Inventory local iPhone/iPad backups for review.
   xcode                Inventory Xcode build, archive, DeviceSupport, and simulator storage.
+  android              Inventory Android SDK, emulator, AVD, and Android Studio storage.
   startup              List LaunchAgents and LaunchDaemons for review.
   trash                Inventory current user Trash contents.
   caches               Inventory safe and opt-in cache buckets.
@@ -136,7 +138,7 @@ Options:
                        downloads, installers, nodes, venvs, apps, appdata, libraries, cloud, personal,
                        browsers, leftovers, startup,
                        trash, backups, xcode, caches, diagnostics, packages, homebrew, toolchains,
-                       containers, snapshots, doctor, protect, guard, or rules.
+                       containers, android, snapshots, doctor, protect, guard, or rules.
   --output PATH        Output path for report.
   --log PATH           Write apply audit log here. Default: ~/.local/state/cleanroom/runs/*.log.
   --config PATH        Load config file. Default: ~/.config/cleanroom/config.
@@ -225,6 +227,8 @@ Examples:
   cleanroom backups --json
   cleanroom xcode
   cleanroom xcode --json
+  cleanroom android
+  cleanroom android --json
   cleanroom startup
   cleanroom startup --json
   cleanroom trash
@@ -1205,7 +1209,7 @@ system_data_rows() {
   printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "application-support" "Application Support" "~/Library/Application Support" "review" "cleanroom leftovers APPNAME" "manual review" "Large app support folders often appear as System Data. Review by app name; cleanroom does not remove the whole folder."
   printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "caches" "User Caches" "~/Library/Caches; ~/.cache" "rebuildable" "cleanroom caches" "cleanroom clean --apply --trash" "Standard user caches and rebuildable app caches."
   printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "developer" "Developer Data" "~/Library/Developer" "mixed" "cleanroom xcode" "cleanroom clean --apply --trash --include-dev-heavy" "Xcode, simulator, DerivedData, DeviceSupport, and archives."
-  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "android" "Android SDK" "~/Library/Android" "dev-heavy" "cleanroom clean --include-dev-heavy" "cleanroom clean --apply --trash --include-dev-heavy" "Android SDK caches, NDKs, system images, and temporary SDK downloads."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "android" "Android SDK" "~/Library/Android; ~/.android" "dev-heavy" "cleanroom android" "cleanroom clean --apply --trash --include-dev-heavy" "Android SDK, emulator, AVD, NDKs, system images, and temporary SDK downloads."
   printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "containers" "Container Storage" "~/.colima; ~/.lima; ~/.local/share/containers; ~/.local/share/podman; ~/Library/Containers/com.docker.docker/Data/vms" "high-impact" "cleanroom containers" "cleanroom clean --apply --trash --include-containers" "Docker Desktop, Colima, Lima, and Podman container storage."
   printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "diagnostics" "Logs and Diagnostics" "~/Library/Logs; ~/Library/DiagnosticReports; ~/Library/Application Support/CrashReporter" "low-risk" "cleanroom diagnostics" "cleanroom clean --apply --trash --include-diagnostics --days $DAYS" "User logs, diagnostic reports, and crash reports."
   printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "mobile-backups" "Device Backups" "~/Library/Application Support/MobileSync/Backup" "protected" "cleanroom backups" "manual review" "Local iPhone and iPad backups are protected because they may be the only copy of device data."
@@ -2430,6 +2434,73 @@ xcode() {
   while IFS=$'\t' read -r kb id title safety path preview apply notes; do
     [[ -z "${id:-}" ]] && continue
     printf '%-10s %-22s %-12s %s\n' "$(human_kb "$kb")" "$title" "$safety" "$path"
+    printf '  preview: %s\n' "$preview"
+    printf '  apply: %s\n' "$apply"
+    printf '  %s\n' "$notes"
+  done <<<"$rows"
+}
+
+android_rows() {
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "android-sdk-root" "Android SDK" "review-only" "~/Library/Android/sdk" "cleanroom android" "manual review" "Full SDK root. Review with Android Studio SDK Manager before removing whole SDK folders."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "android-ndk" "Android NDK" "dev-heavy" "~/Library/Android/sdk/ndk" "cleanroom clean --include-dev-heavy" "cleanroom clean --apply --trash --include-dev-heavy" "Native development kits can be downloaded again, but active native builds may need specific versions."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "android-system-images" "System Images" "dev-heavy" "~/Library/Android/sdk/system-images" "cleanroom clean --include-dev-heavy" "cleanroom clean --apply --trash --include-dev-heavy" "Emulator system images are large and redownloadable through SDK Manager."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "android-temp-downloads" "Temporary Downloads" "dev-heavy" "~/Library/Android/sdk/.downloadIntermediates; ~/Library/Android/sdk/.temp" "cleanroom clean --include-dev-heavy" "cleanroom clean --apply --trash --include-dev-heavy" "Interrupted SDK downloads and temporary SDK files."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "android-avds" "Android Virtual Devices" "high-impact" "~/.android/avd" "cleanroom android" "manual review" "Emulator virtual devices, disk images, snapshots, and app data. Review in Device Manager before removing."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "android-emulator" "Emulator Package" "review-only" "~/Library/Android/sdk/emulator" "cleanroom android" "manual review" "Android emulator binaries. Usually managed by SDK Manager."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "android-platforms" "SDK Platforms" "review-only" "~/Library/Android/sdk/platforms" "cleanroom android" "manual review" "Installed Android platform SDKs. Projects may require specific API levels."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "android-build-tools" "Build Tools" "review-only" "~/Library/Android/sdk/build-tools" "cleanroom android" "manual review" "Android build tools. Keep versions required by current projects."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "android-platform-tools" "Platform Tools" "review-only" "~/Library/Android/sdk/platform-tools" "cleanroom android" "manual review" "adb and related platform tools. Usually small and managed by SDK Manager."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "android-cmdline-tools" "Command Line Tools" "review-only" "~/Library/Android/sdk/cmdline-tools" "cleanroom android" "manual review" "SDK Manager and command-line tooling."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "android-studio-caches-google" "Android Studio Caches" "app-cache" "~/Library/Caches/Google/AndroidStudio" "cleanroom caches" "cleanroom clean --apply --trash --include-app-caches" "Android Studio cache folder when using recent Google-branded builds."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "android-studio-caches-legacy" "Legacy Studio Caches" "app-cache" "~/Library/Caches/AndroidStudio" "cleanroom caches" "cleanroom clean --apply --trash --include-app-caches" "Android Studio cache folder used by older builds."
+}
+
+android() {
+  local rows
+  rows="$(
+    local id title safety paths preview apply notes kb
+    while IFS=$'\t' read -r id title safety paths preview apply notes; do
+      kb="$(paths_field_kb "$paths")"
+      printf '%012d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$kb" "$id" "$title" "$safety" "$paths" "$preview" "$apply" "$notes"
+    done < <(android_rows) | sort -rn
+  )"
+
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '['
+    local first=1 kb id title safety paths preview apply notes kb_num present
+    while IFS=$'\t' read -r kb id title safety paths preview apply notes; do
+      [[ -z "${id:-}" ]] && continue
+      kb_num="$(printf '%s\n' "$kb" | sed 's/^0*//; s/^$/0/')"
+      if [[ "$kb_num" -gt 0 ]]; then
+        present=true
+      else
+        present=false
+      fi
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '{"id":"%s","title":"%s","safety":"%s","paths":"%s","present":%s,"size_kb":%s,"size":"%s","preview_command":"%s","apply_command":"%s","notes":"%s"}' \
+        "$(printf '%s' "$id" | json_escape)" \
+        "$(printf '%s' "$title" | json_escape)" \
+        "$(printf '%s' "$safety" | json_escape)" \
+        "$(printf '%s' "$paths" | json_escape)" \
+        "$present" \
+        "$kb_num" \
+        "$(human_kb "${kb:-0}" | json_escape)" \
+        "$(printf '%s' "$preview" | json_escape)" \
+        "$(printf '%s' "$apply" | json_escape)" \
+        "$(printf '%s' "$notes" | json_escape)"
+    done <<<"$rows"
+    printf ']\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}cleanroom Android storage${RESET}"
+  printf 'Review-only inventory. Cleanup commands are dry-runs unless --apply is passed.\n\n'
+  printf '%-10s %-25s %-12s %s\n' "size" "item" "safety" "paths"
+  local kb id title safety paths preview apply notes
+  while IFS=$'\t' read -r kb id title safety paths preview apply notes; do
+    [[ -z "${id:-}" ]] && continue
+    printf '%-10s %-25s %-12s %s\n' "$(human_kb "$kb")" "$title" "$safety" "$paths"
     printf '  preview: %s\n' "$preview"
     printf '  apply: %s\n' "$apply"
     printf '  %s\n' "$notes"
@@ -3738,7 +3809,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  overview|scan|system-data|plan|large|duplicates|downloads|installers|nodes|venvs|virtualenvs|apps|appdata|libraries|cloud|personal|browsers|leftovers|backups|xcode|startup|trash|caches|diagnostics|packages|homebrew|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
+  overview|scan|system-data|plan|large|duplicates|downloads|installers|nodes|venvs|virtualenvs|apps|appdata|libraries|cloud|personal|browsers|leftovers|backups|xcode|android|startup|trash|caches|diagnostics|packages|homebrew|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -3852,6 +3923,7 @@ case "$ACTION" in
   leftovers) leftovers ;;
   backups) backups ;;
   xcode) xcode ;;
+  android) android ;;
   startup) startup ;;
   trash) trash ;;
   caches) caches ;;

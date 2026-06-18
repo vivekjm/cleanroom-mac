@@ -32,6 +32,16 @@ mkdir -p \
   "$TEST_HOME/Library/Developer/Xcode/iOS DeviceSupport/18.0" \
   "$TEST_HOME/Library/Developer/CoreSimulator/Caches" \
   "$TEST_HOME/Library/Developer/CoreSimulator/Devices/FakeSimulator/data" \
+  "$TEST_HOME/Library/Android/sdk/ndk/25.2.9519653" \
+  "$TEST_HOME/Library/Android/sdk/system-images/android-35/google_apis/arm64-v8a" \
+  "$TEST_HOME/Library/Android/sdk/.downloadIntermediates" \
+  "$TEST_HOME/Library/Android/sdk/.temp" \
+  "$TEST_HOME/Library/Android/sdk/emulator" \
+  "$TEST_HOME/Library/Android/sdk/platforms/android-35" \
+  "$TEST_HOME/Library/Android/sdk/build-tools/35.0.0" \
+  "$TEST_HOME/Library/Android/sdk/platform-tools" \
+  "$TEST_HOME/Library/Android/sdk/cmdline-tools/latest/bin" \
+  "$TEST_HOME/.android/avd/Test.avd" \
   "$TEST_HOME/Library/Application Support/MobileSync/Backup/FakeDeviceBackup" \
   "$TEST_HOME/Library/Application Support/Google/Chrome/Default" \
   "$TEST_HOME/Library/Application Support/Google/Chrome/Default/Cache" \
@@ -93,6 +103,16 @@ printf 'archive\n' >"$TEST_HOME/Library/Developer/Xcode/Archives/2026-06-01/Fake
 printf 'support\n' >"$TEST_HOME/Library/Developer/Xcode/iOS DeviceSupport/18.0/Symbols"
 printf 'sim cache\n' >"$TEST_HOME/Library/Developer/CoreSimulator/Caches/cache.db"
 printf 'sim data\n' >"$TEST_HOME/Library/Developer/CoreSimulator/Devices/FakeSimulator/data/app.db"
+printf 'ndk\n' >"$TEST_HOME/Library/Android/sdk/ndk/25.2.9519653/source.properties"
+printf 'system image\n' >"$TEST_HOME/Library/Android/sdk/system-images/android-35/google_apis/arm64-v8a/system.img"
+printf 'sdk temp\n' >"$TEST_HOME/Library/Android/sdk/.downloadIntermediates/package.zip"
+printf 'sdk temp\n' >"$TEST_HOME/Library/Android/sdk/.temp/download.tmp"
+printf 'emulator\n' >"$TEST_HOME/Library/Android/sdk/emulator/emulator"
+printf 'android jar\n' >"$TEST_HOME/Library/Android/sdk/platforms/android-35/android.jar"
+printf 'aapt\n' >"$TEST_HOME/Library/Android/sdk/build-tools/35.0.0/aapt"
+printf 'adb\n' >"$TEST_HOME/Library/Android/sdk/platform-tools/adb"
+printf 'sdkmanager\n' >"$TEST_HOME/Library/Android/sdk/cmdline-tools/latest/bin/sdkmanager"
+printf 'avd\n' >"$TEST_HOME/.android/avd/Test.avd/userdata-qemu.img"
 printf 'model\n' >"$TEST_HOME/.lmstudio/models/example.gguf"
 printf 'colima disk\n' >"$TEST_HOME/.colima/default/disk.img"
 printf 'lima disk\n' >"$TEST_HOME/.lima/default/disk.img"
@@ -204,6 +224,7 @@ grep 'ai-models' "$rules_json" >/dev/null
 grep 'old-diagnostics' "$rules_json" >/dev/null
 grep 'toolchain-caches' "$rules_json" >/dev/null
 grep 'stale-python-virtualenvs' "$rules_json" >/dev/null
+grep 'android-inventory' "$rules_json" >/dev/null
 grep 'appdata-inventory' "$rules_json" >/dev/null
 grep 'cloud-inventory' "$rules_json" >/dev/null
 grep 'personal-inventory' "$rules_json" >/dev/null
@@ -344,6 +365,15 @@ grep '"id":"xcode-archives"' "$xcode_json" >/dev/null
 grep '"safety":"review-only"' "$xcode_json" >/dev/null
 grep 'cleanroom clean --apply --trash --include-dev-heavy' "$xcode_json" >/dev/null
 rm -f "$xcode_json"
+"$BIN" android | grep 'Android Virtual Devices' >/dev/null
+android_json="$(mktemp)"
+"$BIN" android --json > "$android_json"
+python3 -m json.tool "$android_json" >/dev/null
+grep '"id":"android-system-images"' "$android_json" >/dev/null
+grep '"id":"android-avds"' "$android_json" >/dev/null
+grep '"safety":"dev-heavy"' "$android_json" >/dev/null
+grep 'cleanroom clean --apply --trash --include-dev-heavy' "$android_json" >/dev/null
+rm -f "$android_json"
 "$BIN" startup | grep 'com.example.cleanroom-test' >/dev/null
 startup_json="$(mktemp)"
 "$BIN" startup --json > "$startup_json"

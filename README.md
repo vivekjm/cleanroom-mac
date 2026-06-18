@@ -274,6 +274,13 @@ cleanroom xcode
 cleanroom xcode --json
 ```
 
+Review Android SDK, emulator, and AVD storage:
+
+```sh
+cleanroom android
+cleanroom android --json
+```
+
 Review startup and background launch items:
 
 ```sh
@@ -556,6 +563,8 @@ Config files use simple `key=value` lines and are never executed as shell.
 
 `system-data` breaks common macOS System Data locations into focused buckets such as Application Support, caches, Developer data, container storage, diagnostics, MobileSync backups, Group Containers, HTTPStorages, and saved app state. It is review-only and points to the safest next command for each bucket.
 
+`android --json` emits Android SDK, NDK, system image, emulator, AVD, platform, build-tool, command-line tool, and Android Studio cache sizes with safety labels. NDKs, system images, and temporary SDK downloads are opt-in through `--include-dev-heavy`; full SDK roots and AVDs stay review-only.
+
 `caches --json` emits safe and opt-in cache bucket sizes with the matching preview and apply commands.
 
 `diagnostics` inventories user logs, diagnostic reports, and CrashReporter data. Default cleanup already removes old log files; diagnostic report cleanup is opt-in with `cleanroom clean --include-diagnostics --days N`.
@@ -579,6 +588,8 @@ Config files use simple `key=value` lines and are never executed as shell.
 `apps` lists `.app` bundle sizes from `/Applications` and `~/Applications`, or a path you provide. It never uninstalls apps.
 
 `appdata` ranks top-level Application Support, Containers, Group Containers, HTTPStorages, WebKit, and saved-state folders. It is review-only and includes the central guard status so protected profiles and personal data stand out before you investigate with `leftovers APPNAME`.
+
+`android` helps diagnose large developer storage created by Android Studio, Expo, React Native, Flutter, and native Android work. It inventories the SDK and emulator footprint before suggesting the explicit `clean --include-dev-heavy` path for redownloadable NDK/system-image/temp-download data.
 
 `libraries` inventories protected media and creative libraries such as Photos, Photo Booth, Music, iTunes, TV, iMovie, GarageBand, Logic, and Audio Music Apps. It is review-only and helps explain large Documents or media storage without deleting personal projects.
 

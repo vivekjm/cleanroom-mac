@@ -66,6 +66,7 @@ cleanroom browsers --json
 cleanroom leftovers adobe --json
 cleanroom backups --json
 cleanroom xcode --json
+cleanroom android --json
 cleanroom startup --json
 cleanroom trash --json
 cleanroom caches --json
@@ -119,6 +120,8 @@ cleanroom report --output cleanroom-report.md
 `backups --json` emits local iPhone and iPad backup sizes and device metadata when available. It is intentionally review-only and protected.
 
 `xcode --json` emits Xcode storage buckets such as DerivedData, simulator caches, DeviceSupport, simulator devices, and Xcode Archives with safety labels and matching cleanup guidance.
+
+`android --json` emits Android SDK, NDK, system image, emulator, AVD, platform, build-tool, command-line tool, and Android Studio cache buckets with safety labels and matching cleanup guidance.
 
 `startup --json` emits LaunchAgents and LaunchDaemons with scope, type, status, label, program, and path. It is intentionally review-only and does not unload, disable, or remove anything.
 
@@ -209,6 +212,13 @@ Inspect Xcode storage first:
 ```sh
 cleanroom xcode
 cleanroom xcode --json
+```
+
+Inspect Android SDK and emulator storage first:
+
+```sh
+cleanroom android
+cleanroom android --json
 ```
 
 ## Documents Storage

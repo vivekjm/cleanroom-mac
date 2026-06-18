@@ -23,6 +23,7 @@ _cleanroom() {
     'leftovers:Find or trash app leftovers by search term'
     'backups:Inventory local iPhone/iPad backups'
     'xcode:Inventory Xcode and simulator storage'
+    'android:Inventory Android SDK and emulator storage'
     'startup:List LaunchAgents and LaunchDaemons'
     'trash:Inventory current user Trash'
     'caches:Inventory cache buckets'

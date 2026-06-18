@@ -1,4 +1,4 @@
-.TH CLEANROOM 1 "June 2026" "cleanroom 0.39.0" "User Commands"
+.TH CLEANROOM 1 "June 2026" "cleanroom 0.40.0" "User Commands"
 .SH NAME
 cleanroom \- safe-by-default macOS storage cleaner
 .SH SYNOPSIS
@@ -58,6 +58,9 @@ cleanroom \- safe-by-default macOS storage cleaner
 .br
 .B cleanroom
 .RI "xcode [--json]"
+.br
+.B cleanroom
+.RI "android [--json]"
 .br
 .B cleanroom
 .RI "startup [--json]"
@@ -188,6 +191,10 @@ Inventory local iPhone and iPad backups for review without deleting them.
 .TP
 .B xcode
 Inventory Xcode build, archive, DeviceSupport, and simulator storage.
+.TP
+.B android
+Inventory Android SDK, NDK, system image, emulator, AVD, platform, build-tool,
+command-line tool, and Android Studio cache storage with safety labels.
 .TP
 .B startup
 List LaunchAgents and LaunchDaemons for review without unloading or removing anything.
@@ -333,6 +340,7 @@ cleanroom leftovers adobe --limit 50
 cleanroom leftovers adobe --apply --trash
 cleanroom backups --json
 cleanroom xcode --json
+cleanroom android --json
 cleanroom startup --json
 cleanroom trash --json
 cleanroom caches --json
