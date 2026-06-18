@@ -83,6 +83,8 @@ mkdir -p \
   "$TEST_HOME/.Trash/cleanroom-test-run" \
   "$TEST_HOME/Applications/FakeBig.app/Contents/MacOS" \
   "$TEST_HOME/Applications/Cleanroom Test Uninstaller.app/Contents/MacOS" \
+  "$TEST_HOME/Applications/Cleanroom Login Helper.app/Contents/MacOS" \
+  "$TEST_HOME/bin" \
   "$TEST_HOME/Desktop" \
   "$TEST_HOME/Downloads" \
   "$TEST_HOME/Documents/duplicates" \
@@ -207,7 +209,14 @@ dd if=/dev/zero of="$TEST_HOME/Documents/duplicates/copy-a.bin" bs=1024 count=20
 cp "$TEST_HOME/Documents/duplicates/copy-a.bin" "$TEST_HOME/Documents/duplicates/copy-b.bin"
 dd if=/dev/zero of="$TEST_HOME/Applications/FakeBig.app/Contents/MacOS/fake" bs=1024 count=2048 >/dev/null 2>&1
 printf 'uninstaller\n' >"$TEST_HOME/Applications/Cleanroom Test Uninstaller.app/Contents/MacOS/uninstall"
+printf 'login helper\n' >"$TEST_HOME/Applications/Cleanroom Login Helper.app/Contents/MacOS/helper"
+cat >"$TEST_HOME/bin/osascript" <<'SH'
+#!/usr/bin/env bash
+printf 'Cleanroom Login Helper\tfalse\t%s/Applications/Cleanroom Login Helper.app\n' "$HOME"
+SH
+chmod +x "$TEST_HOME/bin/osascript"
 export HOME="$TEST_HOME"
+export PATH="$TEST_HOME/bin:$PATH"
 
 bash -n "$BIN"
 
@@ -307,6 +316,7 @@ grep 'desktop-inventory' "$rules_json" >/dev/null
 grep 'screenshots-inventory' "$rules_json" >/dev/null
 grep 'archives-inventory' "$rules_json" >/dev/null
 grep 'android-inventory' "$rules_json" >/dev/null
+grep 'loginitems-inventory' "$rules_json" >/dev/null
 grep 'uninstallers-inventory' "$rules_json" >/dev/null
 grep 'appdata-inventory' "$rules_json" >/dev/null
 grep 'cloud-inventory' "$rules_json" >/dev/null
@@ -527,6 +537,14 @@ python3 -m json.tool "$startup_json" >/dev/null
 grep 'com.example.cleanroom-test' "$startup_json" >/dev/null
 grep '"type":"LaunchAgent"' "$startup_json" >/dev/null
 rm -f "$startup_json"
+"$BIN" loginitems | grep 'Cleanroom Login Helper' >/dev/null
+loginitems_json="$(mktemp)"
+"$BIN" loginitems --json > "$loginitems_json"
+python3 -m json.tool "$loginitems_json" >/dev/null
+grep '"name":"Cleanroom Login Helper"' "$loginitems_json" >/dev/null
+grep '"hidden":"false"' "$loginitems_json" >/dev/null
+grep '"present":true' "$loginitems_json" >/dev/null
+rm -f "$loginitems_json"
 "$BIN" trash | grep 'old-trash.txt' >/dev/null
 trash_json="$(mktemp)"
 "$BIN" trash --json > "$trash_json"

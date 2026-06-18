@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.53.0"
+VERSION="0.54.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -78,6 +78,7 @@ Usage:
   cleanroom xcode [--json]
   cleanroom android [--json]
   cleanroom startup [--json]
+  cleanroom loginitems [--json]
   cleanroom trash [--json]
   cleanroom caches [--json]
   cleanroom diagnostics [--json]
@@ -134,6 +135,7 @@ Actions:
   xcode                Inventory Xcode build, archive, DeviceSupport, and simulator storage.
   android              Inventory Android SDK, emulator, AVD, and Android Studio storage.
   startup              List LaunchAgents and LaunchDaemons for review.
+  loginitems           List user Login Items for review.
   trash                Inventory current user Trash contents.
   caches               Inventory safe and opt-in cache buckets.
   diagnostics          Inventory user logs and diagnostic reports.
@@ -162,7 +164,7 @@ Options:
   --verbose            Print every path touched.
   --json               Emit JSON for overview, map, snapshot, diff, state, permissions, review, scan, system-data, plan, large, duplicates,
                        documents, desktop, screenshots, archives, downloads, installers, nodes, venvs, apps, uninstallers, appdata, libraries, cloud, personal, communications,
-                       browsers, leftovers, startup,
+                       browsers, leftovers, startup, loginitems,
                        trash, backups, xcode, caches, diagnostics, packages, receipts, homebrew, toolchains,
                        containers, android, snapshots, doctor, protect, guard, or rules.
   --output PATH        Output path for report.
@@ -284,6 +286,8 @@ Examples:
   cleanroom android --json
   cleanroom startup
   cleanroom startup --json
+  cleanroom loginitems
+  cleanroom loginitems --json
   cleanroom trash
   cleanroom trash --json
   cleanroom caches
@@ -1343,6 +1347,7 @@ map_rows() {
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "media" "Media Libraries" "$HOME/Pictures; $HOME/Music; $HOME/Movies" "protected" "cleanroom libraries" "Photos, music, videos, and creative projects."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "communications" "Mail and Messages" "$HOME/Library/Mail; $HOME/Library/Mail Downloads; $HOME/Library/Containers/com.apple.mail/Data/Library/Mail Downloads; $HOME/Library/Messages" "protected" "cleanroom communications" "Mail, chats, and communication attachments are protected."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "developer" "Developer Data" "$HOME/Library/Developer; $HOME/Library/Android; $HOME/.android" "mixed" "cleanroom system-data" "Xcode, simulators, Android SDKs, and emulator data."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "login-items" "Login Items" "System Events Login Items" "review" "cleanroom loginitems" "Apps and helpers that macOS starts at login. Review when troubleshooting slow startup."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "uninstallers" "Vendor Uninstallers" "/Applications; $HOME/Applications; /Applications/Utilities; Application Support" "review" "cleanroom uninstallers --limit 50" "Vendor uninstallers, remover apps, and scripts. Review before manual leftover cleanup."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "packages" "Package Stores" "$HOME/.npm; $HOME/.yarn; $HOME/Library/pnpm; $HOME/.gradle; $HOME/.cocoapods; $HOME/.cargo" "rebuildable" "cleanroom packages" "Package-manager caches and stores."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "receipts" "Package Receipts" "/var/db/receipts; /Library/Receipts; $HOME/Library/Receipts" "review" "cleanroom receipts --limit 50" "macOS package installer records. Useful for uninstall investigations; not cleanup targets."
@@ -3319,6 +3324,89 @@ startup_count() {
   startup_rows | awk 'END {print NR + 0}'
 }
 
+loginitem_manage_command() {
+  printf 'open x-apple.systempreferences:com.apple.LoginItems-Settings.extension'
+}
+
+loginitem_rows() {
+  command -v osascript >/dev/null 2>&1 || return 0
+  local script_output
+  script_output="$(osascript 2>/dev/null <<APPLESCRIPT || true
+set output to ""
+tell application "System Events"
+  repeat with itemRef in login items
+    set itemName to name of itemRef as text
+    set itemHidden to hidden of itemRef as text
+    set itemPath to ""
+    try
+      set itemPath to POSIX path of (path of itemRef as alias)
+    end try
+    set output to output & itemName & tab & itemHidden & tab & itemPath & linefeed
+  end repeat
+end tell
+return output
+APPLESCRIPT
+)"
+  local name hidden path expanded kb
+  while IFS=$'\t' read -r name hidden path; do
+    [[ -n "${name:-}" ]] || continue
+    expanded=""
+    kb=0
+    if [[ -n "${path:-}" ]]; then
+      expanded="$(expand_path "$path")"
+      kb="$(size_kb "$expanded")"
+    fi
+    printf '%012d\t%s\t%s\t%s\n' "$kb" "$name" "${hidden:-unknown}" "$expanded"
+  done <<<"$script_output" | sort -rn
+}
+
+loginitems() {
+  local rows
+  rows="$(loginitem_rows)"
+
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '['
+    local first=1 kb name hidden path kb_num
+    while IFS=$'\t' read -r kb name hidden path; do
+      [[ -z "${name:-}" ]] && continue
+      kb_num="$(printf '%s\n' "$kb" | sed 's/^0*//; s/^$/0/')"
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '{"name":"%s","hidden":"%s","path":"%s","present":%s,"size_kb":%s,"size":"%s","manage_command":"%s","guidance":"%s"}' \
+        "$(printf '%s' "$name" | json_escape)" \
+        "$(printf '%s' "$hidden" | json_escape)" \
+        "$(printf '%s' "$path" | json_escape)" \
+        "$(if [[ -n "$path" && -e "$path" ]]; then echo true; else echo false; fi)" \
+        "$kb_num" \
+        "$(human_kb "${kb:-0}" | json_escape)" \
+        "$(loginitem_manage_command | json_escape)" \
+        "$(printf '%s' "Review Login Items in System Settings. cleanroom does not disable or remove them." | json_escape)"
+    done <<<"$rows"
+    printf ']\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}cleanroom Login Items${RESET}"
+  printf 'Review-only inventory. cleanroom does not disable, remove, or change Login Items.\n'
+  printf 'Manage them in System Settings > General > Login Items.\n\n'
+  if ! command -v osascript >/dev/null 2>&1; then
+    printf 'osascript not found; Login Items cannot be inspected on this system.\n'
+    return 0
+  fi
+  if [[ -z "$rows" ]]; then
+    printf 'No Login Items reported by System Events, or access was denied.\n'
+    return 0
+  fi
+  printf '%-10s %-8s %s\n' "size" "hidden" "name"
+  local kb name hidden path
+  while IFS=$'\t' read -r kb name hidden path; do
+    [[ -z "${name:-}" ]] && continue
+    printf '%-10s %-8s %s\n' "$(human_kb "$kb")" "$hidden" "$name"
+    [[ -n "$path" ]] && printf '  path: %s\n' "$path"
+  done <<<"$rows"
+  printf '\nManage: %s\n' "$(loginitem_manage_command)"
+}
+
 startup() {
   local rows
   rows="$(startup_rows)"
@@ -4173,6 +4261,7 @@ overview() {
   printf 'cleanroom libraries\n'
   printf 'cleanroom trash\n'
   printf 'cleanroom startup\n'
+  printf 'cleanroom loginitems\n'
   printf 'cleanroom packages\n'
   printf 'cleanroom receipts --limit 50\n'
   printf 'cleanroom homebrew\n'
@@ -4891,7 +4980,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  overview|map|snapshot|diff|state|permissions|review|scan|system-data|plan|large|duplicates|documents|desktop|screenshots|archives|downloads|installers|nodes|venvs|virtualenvs|apps|uninstallers|appdata|libraries|cloud|personal|communications|comms|browsers|leftovers|backups|xcode|android|startup|trash|caches|diagnostics|packages|receipts|homebrew|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
+  overview|map|snapshot|diff|state|permissions|review|scan|system-data|plan|large|duplicates|documents|desktop|screenshots|archives|downloads|installers|nodes|venvs|virtualenvs|apps|uninstallers|appdata|libraries|cloud|personal|communications|comms|browsers|leftovers|backups|xcode|android|startup|loginitems|trash|caches|diagnostics|packages|receipts|homebrew|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -5019,6 +5108,7 @@ case "$ACTION" in
   xcode) xcode ;;
   android) android ;;
   startup) startup ;;
+  loginitems) loginitems ;;
   trash) trash ;;
   caches) caches ;;
   diagnostics) diagnostics ;;

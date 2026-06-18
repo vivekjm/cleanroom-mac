@@ -38,6 +38,7 @@ _cleanroom() {
     'xcode:Inventory Xcode and simulator storage'
     'android:Inventory Android SDK and emulator storage'
     'startup:List LaunchAgents and LaunchDaemons'
+    'loginitems:List user Login Items'
     'trash:Inventory current user Trash'
     'caches:Inventory cache buckets'
     'diagnostics:Inventory logs and diagnostic reports'

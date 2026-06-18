@@ -32,6 +32,7 @@ cleanroom leftovers adobe
 cleanroom backups
 cleanroom xcode
 cleanroom startup
+cleanroom loginitems
 cleanroom trash
 cleanroom caches
 cleanroom diagnostics
@@ -88,6 +89,7 @@ cleanroom backups --json
 cleanroom xcode --json
 cleanroom android --json
 cleanroom startup --json
+cleanroom loginitems --json
 cleanroom trash --json
 cleanroom caches --json
 cleanroom diagnostics --json
@@ -173,6 +175,8 @@ cleanroom permissions --json
 `android --json` emits Android SDK, NDK, system image, emulator, AVD, platform, build-tool, command-line tool, and Android Studio cache buckets with safety labels and matching cleanup guidance.
 
 `startup --json` emits LaunchAgents and LaunchDaemons with scope, type, status, label, program, and path. It is intentionally review-only and does not unload, disable, or remove anything.
+
+`loginitems --json` emits user Login Items reported by macOS System Events, including hidden status, path, present flag, and size when available. It is intentionally review-only and does not disable, remove, or change Login Items.
 
 `trash --json` emits current `~/.Trash` size and top-level items. Emptying Trash requires `cleanroom clean --include-user-trash --apply`.
 

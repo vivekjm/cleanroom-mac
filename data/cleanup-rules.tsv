@@ -19,6 +19,7 @@ desktop-inventory	desktop	review-only	no	-	Top-level files and folders under ~/D
 screenshots-inventory	screenshots	review-only	no	-	Screenshot and screen recording files under Desktop, Downloads, Documents, or a provided folder	Review-only screenshot inventory; screenshots can contain sensitive data.
 archives-inventory	archives	review-only	no	-	Archive and disk image files under Downloads, Desktop, Documents, or a provided folder	Review-only archive inventory; archives can be backups, deliverables, or installer sources.
 android-inventory	android	review-only	no	-	Android SDK, NDK, system images, AVDs, emulator, platform/build tools, and Studio caches	Review-only Android SDK and emulator inventory with safety labels and cleanup guidance.
+loginitems-inventory	loginitems	review-only	no	-	System Events Login Items	Read-only user Login Items inventory; cleanroom does not disable, remove, or change Login Items.
 uninstallers-inventory	uninstallers	review-only	no	-	/Applications; ~/Applications; /Applications/Utilities; Application Support	Read-only vendor uninstaller and remover tool inventory; cleanroom does not run or remove these tools.
 appdata-inventory	appdata	review-only	no	-	Application Support, Containers, Group Containers, HTTPStorages, WebKit, and saved state	Review-only app data inventory; use leftovers or vendor tools before removing app state.
 cloud-inventory	cloud	review-only	no	-	iCloud Drive, CloudStorage, Dropbox, Google Drive, OneDrive, Box, and Sync	Review-only cloud-sync storage inventory; cleanroom does not remove synced folders.
