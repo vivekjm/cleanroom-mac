@@ -242,6 +242,18 @@ test -f "$snapshot_output"
 python3 -m json.tool "$snapshot_output" >/dev/null
 "$BIN" snapshot | grep 'Wrote snapshot' >/dev/null
 find "$TEST_HOME/.local/state/cleanroom/snapshots" -type f -name 'snapshot-*.json' | grep 'snapshot-' >/dev/null
+snapshot_before="$TEST_HOME/snapshot-before.json"
+snapshot_after="$TEST_HOME/snapshot-after.json"
+"$BIN" snapshot --output "$snapshot_before" >/dev/null
+dd if=/dev/zero of="$TEST_HOME/Downloads/snapshot-growth.bin" bs=1024 count=32 >/dev/null 2>&1
+"$BIN" snapshot --output "$snapshot_after" >/dev/null
+"$BIN" diff "$snapshot_before" "$snapshot_after" | grep 'downloads' >/dev/null
+diff_json="$(mktemp)"
+"$BIN" diff "$snapshot_before" "$snapshot_after" --json > "$diff_json"
+python3 -m json.tool "$diff_json" >/dev/null
+grep '"id":"downloads"' "$diff_json" >/dev/null
+grep '"delta_kb":' "$diff_json" >/dev/null
+rm -f "$diff_json"
 "$BIN" system-data | grep 'System Data breakdown' >/dev/null
 system_data_json="$(mktemp)"
 "$BIN" system-data --json > "$system_data_json"
@@ -263,6 +275,7 @@ grep 'toolchain-caches' "$rules_json" >/dev/null
 grep 'stale-python-virtualenvs' "$rules_json" >/dev/null
 grep 'storage-map' "$rules_json" >/dev/null
 grep 'storage-snapshot' "$rules_json" >/dev/null
+grep 'storage-diff' "$rules_json" >/dev/null
 grep 'review-dashboard' "$rules_json" >/dev/null
 grep 'documents-inventory' "$rules_json" >/dev/null
 grep 'desktop-inventory' "$rules_json" >/dev/null

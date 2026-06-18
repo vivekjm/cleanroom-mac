@@ -146,6 +146,7 @@ Save a timestamped storage snapshot:
 cleanroom snapshot
 cleanroom snapshot --output ~/Desktop/cleanroom-before.json
 cleanroom snapshot --json
+cleanroom diff ~/Desktop/cleanroom-before.json ~/Desktop/cleanroom-after.json
 ```
 
 Scan:
@@ -624,6 +625,8 @@ Config files use simple `key=value` lines and are never executed as shell.
 `map` ranks focused major storage buckets such as Documents, Desktop, Downloads, user Applications, Application Support, app containers, cloud storage, media libraries, communication data, developer data, package stores, toolchains, container VMs, and Trash. It is review-only. Buckets can overlap when a smaller folder is also part of a larger parent.
 
 `snapshot` writes the same focused storage-map data plus disk state into a timestamped JSON file under `~/.local/state/cleanroom/snapshots/`, or to `--output PATH`. It is useful before and after cleanup, installs, or support sessions.
+
+`diff` compares two snapshot JSON files and ranks bucket deltas. With no paths, it compares the latest two snapshots from `~/.local/state/cleanroom/snapshots/`. It is read-only and useful for explaining what grew after an install or what shrank after cleanup.
 
 `review` gives normal users a read-only checklist of personal storage hotspots: Documents, Desktop, old Downloads, screenshots, archives, installers, app data, and installed app bundles. It points to the next focused command for each item.
 

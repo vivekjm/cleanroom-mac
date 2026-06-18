@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.48.0"
+VERSION="0.49.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -48,6 +48,7 @@ Usage:
   cleanroom overview [--json]
   cleanroom map [--json]
   cleanroom snapshot [--json] [--output PATH]
+  cleanroom diff [BEFORE.json AFTER.json] [--json]
   cleanroom review [--json]
   cleanroom scan [options]
   cleanroom system-data [--json]
@@ -99,6 +100,7 @@ Actions:
   overview             Show a read-only storage dashboard and next steps.
   map                  Show a read-only map of major storage buckets.
   snapshot             Write a timestamped storage-map snapshot for before/after tracking.
+  diff                 Compare two storage snapshots, or the latest two by default.
   review               Show a read-only personal storage review checklist.
   scan                 Show disk usage and likely cleanup candidates.
   system-data          Break down common macOS System Data buckets.
@@ -150,7 +152,7 @@ Options:
   --trash              Move deleted files to ~/.Trash/cleanroom-* instead of rm -rf.
   --yes                Do not prompt before --apply cleanup.
   --verbose            Print every path touched.
-  --json               Emit JSON for overview, map, snapshot, review, scan, system-data, plan, large, duplicates,
+  --json               Emit JSON for overview, map, snapshot, diff, review, scan, system-data, plan, large, duplicates,
                        documents, desktop, screenshots, archives, downloads, installers, nodes, venvs, apps, appdata, libraries, cloud, personal, communications,
                        browsers, leftovers, startup,
                        trash, backups, xcode, caches, diagnostics, packages, homebrew, toolchains,
@@ -206,6 +208,8 @@ Examples:
   cleanroom map --json
   cleanroom snapshot
   cleanroom snapshot --json
+  cleanroom diff
+  cleanroom diff before.json after.json --json
   cleanroom review
   cleanroom review --json
   cleanroom scan
@@ -655,6 +659,13 @@ snapshot_dir() {
 
 default_snapshot_file() {
   printf '%s\n' "$(snapshot_dir)/snapshot-$RUN_ID.json"
+}
+
+latest_snapshot_files() {
+  local dir
+  dir="$(snapshot_dir)"
+  [[ -d "$dir" ]] || return 1
+  find "$dir" -type f -name 'snapshot-*.json' -exec ls -t {} + 2>/dev/null | head -2
 }
 
 latest_log_file() {
@@ -1426,6 +1437,107 @@ snapshot() {
     printf '%-10s %-16s %s\n' "$(human_kb "$kb")" "$category" "$id"
   done <<<"$rows"
   printf '\nCompare snapshots manually or attach them to support reports. Snapshot data is read-only and contains paths plus sizes only.\n'
+}
+
+snapshot_diff() {
+  local before after latest newest older
+  if [[ "${#PATH_ARGS[@]}" -eq 0 ]]; then
+    latest="$(latest_snapshot_files || true)"
+    newest="$(printf '%s\n' "$latest" | sed -n '1p')"
+    older="$(printf '%s\n' "$latest" | sed -n '2p')"
+    [[ -n "${newest:-}" && -n "${older:-}" ]] || die "Need two snapshots. Run cleanroom snapshot twice or pass BEFORE.json AFTER.json."
+    before="$older"
+    after="$newest"
+  elif [[ "${#PATH_ARGS[@]}" -eq 2 ]]; then
+    before="$(expand_path "${PATH_ARGS[0]}")"
+    after="$(expand_path "${PATH_ARGS[1]}")"
+  else
+    die "diff requires zero args for latest two snapshots, or BEFORE.json AFTER.json."
+  fi
+  [[ -f "$before" ]] || die "Snapshot not found: $before"
+  [[ -f "$after" ]] || die "Snapshot not found: $after"
+
+  if ! command -v python3 >/dev/null 2>&1; then
+    die "diff requires python3 to parse snapshot JSON."
+  fi
+
+  python3 - "$before" "$after" "$JSON" <<'PY'
+import json
+import sys
+
+before_path, after_path, json_mode = sys.argv[1], sys.argv[2], sys.argv[3] == "1"
+
+with open(before_path, "r", encoding="utf-8") as handle:
+    before = json.load(handle)
+with open(after_path, "r", encoding="utf-8") as handle:
+    after = json.load(handle)
+
+before_buckets = {item.get("id", ""): item for item in before.get("buckets", []) if item.get("id")}
+after_buckets = {item.get("id", ""): item for item in after.get("buckets", []) if item.get("id")}
+items = []
+for bucket_id in sorted(set(before_buckets) | set(after_buckets)):
+    old = before_buckets.get(bucket_id, {})
+    new = after_buckets.get(bucket_id, {})
+    before_kb = int(old.get("size_kb") or 0)
+    after_kb = int(new.get("size_kb") or 0)
+    delta_kb = after_kb - before_kb
+    source = new or old
+    items.append({
+        "id": bucket_id,
+        "title": source.get("title", bucket_id),
+        "category": source.get("category", ""),
+        "before_kb": before_kb,
+        "after_kb": after_kb,
+        "delta_kb": delta_kb,
+        "command": source.get("command", ""),
+    })
+
+items.sort(key=lambda item: (abs(item["delta_kb"]), item["after_kb"]), reverse=True)
+
+def human(kb):
+    value = kb * 1024.0
+    units = ["B", "KB", "MB", "GB", "TB"]
+    i = 0
+    while abs(value) >= 1024 and i < len(units) - 1:
+        value /= 1024.0
+        i += 1
+    if i <= 1:
+        return f"{value:.0f}{units[i]}"
+    return f"{value:.1f}{units[i]}"
+
+if json_mode:
+    payload = {
+        "before_file": before_path,
+        "after_file": after_path,
+        "before_created_at": before.get("created_at", ""),
+        "after_created_at": after.get("created_at", ""),
+        "items": [
+            {
+                **item,
+                "before": human(item["before_kb"]),
+                "after": human(item["after_kb"]),
+                "delta": human(item["delta_kb"]),
+            }
+            for item in items
+        ],
+    }
+    print(json.dumps(payload, separators=(",", ":")))
+    raise SystemExit(0)
+
+print("\033[1mcleanroom snapshot diff\033[0m")
+print(f"before: {before_path}")
+print(f"after:  {after_path}")
+print("")
+print(f"{'delta':<10} {'after':<10} {'before':<10} {'category':<14} {'bucket':<20} next command")
+shown = 0
+for item in items:
+    if item["delta_kb"] == 0 and shown >= 10:
+        continue
+    print(f"{human(item['delta_kb']):<10} {human(item['after_kb']):<10} {human(item['before_kb']):<10} {item['category']:<14} {item['id']:<20} {item['command']}")
+    shown += 1
+print("")
+print("Positive deltas grew; negative deltas shrank. Snapshot diff is read-only.")
+PY
 }
 
 large_rows() {
@@ -3782,6 +3894,7 @@ overview() {
   printf '\n%s\n' "${BOLD}Useful next commands${RESET}"
   printf 'cleanroom map\n'
   printf 'cleanroom snapshot\n'
+  printf 'cleanroom diff\n'
   printf 'cleanroom review\n'
   printf 'cleanroom plan\n'
   printf 'cleanroom system-data\n'
@@ -4434,7 +4547,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  overview|map|snapshot|review|scan|system-data|plan|large|duplicates|documents|desktop|screenshots|archives|downloads|installers|nodes|venvs|virtualenvs|apps|appdata|libraries|cloud|personal|communications|comms|browsers|leftovers|backups|xcode|android|startup|trash|caches|diagnostics|packages|homebrew|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
+  overview|map|snapshot|diff|review|scan|system-data|plan|large|duplicates|documents|desktop|screenshots|archives|downloads|installers|nodes|venvs|virtualenvs|apps|appdata|libraries|cloud|personal|communications|comms|browsers|leftovers|backups|xcode|android|startup|trash|caches|diagnostics|packages|homebrew|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -4518,7 +4631,7 @@ while [[ "$#" -gt 0 ]]; do
     -h|--help) usage; exit 0 ;;
     -v|--version) echo "$VERSION"; exit 0 ;;
     *)
-      if [[ "$ACTION" == "guard" || "$ACTION" == "large" || "$ACTION" == "duplicates" || "$ACTION" == "documents" || "$ACTION" == "screenshots" || "$ACTION" == "archives" || "$ACTION" == "nodes" || "$ACTION" == "venvs" || "$ACTION" == "virtualenvs" || "$ACTION" == "apps" || "$ACTION" == "leftovers" ]]; then
+      if [[ "$ACTION" == "guard" || "$ACTION" == "diff" || "$ACTION" == "large" || "$ACTION" == "duplicates" || "$ACTION" == "documents" || "$ACTION" == "screenshots" || "$ACTION" == "archives" || "$ACTION" == "nodes" || "$ACTION" == "venvs" || "$ACTION" == "virtualenvs" || "$ACTION" == "apps" || "$ACTION" == "leftovers" ]]; then
         PATH_ARGS+=("$1")
       else
         die "Unknown option: $1"
@@ -4532,6 +4645,7 @@ case "$ACTION" in
   overview) overview ;;
   map) map ;;
   snapshot) snapshot ;;
+  diff) snapshot_diff ;;
   review) review ;;
   scan) scan ;;
   system-data) system_data ;;

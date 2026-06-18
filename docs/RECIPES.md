@@ -8,6 +8,7 @@ Common `cleanroom` workflows.
 cleanroom overview
 cleanroom map
 cleanroom snapshot
+cleanroom diff
 cleanroom scan
 cleanroom system-data
 cleanroom plan
@@ -53,6 +54,7 @@ cleanroom clean
 cleanroom overview --json
 cleanroom map --json
 cleanroom snapshot --json
+cleanroom diff before.json after.json --json
 cleanroom review --json
 cleanroom scan --json
 cleanroom system-data --json
@@ -93,6 +95,7 @@ cleanroom guard --json ~/Library/Application\ Support/Google/Chrome
 cleanroom rules --json
 cleanroom report --output cleanroom-report.md
 cleanroom snapshot --output cleanroom-before.json
+cleanroom diff cleanroom-before.json cleanroom-after.json
 ```
 
 `overview --json` emits a compact dashboard with disk state, summary counts, and top cleanup recommendations.
@@ -100,6 +103,8 @@ cleanroom snapshot --output cleanroom-before.json
 `map --json` emits a read-only focused storage bucket map with paths, safety category, size, next command, and description. Buckets can overlap when a smaller folder is also part of a larger parent.
 
 `snapshot --json` emits disk state plus the focused storage-map buckets in one timestamped JSON object. Plain `snapshot` writes the same data to `~/.local/state/cleanroom/snapshots/`; use `--output PATH` to choose the file.
+
+`diff --json BEFORE AFTER` emits before/after storage bucket deltas from two snapshot files. Plain `diff` with no paths compares the latest two saved snapshots.
 
 `review --json` emits a read-only checklist of personal storage hotspots with estimates, counts, descriptions, and next commands.
 

@@ -78,6 +78,7 @@ final class CleanroomAppDelegate: NSObject, NSApplicationDelegate {
         inspectRow.addArrangedSubview(button("Overview", action: #selector(overview)))
         inspectRow.addArrangedSubview(button("Map", action: #selector(storageMap)))
         inspectRow.addArrangedSubview(button("Snapshot", action: #selector(snapshot)))
+        inspectRow.addArrangedSubview(button("Diff", action: #selector(snapshotDiff)))
         inspectRow.addArrangedSubview(button("Review", action: #selector(reviewStorage)))
         inspectRow.addArrangedSubview(button("Scan", action: #selector(scan)))
         inspectRow.addArrangedSubview(button("System Data", action: #selector(systemData)))
@@ -184,6 +185,10 @@ final class CleanroomAppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func snapshot() {
         runCommand("snapshot", title: "Snapshot")
+    }
+
+    @objc private func snapshotDiff() {
+        runCommand("diff", title: "Diff")
     }
 
     @objc private func reviewStorage() {
