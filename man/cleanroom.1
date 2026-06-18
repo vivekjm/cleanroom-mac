@@ -1,4 +1,4 @@
-.TH CLEANROOM 1 "June 2026" "cleanroom 0.49.0" "User Commands"
+.TH CLEANROOM 1 "June 2026" "cleanroom 0.50.0" "User Commands"
 .SH NAME
 cleanroom \- safe-by-default macOS storage cleaner
 .SH SYNOPSIS
@@ -13,6 +13,9 @@ cleanroom \- safe-by-default macOS storage cleaner
 .br
 .B cleanroom
 .RI "diff [before.json after.json] [--json]"
+.br
+.B cleanroom
+.RI "state [--json]"
 .br
 .B cleanroom
 .RI "review [--json]"
@@ -170,6 +173,10 @@ emit the snapshot to stdout.
 .B diff
 Compare two snapshot JSON files and rank bucket deltas. With no paths, compare
 the latest two saved snapshots from ~/.local/state/cleanroom/snapshots.
+.TP
+.B state
+Inventory Cleanroom-created apply logs, storage snapshots, and recoverable
+~/.Trash/cleanroom-* folders without deleting anything.
 .TP
 .B scan
 Show disk usage, cleanup candidates, largest home folders, and large files.
@@ -385,6 +392,7 @@ cleanroom overview
 cleanroom map --json
 cleanroom snapshot --output ~/Desktop/cleanroom-before.json
 cleanroom diff ~/Desktop/cleanroom-before.json ~/Desktop/cleanroom-after.json
+cleanroom state --json
 cleanroom scan
 cleanroom system-data
 cleanroom plan --json

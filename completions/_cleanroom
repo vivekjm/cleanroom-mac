@@ -8,6 +8,7 @@ _cleanroom() {
     'map:Show major storage bucket map'
     'snapshot:Write a storage-map snapshot'
     'diff:Compare two storage snapshots'
+    'state:Inventory cleanroom-created state files'
     'review:Show personal storage review checklist'
     'scan:Show disk usage and cleanup candidates'
     'system-data:Break down common System Data buckets'

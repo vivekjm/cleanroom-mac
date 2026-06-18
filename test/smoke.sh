@@ -79,6 +79,7 @@ mkdir -p \
   "$TEST_HOME/Library/Containers/com.docker.docker/Data/vms/0" \
   "$TEST_HOME/Library/Containers/io.podman_desktop.PodmanDesktop/Data" \
   "$TEST_HOME/.Trash" \
+  "$TEST_HOME/.Trash/cleanroom-test-run" \
   "$TEST_HOME/Applications/FakeBig.app/Contents/MacOS" \
   "$TEST_HOME/Desktop" \
   "$TEST_HOME/Downloads" \
@@ -152,6 +153,7 @@ printf 'music library\n' >"$TEST_HOME/Music/Music Library.musiclibrary/Library.m
 printf 'imovie library\n' >"$TEST_HOME/Movies/iMovie Library.imovielibrary/CurrentVersion.flexolibrary"
 printf 'garageband project\n' >"$TEST_HOME/Music/GarageBand/song.band"
 printf 'trashed\n' >"$TEST_HOME/.Trash/old-trash.txt"
+printf 'recoverable cleanroom trash\n' >"$TEST_HOME/.Trash/cleanroom-test-run/item.txt"
 printf 'screenshot\n' >"$TEST_HOME/Desktop/Screenshot 2026-06-01 at 10.00.00 PM.png"
 printf 'recording\n' >"$TEST_HOME/Downloads/Screen Recording 2026-06-01 at 10.00.00 PM.mov"
 dd if=/dev/zero of="$TEST_HOME/Downloads/old-archive.zip" bs=1024 count=512 >/dev/null 2>&1
@@ -254,6 +256,14 @@ python3 -m json.tool "$diff_json" >/dev/null
 grep '"id":"downloads"' "$diff_json" >/dev/null
 grep '"delta_kb":' "$diff_json" >/dev/null
 rm -f "$diff_json"
+"$BIN" state | grep 'cleanroom state' >/dev/null
+state_json="$(mktemp)"
+"$BIN" state --json > "$state_json"
+python3 -m json.tool "$state_json" >/dev/null
+grep '"id":"run-logs"' "$state_json" >/dev/null
+grep '"id":"snapshots"' "$state_json" >/dev/null
+grep '"id":"recoverable-trash"' "$state_json" >/dev/null
+rm -f "$state_json"
 "$BIN" system-data | grep 'System Data breakdown' >/dev/null
 system_data_json="$(mktemp)"
 "$BIN" system-data --json > "$system_data_json"
@@ -276,6 +286,7 @@ grep 'stale-python-virtualenvs' "$rules_json" >/dev/null
 grep 'storage-map' "$rules_json" >/dev/null
 grep 'storage-snapshot' "$rules_json" >/dev/null
 grep 'storage-diff' "$rules_json" >/dev/null
+grep 'cleanroom-state' "$rules_json" >/dev/null
 grep 'review-dashboard' "$rules_json" >/dev/null
 grep 'documents-inventory' "$rules_json" >/dev/null
 grep 'desktop-inventory' "$rules_json" >/dev/null

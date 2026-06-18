@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.49.0"
+VERSION="0.50.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -49,6 +49,7 @@ Usage:
   cleanroom map [--json]
   cleanroom snapshot [--json] [--output PATH]
   cleanroom diff [BEFORE.json AFTER.json] [--json]
+  cleanroom state [--json]
   cleanroom review [--json]
   cleanroom scan [options]
   cleanroom system-data [--json]
@@ -101,6 +102,7 @@ Actions:
   map                  Show a read-only map of major storage buckets.
   snapshot             Write a timestamped storage-map snapshot for before/after tracking.
   diff                 Compare two storage snapshots, or the latest two by default.
+  state                Inventory cleanroom logs, snapshots, and recoverable Trash folders.
   review               Show a read-only personal storage review checklist.
   scan                 Show disk usage and likely cleanup candidates.
   system-data          Break down common macOS System Data buckets.
@@ -152,7 +154,7 @@ Options:
   --trash              Move deleted files to ~/.Trash/cleanroom-* instead of rm -rf.
   --yes                Do not prompt before --apply cleanup.
   --verbose            Print every path touched.
-  --json               Emit JSON for overview, map, snapshot, diff, review, scan, system-data, plan, large, duplicates,
+  --json               Emit JSON for overview, map, snapshot, diff, state, review, scan, system-data, plan, large, duplicates,
                        documents, desktop, screenshots, archives, downloads, installers, nodes, venvs, apps, appdata, libraries, cloud, personal, communications,
                        browsers, leftovers, startup,
                        trash, backups, xcode, caches, diagnostics, packages, homebrew, toolchains,
@@ -210,6 +212,8 @@ Examples:
   cleanroom snapshot --json
   cleanroom diff
   cleanroom diff before.json after.json --json
+  cleanroom state
+  cleanroom state --json
   cleanroom review
   cleanroom review --json
   cleanroom scan
@@ -3251,6 +3255,74 @@ trash_total_kb() {
   size_kb "~/.Trash"
 }
 
+count_files_under() {
+  local path="$1"
+  [[ -d "$path" ]] || { printf '0\n'; return; }
+  find "$path" -type f 2>/dev/null | awk 'END {print NR + 0}'
+}
+
+count_dirs_matching() {
+  local pattern="$1"
+  find "$(dirname "$pattern")" -mindepth 1 -maxdepth 1 -type d -name "$(basename "$pattern")" 2>/dev/null | awk 'END {print NR + 0}'
+}
+
+cleanroom_trash_total_kb() {
+  local total=0 path kb
+  while IFS= read -r path; do
+    [[ -z "$path" ]] && continue
+    kb="$(size_kb "$path")"
+    total=$((total + kb))
+  done < <(find "$HOME/.Trash" -mindepth 1 -maxdepth 1 -type d -name 'cleanroom-*' 2>/dev/null)
+  printf '%s\n' "$total"
+}
+
+state_rows() {
+  local runs snapshots trash_pattern trash_kb
+  runs="$(log_dir)"
+  snapshots="$(snapshot_dir)"
+  trash_pattern="$HOME/.Trash/cleanroom-*"
+  trash_kb="$(cleanroom_trash_total_kb)"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$(size_kb "$runs")" "run-logs" "Apply logs" "$runs" "$(count_files_under "$runs")" "cleanroom history" "Audit logs for applied cleanup and restore operations."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$(size_kb "$snapshots")" "snapshots" "Storage snapshots" "$snapshots" "$(count_files_under "$snapshots")" "cleanroom diff" "Timestamped storage snapshot JSON files for before/after comparisons."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$trash_kb" "recoverable-trash" "Recoverable Trash folders" "$trash_pattern" "$(count_dirs_matching "$trash_pattern")" "cleanroom restore --log PATH" "Files moved by cleanroom --trash runs. Review before emptying Trash."
+}
+
+state() {
+  local rows
+  rows="$(state_rows | sort -rn)"
+
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '['
+    local first=1 kb id title path count command description
+    while IFS=$'\t' read -r kb id title path count command description; do
+      [[ -z "${id:-}" ]] && continue
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '{"id":"%s","title":"%s","path":"%s","count":%s,"size_kb":%s,"size":"%s","command":"%s","description":"%s"}' \
+        "$(printf '%s' "$id" | json_escape)" \
+        "$(printf '%s' "$title" | json_escape)" \
+        "$(printf '%s' "$path" | json_escape)" \
+        "${count:-0}" \
+        "${kb:-0}" \
+        "$(human_kb "${kb:-0}" | json_escape)" \
+        "$(printf '%s' "$command" | json_escape)" \
+        "$(printf '%s' "$description" | json_escape)"
+    done <<<"$rows"
+    printf ']\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}cleanroom state${RESET}"
+  printf 'Read-only inventory of files cleanroom creates for audit, snapshots, and recoverable Trash mode.\n\n'
+  printf '%-10s %-8s %-20s %-28s %s\n' "size" "count" "id" "next command" "path"
+  local kb id title path count command description
+  while IFS=$'\t' read -r kb id title path count command description; do
+    [[ -z "${id:-}" ]] && continue
+    printf '%-10s %-8s %-20s %-28s %s\n' "$(human_kb "${kb:-0}")" "${count:-0}" "$id" "$command" "$path"
+    printf '  %s\n' "$description"
+  done <<<"$rows"
+}
+
 trash() {
   local rows total
   rows="$(trash_rows || true)"
@@ -3895,6 +3967,7 @@ overview() {
   printf 'cleanroom map\n'
   printf 'cleanroom snapshot\n'
   printf 'cleanroom diff\n'
+  printf 'cleanroom state\n'
   printf 'cleanroom review\n'
   printf 'cleanroom plan\n'
   printf 'cleanroom system-data\n'
@@ -4547,7 +4620,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  overview|map|snapshot|diff|review|scan|system-data|plan|large|duplicates|documents|desktop|screenshots|archives|downloads|installers|nodes|venvs|virtualenvs|apps|appdata|libraries|cloud|personal|communications|comms|browsers|leftovers|backups|xcode|android|startup|trash|caches|diagnostics|packages|homebrew|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
+  overview|map|snapshot|diff|state|review|scan|system-data|plan|large|duplicates|documents|desktop|screenshots|archives|downloads|installers|nodes|venvs|virtualenvs|apps|appdata|libraries|cloud|personal|communications|comms|browsers|leftovers|backups|xcode|android|startup|trash|caches|diagnostics|packages|homebrew|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -4646,6 +4719,7 @@ case "$ACTION" in
   map) map ;;
   snapshot) snapshot ;;
   diff) snapshot_diff ;;
+  state) state ;;
   review) review ;;
   scan) scan ;;
   system-data) system_data ;;

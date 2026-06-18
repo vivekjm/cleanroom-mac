@@ -85,6 +85,7 @@ final class CleanroomAppDelegate: NSObject, NSApplicationDelegate {
         inspectRow.addArrangedSubview(button("Plan", action: #selector(plan)))
         inspectRow.addArrangedSubview(button("Report to Desktop", action: #selector(report)))
         inspectRow.addArrangedSubview(button("History", action: #selector(history)))
+        inspectRow.addArrangedSubview(button("State", action: #selector(state)))
         inspectRow.addArrangedSubview(button("Protected Data", action: #selector(protect)))
         inspectRow.addArrangedSubview(button("Backups", action: #selector(backups)))
         inspectRow.addArrangedSubview(button("Xcode", action: #selector(xcode)))
@@ -340,6 +341,10 @@ final class CleanroomAppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func history() {
         runCommand("history", title: "History")
+    }
+
+    @objc private func state() {
+        runCommand("state", title: "State")
     }
 
     @objc private func protect() {

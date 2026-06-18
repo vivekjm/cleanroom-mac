@@ -9,6 +9,7 @@ cleanroom overview
 cleanroom map
 cleanroom snapshot
 cleanroom diff
+cleanroom state
 cleanroom scan
 cleanroom system-data
 cleanroom plan
@@ -55,6 +56,7 @@ cleanroom overview --json
 cleanroom map --json
 cleanroom snapshot --json
 cleanroom diff before.json after.json --json
+cleanroom state --json
 cleanroom review --json
 cleanroom scan --json
 cleanroom system-data --json
@@ -96,6 +98,7 @@ cleanroom rules --json
 cleanroom report --output cleanroom-report.md
 cleanroom snapshot --output cleanroom-before.json
 cleanroom diff cleanroom-before.json cleanroom-after.json
+cleanroom state --json
 ```
 
 `overview --json` emits a compact dashboard with disk state, summary counts, and top cleanup recommendations.
@@ -105,6 +108,8 @@ cleanroom diff cleanroom-before.json cleanroom-after.json
 `snapshot --json` emits disk state plus the focused storage-map buckets in one timestamped JSON object. Plain `snapshot` writes the same data to `~/.local/state/cleanroom/snapshots/`; use `--output PATH` to choose the file.
 
 `diff --json BEFORE AFTER` emits before/after storage bucket deltas from two snapshot files. Plain `diff` with no paths compares the latest two saved snapshots.
+
+`state --json` emits Cleanroom-created run-log, snapshot, and recoverable Trash-folder counts and sizes. It is intentionally read-only and helps wrappers or support flows show what Cleanroom itself has created.
 
 `review --json` emits a read-only checklist of personal storage hotspots with estimates, counts, descriptions, and next commands.
 
