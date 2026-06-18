@@ -233,6 +233,7 @@ grep 'ai-models' "$rules_json" >/dev/null
 grep 'old-diagnostics' "$rules_json" >/dev/null
 grep 'toolchain-caches' "$rules_json" >/dev/null
 grep 'stale-python-virtualenvs' "$rules_json" >/dev/null
+grep 'review-dashboard' "$rules_json" >/dev/null
 grep 'documents-inventory' "$rules_json" >/dev/null
 grep 'desktop-inventory' "$rules_json" >/dev/null
 grep 'screenshots-inventory' "$rules_json" >/dev/null
@@ -242,6 +243,16 @@ grep 'appdata-inventory' "$rules_json" >/dev/null
 grep 'cloud-inventory' "$rules_json" >/dev/null
 grep 'personal-inventory' "$rules_json" >/dev/null
 rm -f "$rules_json"
+"$BIN" review | grep 'personal storage checklist' >/dev/null
+review_json="$(mktemp)"
+"$BIN" review --json > "$review_json"
+python3 -m json.tool "$review_json" >/dev/null
+grep '"id":"documents"' "$review_json" >/dev/null
+grep '"id":"desktop"' "$review_json" >/dev/null
+grep '"id":"screenshots"' "$review_json" >/dev/null
+grep '"id":"archives"' "$review_json" >/dev/null
+grep '"command":"cleanroom appdata --limit 20"' "$review_json" >/dev/null
+rm -f "$review_json"
 "$BIN" plan | grep 'cleanroom plan' >/dev/null
 plan_json="$(mktemp)"
 "$BIN" plan --json > "$plan_json"

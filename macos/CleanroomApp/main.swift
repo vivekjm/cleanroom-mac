@@ -76,6 +76,7 @@ final class CleanroomAppDelegate: NSObject, NSApplicationDelegate {
         reviewRow.alignment = .centerY
 
         inspectRow.addArrangedSubview(button("Overview", action: #selector(overview)))
+        inspectRow.addArrangedSubview(button("Review", action: #selector(reviewStorage)))
         inspectRow.addArrangedSubview(button("Scan", action: #selector(scan)))
         inspectRow.addArrangedSubview(button("System Data", action: #selector(systemData)))
         inspectRow.addArrangedSubview(button("Plan", action: #selector(plan)))
@@ -172,6 +173,10 @@ final class CleanroomAppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func overview() {
         runCommand("overview", title: "Overview")
+    }
+
+    @objc private func reviewStorage() {
+        runCommand("review", title: "Review")
     }
 
     @objc private func scan() {

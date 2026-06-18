@@ -1,9 +1,12 @@
-.TH CLEANROOM 1 "June 2026" "cleanroom 0.44.0" "User Commands"
+.TH CLEANROOM 1 "June 2026" "cleanroom 0.45.0" "User Commands"
 .SH NAME
 cleanroom \- safe-by-default macOS storage cleaner
 .SH SYNOPSIS
 .B cleanroom
 .RI "overview [--json]"
+.br
+.B cleanroom
+.RI "review [--json]"
 .br
 .B cleanroom
 .RI "scan [options]"
@@ -143,6 +146,9 @@ Show a read-only storage dashboard with disk state, summaries, and next steps.
 .TP
 .B scan
 Show disk usage, cleanup candidates, largest home folders, and large files.
+.TP
+.B review
+Show a read-only personal storage checklist with next focused commands.
 .TP
 .B system-data
 Break common macOS System Data locations into review-only buckets with next commands.

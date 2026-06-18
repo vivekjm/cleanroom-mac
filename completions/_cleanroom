@@ -5,6 +5,7 @@ _cleanroom() {
 
   commands=(
     'overview:Show read-only storage dashboard'
+    'review:Show personal storage review checklist'
     'scan:Show disk usage and cleanup candidates'
     'system-data:Break down common System Data buckets'
     'plan:Rank cleanup opportunities'

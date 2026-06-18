@@ -48,6 +48,7 @@ cleanroom clean
 
 ```sh
 cleanroom overview --json
+cleanroom review --json
 cleanroom scan --json
 cleanroom system-data --json
 cleanroom plan --json
@@ -88,6 +89,8 @@ cleanroom report --output cleanroom-report.md
 ```
 
 `overview --json` emits a compact dashboard with disk state, summary counts, and top cleanup recommendations.
+
+`review --json` emits a read-only checklist of personal storage hotspots with estimates, counts, descriptions, and next commands.
 
 `scan --json` emits disk and candidate sizes as JSON for wrappers, dashboards, or future GUI frontends.
 

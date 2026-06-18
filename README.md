@@ -146,6 +146,13 @@ cleanroom system-data
 cleanroom system-data --json
 ```
 
+Review personal storage hotspots:
+
+```sh
+cleanroom review
+cleanroom review --json
+```
+
 Get ranked cleanup recommendations:
 
 ```sh
@@ -591,6 +598,8 @@ Config files use simple `key=value` lines and are never executed as shell.
 `restore` only restores entries that were moved by `--trash` and still exist in the cleanroom Trash folder. It skips destinations that already exist.
 
 `overview` summarizes disk state, top recommendations, package-store size, toolchain-cache size, container storage size, diagnostic-report size, protected-data presence, snapshots, app bundle count, and useful next commands without deleting anything.
+
+`review` gives normal users a read-only checklist of personal storage hotspots: Documents, Desktop, old Downloads, screenshots, archives, installers, app data, and installed app bundles. It points to the next focused command for each item.
 
 `system-data` breaks common macOS System Data locations into focused buckets such as Application Support, caches, Developer data, container storage, diagnostics, MobileSync backups, Group Containers, HTTPStorages, and saved app state. It is review-only and points to the safest next command for each bucket.
 

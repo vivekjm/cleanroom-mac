@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.44.0"
+VERSION="0.45.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -46,6 +46,7 @@ cleanroom - safe macOS storage cleaner
 
 Usage:
   cleanroom overview [--json]
+  cleanroom review [--json]
   cleanroom scan [options]
   cleanroom system-data [--json]
   cleanroom plan [--json]
@@ -93,6 +94,7 @@ Usage:
 
 Actions:
   overview             Show a read-only storage dashboard and next steps.
+  review               Show a read-only personal storage review checklist.
   scan                 Show disk usage and likely cleanup candidates.
   system-data          Break down common macOS System Data buckets.
   plan                 Rank safe cleanup opportunities and show copyable commands.
@@ -142,7 +144,7 @@ Options:
   --trash              Move deleted files to ~/.Trash/cleanroom-* instead of rm -rf.
   --yes                Do not prompt before --apply cleanup.
   --verbose            Print every path touched.
-  --json               Emit JSON for overview, scan, system-data, plan, large, duplicates,
+  --json               Emit JSON for overview, review, scan, system-data, plan, large, duplicates,
                        documents, desktop, screenshots, archives, downloads, installers, nodes, venvs, apps, appdata, libraries, cloud, personal,
                        browsers, leftovers, startup,
                        trash, backups, xcode, caches, diagnostics, packages, homebrew, toolchains,
@@ -194,6 +196,8 @@ Safety:
 Examples:
   cleanroom overview
   cleanroom overview --json
+  cleanroom review
+  cleanroom review --json
   cleanroom scan
   cleanroom scan --json
   cleanroom system-data
@@ -3401,6 +3405,101 @@ app_bundle_count() {
   printf '%s\n' "$total"
 }
 
+tab_rows_total_kb() {
+  awk -F '\t' '{
+    value = $1
+    sub(/^0+/, "", value)
+    if (value == "") value = 0
+    total += value
+  } END {print total + 0}'
+}
+
+tab_rows_count() {
+  awk 'END {print NR + 0}'
+}
+
+review_rows() {
+  local documents_kb desktop_kb downloads_rows_value downloads_kb downloads_count screenshots_rows_value screenshots_kb screenshots_count archives_rows_value archives_kb archives_count installers_rows_value installers_kb installers_count appdata_rows_value appdata_kb appdata_count app_count
+
+  documents_kb="$(size_kb "$HOME/Documents")"
+  desktop_kb="$(size_kb "$HOME/Desktop")"
+  downloads_rows_value="$(downloads_rows)"
+  downloads_kb="$(printf '%s\n' "$downloads_rows_value" | tab_rows_total_kb)"
+  downloads_count="$(printf '%s\n' "$downloads_rows_value" | sed '/^$/d' | tab_rows_count)"
+  screenshots_rows_value="$(screenshot_rows)"
+  screenshots_kb="$(printf '%s\n' "$screenshots_rows_value" | tab_rows_total_kb)"
+  screenshots_count="$(printf '%s\n' "$screenshots_rows_value" | sed '/^$/d' | tab_rows_count)"
+  archives_rows_value="$(archive_rows)"
+  archives_kb="$(printf '%s\n' "$archives_rows_value" | tab_rows_total_kb)"
+  archives_count="$(printf '%s\n' "$archives_rows_value" | sed '/^$/d' | tab_rows_count)"
+  installers_rows_value="$(installer_rows)"
+  installers_kb="$(printf '%s\n' "$installers_rows_value" | tab_rows_total_kb)"
+  installers_count="$(printf '%s\n' "$installers_rows_value" | sed '/^$/d' | tab_rows_count)"
+  appdata_rows_value="$(appdata_rows)"
+  appdata_kb="$(printf '%s\n' "$appdata_rows_value" | tab_rows_total_kb)"
+  appdata_count="$(printf '%s\n' "$appdata_rows_value" | sed '/^$/d' | tab_rows_count)"
+  app_count="$(app_bundle_count)"
+
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$documents_kb" "documents" "Documents folder" "cleanroom documents ~/Documents --limit 50" "Top-level Documents folders and files with guard status." "review-only"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$desktop_kb" "desktop" "Desktop clutter" "cleanroom desktop --limit 50" "Top-level Desktop folders and files with guard status." "review-only"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$downloads_kb" "downloads" "Old Downloads" "cleanroom downloads --days $DAYS --limit $LIMIT" "Top ${downloads_count} old Downloads files from the current review limit." "review-only"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$screenshots_kb" "screenshots" "Screenshots and recordings" "cleanroom screenshots --days $DAYS --limit $LIMIT" "Top ${screenshots_count} screenshot and screen recording files from Desktop, Downloads, and Documents." "review-only"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$archives_kb" "archives" "Archives and disk images" "cleanroom archives --days $DAYS --limit $LIMIT" "Top ${archives_count} archive and disk image files from Downloads, Desktop, and Documents." "review-only"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$installers_kb" "installers" "Old installers" "cleanroom installers --days $DAYS --limit $LIMIT" "Top ${installers_count} downloaded installers that have an opt-in cleanup path." "review-only"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$appdata_kb" "appdata" "Large app data folders" "cleanroom appdata --limit $LIMIT" "Top ${appdata_count} app support/container folders with guard status." "review-only"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$app_count" "apps" "Installed app bundles" "cleanroom apps --limit $LIMIT" "Count of app bundles found in application folders; run the command for sizes." "count"
+}
+
+review() {
+  local rows
+  rows="$(review_rows | sort -rn)"
+
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '['
+    local first=1 estimate id title command description kind
+    while IFS=$'\t' read -r estimate id title command description kind; do
+      [[ -z "${id:-}" ]] && continue
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      if [[ "$kind" == "count" ]]; then
+        printf '{"id":"%s","title":"%s","kind":"%s","count":%s,"command":"%s","description":"%s"}' \
+          "$(printf '%s' "$id" | json_escape)" \
+          "$(printf '%s' "$title" | json_escape)" \
+          "$(printf '%s' "$kind" | json_escape)" \
+          "${estimate:-0}" \
+          "$(printf '%s' "$command" | json_escape)" \
+          "$(printf '%s' "$description" | json_escape)"
+      else
+        printf '{"id":"%s","title":"%s","kind":"%s","estimate_kb":%s,"estimate":"%s","command":"%s","description":"%s"}' \
+          "$(printf '%s' "$id" | json_escape)" \
+          "$(printf '%s' "$title" | json_escape)" \
+          "$(printf '%s' "$kind" | json_escape)" \
+          "${estimate:-0}" \
+          "$(human_kb "${estimate:-0}" | json_escape)" \
+          "$(printf '%s' "$command" | json_escape)" \
+          "$(printf '%s' "$description" | json_escape)"
+      fi
+    done <<<"$rows"
+    printf ']\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}cleanroom review${RESET}"
+  printf 'Read-only personal storage checklist. Nothing is deleted.\n\n'
+  printf '%-10s %-14s %-28s %s\n' "estimate" "id" "title" "next command"
+  local estimate id title command description kind display
+  while IFS=$'\t' read -r estimate id title command description kind; do
+    [[ -z "${id:-}" ]] && continue
+    if [[ "$kind" == "count" ]]; then
+      display="${estimate:-0} apps"
+    else
+      display="$(human_kb "${estimate:-0}")"
+    fi
+    printf '%-10s %-14s %-28s %s\n' "$display" "$id" "$title" "$command"
+    printf '  %s\n' "$description"
+  done <<<"$rows"
+}
+
 overview() {
   local plan_rows_sorted package_total toolchain_total container_total diagnostic_total protected_count snapshots app_count startup_items trash_total
   plan_rows_sorted="$(plan_rows | sort -rn | head -5)"
@@ -3475,6 +3574,7 @@ overview() {
   done <<<"$plan_rows_sorted"
 
   printf '\n%s\n' "${BOLD}Useful next commands${RESET}"
+  printf 'cleanroom review\n'
   printf 'cleanroom plan\n'
   printf 'cleanroom system-data\n'
   printf 'cleanroom documents ~/Documents --limit 50\n'
@@ -4125,7 +4225,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  overview|scan|system-data|plan|large|duplicates|documents|desktop|screenshots|archives|downloads|installers|nodes|venvs|virtualenvs|apps|appdata|libraries|cloud|personal|browsers|leftovers|backups|xcode|android|startup|trash|caches|diagnostics|packages|homebrew|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
+  overview|review|scan|system-data|plan|large|duplicates|documents|desktop|screenshots|archives|downloads|installers|nodes|venvs|virtualenvs|apps|appdata|libraries|cloud|personal|browsers|leftovers|backups|xcode|android|startup|trash|caches|diagnostics|packages|homebrew|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -4221,6 +4321,7 @@ done
 
 case "$ACTION" in
   overview) overview ;;
+  review) review ;;
   scan) scan ;;
   system-data) system_data ;;
   plan) plan ;;
