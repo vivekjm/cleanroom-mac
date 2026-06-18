@@ -15,6 +15,7 @@ cleanroom scan
 cleanroom system-data
 cleanroom plan
 cleanroom large
+cleanroom brokenlinks
 cleanroom duplicates
 cleanroom downloads
 cleanroom installers
@@ -67,6 +68,7 @@ cleanroom scan --json
 cleanroom system-data --json
 cleanroom plan --json
 cleanroom large --json ~/Documents
+cleanroom brokenlinks --json ~/Documents
 cleanroom duplicates --json ~/Documents
 cleanroom documents --json ~/Documents
 cleanroom desktop --json
@@ -131,6 +133,8 @@ cleanroom permissions --json
 `plan --json` emits ranked cleanup recommendations with estimated reclaim size, preview commands, and explicit apply commands.
 
 `large --json [PATH]` emits large files above `--min-mb` for review. It is intentionally review-only and does not delete anything.
+
+`brokenlinks --json [PATH]` emits dangling symlinks with link path, stored target, parent folder, modified date, and Finder reveal command. It is intentionally review-only and does not delete links.
 
 `duplicates --json [PATH]` emits exact duplicate groups with SHA-256 hashes, paths, and estimated possible reclaim. It is intentionally review-only and does not delete anything.
 

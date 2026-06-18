@@ -16,6 +16,7 @@ permissions-audit	permissions	review-only	no	-	Library, Mail, Messages, backups,
 review-dashboard	review	review-only	no	-	Documents, Desktop, Downloads, screenshots, archives, installers, app data, and app bundles	Read-only personal storage review checklist that routes to focused commands.
 documents-inventory	documents	review-only	no	-	Top-level files and folders under ~/Documents or a provided folder	Review-only user-folder storage inventory with guard status and drill-down commands.
 desktop-inventory	desktop	review-only	no	-	Top-level files and folders under ~/Desktop	Review-only Desktop storage inventory with guard status and drill-down commands.
+brokenlinks-inventory	brokenlinks	review-only	no	-	Broken symlinks under Documents, Desktop, Downloads, Applications, or a provided folder	Read-only broken symlink inventory; cleanroom does not delete links.
 screenshots-inventory	screenshots	review-only	no	-	Screenshot and screen recording files under Desktop, Downloads, Documents, or a provided folder	Review-only screenshot inventory; screenshots can contain sensitive data.
 archives-inventory	archives	review-only	no	-	Archive and disk image files under Downloads, Desktop, Documents, or a provided folder	Review-only archive inventory; archives can be backups, deliverables, or installer sources.
 android-inventory	android	review-only	no	-	Android SDK, NDK, system images, AVDs, emulator, platform/build tools, and Studio caches	Review-only Android SDK and emulator inventory with safety labels and cleanup guidance.

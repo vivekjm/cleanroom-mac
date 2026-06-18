@@ -15,6 +15,7 @@ _cleanroom() {
     'system-data:Break down common System Data buckets'
     'plan:Rank cleanup opportunities'
     'large:List large files for review'
+    'brokenlinks:List broken symlinks for review'
     'duplicates:Find exact duplicate files for review'
     'documents:Rank top-level user folders/files'
     'desktop:Rank top-level Desktop files'

@@ -169,6 +169,7 @@ dd if=/dev/zero of="$TEST_HOME/Documents/media-project/clip.mov" bs=1024 count=6
 printf 'old dependency\n' >"$TEST_HOME/Documents/example/node_modules/package.txt"
 printf 'home = /usr/bin\n' >"$TEST_HOME/Documents/python-app/.venv/pyvenv.cfg"
 printf 'python shim\n' >"$TEST_HOME/Documents/python-app/.venv/bin/python"
+ln -s "$TEST_HOME/Documents/missing-target" "$TEST_HOME/Documents/broken-link"
 touch -t 202001010000 "$TEST_HOME/Documents/example/node_modules" "$TEST_HOME/Documents/example/node_modules/package.txt"
 touch -t 202001010000 "$TEST_HOME/Documents/python-app/.venv" "$TEST_HOME/Documents/python-app/.venv/pyvenv.cfg" "$TEST_HOME/Documents/python-app/.venv/bin/python"
 touch -t 202001010000 "$TEST_HOME/Desktop/Screenshot 2026-06-01 at 10.00.00 PM.png" "$TEST_HOME/Downloads/Screen Recording 2026-06-01 at 10.00.00 PM.mov" "$TEST_HOME/Downloads/old-archive.zip" "$TEST_HOME/Desktop/old-disk-image.dmg"
@@ -313,6 +314,7 @@ grep 'permissions-audit' "$rules_json" >/dev/null
 grep 'review-dashboard' "$rules_json" >/dev/null
 grep 'documents-inventory' "$rules_json" >/dev/null
 grep 'desktop-inventory' "$rules_json" >/dev/null
+grep 'brokenlinks-inventory' "$rules_json" >/dev/null
 grep 'screenshots-inventory' "$rules_json" >/dev/null
 grep 'archives-inventory' "$rules_json" >/dev/null
 grep 'android-inventory' "$rules_json" >/dev/null
@@ -351,6 +353,15 @@ large_json="$(mktemp)"
 python3 -m json.tool "$large_json" >/dev/null
 grep 'big-test.bin' "$large_json" >/dev/null
 rm -f "$large_json"
+"$BIN" brokenlinks "$HOME/Documents" --limit 10 | grep 'broken-link' >/dev/null
+brokenlinks_json="$(mktemp)"
+"$BIN" brokenlinks --json "$HOME/Documents" --limit 10 > "$brokenlinks_json"
+python3 -m json.tool "$brokenlinks_json" >/dev/null
+grep '"path":' "$brokenlinks_json" >/dev/null
+grep 'broken-link' "$brokenlinks_json" >/dev/null
+grep 'missing-target' "$brokenlinks_json" >/dev/null
+grep 'open -R' "$brokenlinks_json" >/dev/null
+rm -f "$brokenlinks_json"
 "$BIN" duplicates "$HOME/Documents" --min-mb 1 --limit 5 | grep 'copy-a.bin' >/dev/null
 "$BIN" duplicates "$HOME/Documents" --min-mb 1 --limit 5 | grep 'copy-b.bin' >/dev/null
 duplicates_json="$(mktemp)"

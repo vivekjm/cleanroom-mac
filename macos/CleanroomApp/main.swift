@@ -105,6 +105,7 @@ final class CleanroomAppDelegate: NSObject, NSApplicationDelegate {
         reviewRow.addArrangedSubview(button("Downloads", action: #selector(downloads)))
         reviewRow.addArrangedSubview(button("Installers", action: #selector(installers)))
         reviewRow.addArrangedSubview(button("Duplicates", action: #selector(duplicates)))
+        reviewRow.addArrangedSubview(button("Broken Links", action: #selector(brokenLinks)))
         reviewRow.addArrangedSubview(button("Node Modules", action: #selector(nodes)))
         reviewRow.addArrangedSubview(button("Virtualenvs", action: #selector(venvs)))
         reviewRow.addArrangedSubview(button("Apps", action: #selector(apps)))
@@ -214,6 +215,10 @@ final class CleanroomAppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func largeFiles() {
         runCommand("large --limit 30 --min-mb 500", title: "Large Files")
+    }
+
+    @objc private func brokenLinks() {
+        runCommand("brokenlinks --limit 40", title: "Broken Links")
     }
 
     @objc private func documents() {

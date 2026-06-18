@@ -186,6 +186,14 @@ cleanroom large ~/Documents --min-mb 250 --limit 30
 cleanroom large --json ~/Downloads
 ```
 
+Find broken symlinks for manual review:
+
+```sh
+cleanroom brokenlinks
+cleanroom brokenlinks ~/Documents --limit 50
+cleanroom brokenlinks --json
+```
+
 Find exact duplicate files for manual review:
 
 ```sh
@@ -677,6 +685,8 @@ Config files use simple `key=value` lines and are never executed as shell.
 `plan` estimates cleanup opportunities and prints copyable dry-run commands plus explicit apply commands. It does not delete anything.
 
 `large` lists large files for review and never deletes them. Use it when macOS reports high Documents storage and you need to find videos, archives, disk images, datasets, or project artifacts manually.
+
+`brokenlinks` lists dangling symlinks from common user folders or a path you provide. It never deletes links; review them first because source trees, package managers, and managed apps may intentionally leave links behind.
 
 `duplicates` hashes files above `--min-mb`, groups exact matches, estimates possible reclaim, and never deletes anything.
 

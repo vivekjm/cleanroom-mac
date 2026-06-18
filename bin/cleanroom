@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.54.0"
+VERSION="0.55.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -56,6 +56,7 @@ Usage:
   cleanroom system-data [--json]
   cleanroom plan [--json]
   cleanroom large [PATH] [--min-mb N] [--limit N] [--json]
+  cleanroom brokenlinks [PATH] [--limit N] [--json]
   cleanroom duplicates [PATH] [--min-mb N] [--limit N] [--json]
   cleanroom documents [PATH] [--limit N] [--json]
   cleanroom desktop [--limit N] [--json]
@@ -113,6 +114,7 @@ Actions:
   system-data          Break down common macOS System Data buckets.
   plan                 Rank safe cleanup opportunities and show copyable commands.
   large                List largest files for review without deleting anything.
+  brokenlinks          List broken symlinks for review without deleting anything.
   duplicates           Find exact duplicate files for review without deleting anything.
   documents            Rank top-level user folders/files for review without deleting anything.
   desktop              Rank top-level Desktop folders/files for review without deleting anything.
@@ -162,7 +164,7 @@ Options:
   --trash              Move deleted files to ~/.Trash/cleanroom-* instead of rm -rf.
   --yes                Do not prompt before --apply cleanup.
   --verbose            Print every path touched.
-  --json               Emit JSON for overview, map, snapshot, diff, state, permissions, review, scan, system-data, plan, large, duplicates,
+  --json               Emit JSON for overview, map, snapshot, diff, state, permissions, review, scan, system-data, plan, large, brokenlinks, duplicates,
                        documents, desktop, screenshots, archives, downloads, installers, nodes, venvs, apps, uninstallers, appdata, libraries, cloud, personal, communications,
                        browsers, leftovers, startup, loginitems,
                        trash, backups, xcode, caches, diagnostics, packages, receipts, homebrew, toolchains,
@@ -234,6 +236,9 @@ Examples:
   cleanroom plan --json
   cleanroom large ~/Documents --min-mb 250 --limit 30
   cleanroom large --json ~/Downloads
+  cleanroom brokenlinks
+  cleanroom brokenlinks ~/Documents --limit 50
+  cleanroom brokenlinks --json
   cleanroom duplicates ~/Documents --min-mb 100
   cleanroom duplicates --json ~/Downloads
   cleanroom documents
@@ -1340,6 +1345,7 @@ map_rows() {
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "documents" "Documents" "$HOME/Documents" "review" "cleanroom documents ~/Documents --limit 50" "User documents and project folders. Review manually."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "desktop" "Desktop" "$HOME/Desktop" "review" "cleanroom desktop --limit 50" "Desktop exports, screenshots, archives, and working files."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "downloads" "Downloads" "$HOME/Downloads" "review" "cleanroom downloads --days $DAYS --limit 50" "Downloads can hold installers, archives, exports, and temporary files."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "broken-links" "Broken Symlinks" "$HOME/Documents; $HOME/Desktop; $HOME/Downloads; $HOME/Applications" "review" "cleanroom brokenlinks --limit 50" "Dangling symlinks left by moved projects, removed apps, or old exports. Review manually."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "user-applications" "User Applications" "$HOME/Applications" "review" "cleanroom apps --limit 50" "Per-user app bundles. Run cleanroom apps to review system-wide applications too."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "app-support" "Application Support" "$HOME/Library/Application Support" "review" "cleanroom appdata --limit 50" "Large app support folders. Use app-specific review before removing anything."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "containers" "App Containers" "$HOME/Library/Containers; $HOME/Library/Group Containers" "review" "cleanroom appdata --limit 50" "Sandbox and shared app containers can contain account data."
@@ -1614,6 +1620,77 @@ large() {
   while IFS=$'\t' read -r kb path; do
     [[ -z "${path:-}" ]] && continue
     printf '%8s  %s\n' "$(human_kb "$kb")" "$path"
+  done <<<"$rows"
+}
+
+brokenlinks_roots() {
+  if [[ "${#PATH_ARGS[@]}" -gt 0 ]]; then
+    local path
+    for path in "${PATH_ARGS[@]}"; do
+      printf '%s\n' "$(expand_path "$path")"
+    done
+  else
+    printf '%s\n' "$HOME/Documents"
+    printf '%s\n' "$HOME/Desktop"
+    printf '%s\n' "$HOME/Downloads"
+    printf '%s\n' "$HOME/Applications"
+  fi
+}
+
+brokenlinks_rows() {
+  local root path target epoch
+  while IFS= read -r root; do
+    [[ -d "$root" ]] || continue
+    while IFS= read -r -d '' path; do
+      if [[ -e "$path" ]]; then
+        continue
+      fi
+      target="$(readlink "$path" 2>/dev/null || true)"
+      epoch="$(path_mtime_epoch "$path")"
+      printf '%012d\t%s\t%s\t%s\n' "$epoch" "$path" "$target" "$(dirname "$path")"
+    done < <(find "$root" -xdev -type l -print0 2>/dev/null)
+  done < <(brokenlinks_roots) | sort -rn | head -n "$LIMIT"
+}
+
+brokenlinks() {
+  local rows
+  rows="$(brokenlinks_rows)"
+
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '['
+    local first=1 epoch path target parent epoch_num
+    while IFS=$'\t' read -r epoch path target parent; do
+      [[ -z "${path:-}" ]] && continue
+      epoch_num="$(printf '%s\n' "${epoch:-0}" | sed 's/^0*//; s/^$/0/')"
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '{"path":"%s","target":"%s","parent":"%s","modified_epoch":%s,"modified":"%s","review_command":"%s","guidance":"%s"}' \
+        "$(printf '%s' "$path" | json_escape)" \
+        "$(printf '%s' "$target" | json_escape)" \
+        "$(printf '%s' "$parent" | json_escape)" \
+        "${epoch_num:-0}" \
+        "$(file_mtime_iso "${epoch_num:-0}" | json_escape)" \
+        "$(printf 'open -R %s' "$(shell_quote "$path")" | json_escape)" \
+        "$(printf '%s' "Review broken links before removing them; they may belong to source trees or managed apps." | json_escape)"
+    done <<<"$rows"
+    printf ']\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}cleanroom broken links${RESET}"
+  printf 'Review-only list. cleanroom does not delete symlinks.\n'
+  printf 'Limit: %s\n\n' "$LIMIT"
+  if [[ -z "$rows" ]]; then
+    printf 'No broken symlinks found in readable search folders.\n'
+    return 0
+  fi
+  printf '%-12s %s\n' "modified" "link -> target"
+  local epoch path target parent epoch_num
+  while IFS=$'\t' read -r epoch path target parent; do
+    [[ -z "${path:-}" ]] && continue
+    epoch_num="$(printf '%s\n' "${epoch:-0}" | sed 's/^0*//; s/^$/0/')"
+    printf '%-12s %s -> %s\n' "$(file_mtime_iso "${epoch_num:-0}")" "$path" "$target"
+    printf '  reveal: open -R %s\n' "$(shell_quote "$path")"
   done <<<"$rows"
 }
 
@@ -4252,6 +4329,7 @@ overview() {
   printf 'cleanroom review\n'
   printf 'cleanroom plan\n'
   printf 'cleanroom system-data\n'
+  printf 'cleanroom brokenlinks --limit 50\n'
   printf 'cleanroom documents ~/Documents --limit 50\n'
   printf 'cleanroom large ~/Documents --min-mb 250 --limit 50\n'
   printf 'cleanroom downloads --days 30 --limit 50\n'
@@ -4980,7 +5058,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  overview|map|snapshot|diff|state|permissions|review|scan|system-data|plan|large|duplicates|documents|desktop|screenshots|archives|downloads|installers|nodes|venvs|virtualenvs|apps|uninstallers|appdata|libraries|cloud|personal|communications|comms|browsers|leftovers|backups|xcode|android|startup|loginitems|trash|caches|diagnostics|packages|receipts|homebrew|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
+  overview|map|snapshot|diff|state|permissions|review|scan|system-data|plan|large|brokenlinks|duplicates|documents|desktop|screenshots|archives|downloads|installers|nodes|venvs|virtualenvs|apps|uninstallers|appdata|libraries|cloud|personal|communications|comms|browsers|leftovers|backups|xcode|android|startup|loginitems|trash|caches|diagnostics|packages|receipts|homebrew|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -5064,7 +5142,7 @@ while [[ "$#" -gt 0 ]]; do
     -h|--help) usage; exit 0 ;;
     -v|--version) echo "$VERSION"; exit 0 ;;
     *)
-      if [[ "$ACTION" == "guard" || "$ACTION" == "diff" || "$ACTION" == "large" || "$ACTION" == "duplicates" || "$ACTION" == "documents" || "$ACTION" == "screenshots" || "$ACTION" == "archives" || "$ACTION" == "nodes" || "$ACTION" == "venvs" || "$ACTION" == "virtualenvs" || "$ACTION" == "apps" || "$ACTION" == "uninstallers" || "$ACTION" == "leftovers" ]]; then
+      if [[ "$ACTION" == "guard" || "$ACTION" == "diff" || "$ACTION" == "large" || "$ACTION" == "brokenlinks" || "$ACTION" == "duplicates" || "$ACTION" == "documents" || "$ACTION" == "screenshots" || "$ACTION" == "archives" || "$ACTION" == "nodes" || "$ACTION" == "venvs" || "$ACTION" == "virtualenvs" || "$ACTION" == "apps" || "$ACTION" == "uninstallers" || "$ACTION" == "leftovers" ]]; then
         PATH_ARGS+=("$1")
       else
         die "Unknown option: $1"
@@ -5086,6 +5164,7 @@ case "$ACTION" in
   system-data) system_data ;;
   plan) plan ;;
   large) large ;;
+  brokenlinks) brokenlinks ;;
   duplicates) duplicates ;;
   documents) documents ;;
   desktop) desktop ;;
