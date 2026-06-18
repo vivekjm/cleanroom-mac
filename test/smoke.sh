@@ -216,6 +216,15 @@ cat >"$TEST_HOME/bin/osascript" <<'SH'
 printf 'Cleanroom Login Helper\tfalse\t%s/Applications/Cleanroom Login Helper.app\n' "$HOME"
 SH
 chmod +x "$TEST_HOME/bin/osascript"
+cat >"$TEST_HOME/bin/xattr" <<'SH'
+#!/usr/bin/env bash
+if [[ "${1:-}" == "-p" && "${2:-}" == "com.apple.quarantine" && "${3:-}" == *"old-installer.dmg" ]]; then
+  printf '0081;66554433;Safari;12345678-90AB-CDEF-1234-567890ABCDEF\n'
+  exit 0
+fi
+exit 1
+SH
+chmod +x "$TEST_HOME/bin/xattr"
 export HOME="$TEST_HOME"
 export PATH="$TEST_HOME/bin:$PATH"
 
@@ -315,6 +324,7 @@ grep 'review-dashboard' "$rules_json" >/dev/null
 grep 'documents-inventory' "$rules_json" >/dev/null
 grep 'desktop-inventory' "$rules_json" >/dev/null
 grep 'brokenlinks-inventory' "$rules_json" >/dev/null
+grep 'quarantine-inventory' "$rules_json" >/dev/null
 grep 'screenshots-inventory' "$rules_json" >/dev/null
 grep 'archives-inventory' "$rules_json" >/dev/null
 grep 'android-inventory' "$rules_json" >/dev/null
@@ -362,6 +372,15 @@ grep 'broken-link' "$brokenlinks_json" >/dev/null
 grep 'missing-target' "$brokenlinks_json" >/dev/null
 grep 'open -R' "$brokenlinks_json" >/dev/null
 rm -f "$brokenlinks_json"
+"$BIN" quarantine "$HOME/Downloads" --limit 10 | grep 'old-installer.dmg' >/dev/null
+quarantine_json="$(mktemp)"
+"$BIN" quarantine --json "$HOME/Downloads" --limit 10 > "$quarantine_json"
+python3 -m json.tool "$quarantine_json" >/dev/null
+grep 'old-installer.dmg' "$quarantine_json" >/dev/null
+grep '"quarantine":"' "$quarantine_json" >/dev/null
+grep 'Safari' "$quarantine_json" >/dev/null
+grep 'open -R' "$quarantine_json" >/dev/null
+rm -f "$quarantine_json"
 "$BIN" duplicates "$HOME/Documents" --min-mb 1 --limit 5 | grep 'copy-a.bin' >/dev/null
 "$BIN" duplicates "$HOME/Documents" --min-mb 1 --limit 5 | grep 'copy-b.bin' >/dev/null
 duplicates_json="$(mktemp)"

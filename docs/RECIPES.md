@@ -16,6 +16,7 @@ cleanroom system-data
 cleanroom plan
 cleanroom large
 cleanroom brokenlinks
+cleanroom quarantine
 cleanroom duplicates
 cleanroom downloads
 cleanroom installers
@@ -69,6 +70,7 @@ cleanroom system-data --json
 cleanroom plan --json
 cleanroom large --json ~/Documents
 cleanroom brokenlinks --json ~/Documents
+cleanroom quarantine --json ~/Downloads
 cleanroom duplicates --json ~/Documents
 cleanroom documents --json ~/Documents
 cleanroom desktop --json
@@ -135,6 +137,8 @@ cleanroom permissions --json
 `large --json [PATH]` emits large files above `--min-mb` for review. It is intentionally review-only and does not delete anything.
 
 `brokenlinks --json [PATH]` emits dangling symlinks with link path, stored target, parent folder, modified date, and Finder reveal command. It is intentionally review-only and does not delete links.
+
+`quarantine --json [PATH]` emits files and apps carrying macOS quarantine metadata with path, size, modified date, raw quarantine value, and Finder reveal command. It is intentionally review-only and does not delete files or clear attributes.
 
 `duplicates --json [PATH]` emits exact duplicate groups with SHA-256 hashes, paths, and estimated possible reclaim. It is intentionally review-only and does not delete anything.
 

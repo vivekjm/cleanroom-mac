@@ -18,6 +18,9 @@ mkdir -p "$RESOURCES_DIR/data"
 swiftc \
   -O \
   -framework AppKit \
+  -framework SwiftUI \
+  "$ROOT/macos/CleanroomApp/DesignSystem.swift" \
+  "$ROOT/macos/CleanroomApp/CleanroomViews.swift" \
   "$ROOT/macos/CleanroomApp/main.swift" \
   -o "$MACOS_DIR/Cleanroom"
 

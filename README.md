@@ -194,6 +194,14 @@ cleanroom brokenlinks ~/Documents --limit 50
 cleanroom brokenlinks --json
 ```
 
+Review downloaded files with macOS quarantine metadata:
+
+```sh
+cleanroom quarantine
+cleanroom quarantine ~/Downloads --limit 50
+cleanroom quarantine --json
+```
+
 Find exact duplicate files for manual review:
 
 ```sh
@@ -687,6 +695,8 @@ Config files use simple `key=value` lines and are never executed as shell.
 `large` lists large files for review and never deletes them. Use it when macOS reports high Documents storage and you need to find videos, archives, disk images, datasets, or project artifacts manually.
 
 `brokenlinks` lists dangling symlinks from common user folders or a path you provide. It never deletes links; review them first because source trees, package managers, and managed apps may intentionally leave links behind.
+
+`quarantine` lists files and apps carrying macOS `com.apple.quarantine` metadata, usually downloaded from browsers, chat apps, or email. It never deletes files or clears attributes; use it to review downloaded content before deciding what to keep.
 
 `duplicates` hashes files above `--min-mb`, groups exact matches, estimates possible reclaim, and never deletes anything.
 

@@ -16,6 +16,7 @@ _cleanroom() {
     'plan:Rank cleanup opportunities'
     'large:List large files for review'
     'brokenlinks:List broken symlinks for review'
+    'quarantine:List quarantined downloaded files'
     'duplicates:Find exact duplicate files for review'
     'documents:Rank top-level user folders/files'
     'desktop:Rank top-level Desktop files'

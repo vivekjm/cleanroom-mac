@@ -1,4 +1,4 @@
-.TH CLEANROOM 1 "June 2026" "cleanroom 0.55.0" "User Commands"
+.TH CLEANROOM 1 "June 2026" "cleanroom 0.56.0" "User Commands"
 .SH NAME
 cleanroom \- safe-by-default macOS storage cleaner
 .SH SYNOPSIS
@@ -37,6 +37,9 @@ cleanroom \- safe-by-default macOS storage cleaner
 .br
 .B cleanroom
 .RI "brokenlinks [path] [--limit n] [--json]"
+.br
+.B cleanroom
+.RI "quarantine [path] [--limit n] [--json]"
 .br
 .B cleanroom
 .RI "duplicates [path] [--min-mb n] [--limit n] [--json]"
@@ -214,6 +217,10 @@ List large files for review without deleting anything.
 .TP
 .B brokenlinks
 List dangling symlinks for review without deleting anything.
+.TP
+.B quarantine
+List files and apps with macOS quarantine metadata without deleting files or
+clearing attributes.
 .TP
 .B duplicates
 Find exact duplicate files for review without deleting anything.
@@ -434,6 +441,7 @@ cleanroom system-data
 cleanroom plan --json
 cleanroom large ~/Documents --min-mb 250 --limit 30
 cleanroom brokenlinks ~/Documents --limit 50
+cleanroom quarantine ~/Downloads --limit 50
 cleanroom duplicates ~/Documents --min-mb 100 --limit 20
 cleanroom documents ~/Documents --limit 40
 cleanroom desktop --limit 40
