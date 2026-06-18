@@ -77,6 +77,7 @@ mkdir -p \
   "$TEST_HOME/Library/Containers/io.podman_desktop.PodmanDesktop/Data" \
   "$TEST_HOME/.Trash" \
   "$TEST_HOME/Applications/FakeBig.app/Contents/MacOS" \
+  "$TEST_HOME/Desktop" \
   "$TEST_HOME/Downloads" \
   "$TEST_HOME/Documents/duplicates" \
   "$TEST_HOME/Documents/media-project" \
@@ -145,6 +146,8 @@ printf 'music library\n' >"$TEST_HOME/Music/Music Library.musiclibrary/Library.m
 printf 'imovie library\n' >"$TEST_HOME/Movies/iMovie Library.imovielibrary/CurrentVersion.flexolibrary"
 printf 'garageband project\n' >"$TEST_HOME/Music/GarageBand/song.band"
 printf 'trashed\n' >"$TEST_HOME/.Trash/old-trash.txt"
+printf 'screenshot\n' >"$TEST_HOME/Desktop/Screenshot 2026-06-01 at 10.00.00 PM.png"
+printf 'recording\n' >"$TEST_HOME/Downloads/Screen Recording 2026-06-01 at 10.00.00 PM.mov"
 printf 'document\n' >"$TEST_HOME/Documents/readme.txt"
 dd if=/dev/zero of="$TEST_HOME/Documents/media-project/clip.mov" bs=1024 count=64 >/dev/null 2>&1
 printf 'old dependency\n' >"$TEST_HOME/Documents/example/node_modules/package.txt"
@@ -152,6 +155,7 @@ printf 'home = /usr/bin\n' >"$TEST_HOME/Documents/python-app/.venv/pyvenv.cfg"
 printf 'python shim\n' >"$TEST_HOME/Documents/python-app/.venv/bin/python"
 touch -t 202001010000 "$TEST_HOME/Documents/example/node_modules" "$TEST_HOME/Documents/example/node_modules/package.txt"
 touch -t 202001010000 "$TEST_HOME/Documents/python-app/.venv" "$TEST_HOME/Documents/python-app/.venv/pyvenv.cfg" "$TEST_HOME/Documents/python-app/.venv/bin/python"
+touch -t 202001010000 "$TEST_HOME/Desktop/Screenshot 2026-06-01 at 10.00.00 PM.png" "$TEST_HOME/Downloads/Screen Recording 2026-06-01 at 10.00.00 PM.mov"
 touch -t 202001010000 "$TEST_HOME/Library/DiagnosticReports/OldApp.crash" "$TEST_HOME/Library/Application Support/CrashReporter/OldApp.plist"
 cat >"$TEST_HOME/Library/LaunchAgents/com.example.cleanroom-test.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
@@ -228,6 +232,7 @@ grep 'old-diagnostics' "$rules_json" >/dev/null
 grep 'toolchain-caches' "$rules_json" >/dev/null
 grep 'stale-python-virtualenvs' "$rules_json" >/dev/null
 grep 'documents-inventory' "$rules_json" >/dev/null
+grep 'screenshots-inventory' "$rules_json" >/dev/null
 grep 'android-inventory' "$rules_json" >/dev/null
 grep 'appdata-inventory' "$rules_json" >/dev/null
 grep 'cloud-inventory' "$rules_json" >/dev/null
@@ -266,6 +271,14 @@ grep '"kind":"directory"' "$documents_json" >/dev/null
 grep '"guard_status":"review"' "$documents_json" >/dev/null
 grep 'cleanroom large' "$documents_json" >/dev/null
 rm -f "$documents_json"
+"$BIN" screenshots "$HOME/Desktop" --days 7 --limit 10 | grep 'Screenshot 2026' >/dev/null
+screenshots_json="$(mktemp)"
+"$BIN" screenshots --json "$HOME/Desktop" --days 7 --limit 10 > "$screenshots_json"
+python3 -m json.tool "$screenshots_json" >/dev/null
+grep '"name":"Screenshot 2026-06-01 at 10.00.00 PM.png"' "$screenshots_json" >/dev/null
+grep '"age_days"' "$screenshots_json" >/dev/null
+grep 'open -R' "$screenshots_json" >/dev/null
+rm -f "$screenshots_json"
 "$BIN" downloads --days 30 --limit 5 | grep 'old-installer.dmg' >/dev/null
 downloads_json="$(mktemp)"
 "$BIN" downloads --json --days 30 --limit 5 > "$downloads_json"

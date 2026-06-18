@@ -1,4 +1,4 @@
-.TH CLEANROOM 1 "June 2026" "cleanroom 0.41.0" "User Commands"
+.TH CLEANROOM 1 "June 2026" "cleanroom 0.42.0" "User Commands"
 .SH NAME
 cleanroom \- safe-by-default macOS storage cleaner
 .SH SYNOPSIS
@@ -22,6 +22,9 @@ cleanroom \- safe-by-default macOS storage cleaner
 .br
 .B cleanroom
 .RI "documents [path] [--limit n] [--json]"
+.br
+.B cleanroom
+.RI "screenshots [path] [--days n] [--limit n] [--json]"
 .br
 .B cleanroom
 .RI "downloads [--days n] [--limit n] [--json]"
@@ -149,6 +152,9 @@ Find exact duplicate files for review without deleting anything.
 .TP
 .B documents
 Rank top-level files and folders in ~/Documents or a provided directory with guard status.
+.TP
+.B screenshots
+List screenshot and screen recording files for review without deleting anything.
 .TP
 .B downloads
 List old files in ~/Downloads for review without deleting anything.
@@ -333,6 +339,7 @@ cleanroom plan --json
 cleanroom large ~/Documents --min-mb 250 --limit 30
 cleanroom duplicates ~/Documents --min-mb 100 --limit 20
 cleanroom documents ~/Documents --limit 40
+cleanroom screenshots ~/Desktop --days 7 --limit 50
 cleanroom downloads --days 30 --limit 50
 cleanroom installers --days 30 --limit 50
 cleanroom nodes ~/Documents --days 45 --limit 30

@@ -92,6 +92,7 @@ final class CleanroomAppDelegate: NSObject, NSApplicationDelegate {
 
         reviewRow.addArrangedSubview(button("Large Files", action: #selector(largeFiles)))
         reviewRow.addArrangedSubview(button("Documents", action: #selector(documents)))
+        reviewRow.addArrangedSubview(button("Screenshots", action: #selector(screenshots)))
         reviewRow.addArrangedSubview(button("Downloads", action: #selector(downloads)))
         reviewRow.addArrangedSubview(button("Installers", action: #selector(installers)))
         reviewRow.addArrangedSubview(button("Duplicates", action: #selector(duplicates)))
@@ -189,6 +190,10 @@ final class CleanroomAppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func documents() {
         runCommand("documents --limit 30", title: "Documents")
+    }
+
+    @objc private func screenshots() {
+        runCommand("screenshots --limit 30 --days 7", title: "Screenshots")
     }
 
     @objc private func downloads() {

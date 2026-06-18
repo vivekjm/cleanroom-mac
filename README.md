@@ -177,6 +177,14 @@ cleanroom documents ~/Documents --limit 40
 cleanroom documents --json
 ```
 
+Review screenshot and screen recording clutter:
+
+```sh
+cleanroom screenshots
+cleanroom screenshots ~/Desktop --days 7 --limit 50
+cleanroom screenshots --json
+```
+
 Review old Downloads files:
 
 ```sh
@@ -572,6 +580,8 @@ Config files use simple `key=value` lines and are never executed as shell.
 `system-data` breaks common macOS System Data locations into focused buckets such as Application Support, caches, Developer data, container storage, diagnostics, MobileSync backups, Group Containers, HTTPStorages, and saved app state. It is review-only and points to the safest next command for each bucket.
 
 `documents` ranks the top-level files and folders inside `~/Documents` or a provided directory. It is review-only, includes each item's guard status, and prints follow-up `documents` and `large` commands so you can drill down safely.
+
+`screenshots` lists screenshot and screen recording files in Desktop, Downloads, and Documents, or a provided folder. It is review-only because screenshots often contain private account, work, or payment information.
 
 `android --json` emits Android SDK, NDK, system image, emulator, AVD, platform, build-tool, command-line tool, and Android Studio cache sizes with safety labels. NDKs, system images, and temporary SDK downloads are opt-in through `--include-dev-heavy`; full SDK roots and AVDs stay review-only.
 

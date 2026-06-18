@@ -9,6 +9,7 @@ simulator-caches	default	rebuildable	yes	-	~/Library/Developer/CoreSimulator/Cac
 homebrew-cache	default	rebuildable	yes	-	~/Library/Caches/Homebrew	Runs Homebrew cleanup or clears Homebrew cache children in Trash mode.
 homebrew-inventory	homebrew	review-only	no	-	Homebrew cache, logs, Cellar, Caskroom, and var folders	Review-only Homebrew storage inventory with brew cleanup guidance.
 documents-inventory	documents	review-only	no	-	Top-level files and folders under ~/Documents or a provided folder	Review-only user-folder storage inventory with guard status and drill-down commands.
+screenshots-inventory	screenshots	review-only	no	-	Screenshot and screen recording files under Desktop, Downloads, Documents, or a provided folder	Review-only screenshot inventory; screenshots can contain sensitive data.
 android-inventory	android	review-only	no	-	Android SDK, NDK, system images, AVDs, emulator, platform/build tools, and Studio caches	Review-only Android SDK and emulator inventory with safety labels and cleanup guidance.
 appdata-inventory	appdata	review-only	no	-	Application Support, Containers, Group Containers, HTTPStorages, WebKit, and saved state	Review-only app data inventory; use leftovers or vendor tools before removing app state.
 cloud-inventory	cloud	review-only	no	-	iCloud Drive, CloudStorage, Dropbox, Google Drive, OneDrive, Box, and Sync	Review-only cloud-sync storage inventory; cleanroom does not remove synced folders.
