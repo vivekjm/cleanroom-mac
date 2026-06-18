@@ -117,6 +117,7 @@ final class CleanroomAppDelegate: NSObject, NSApplicationDelegate {
         reviewRow.addArrangedSubview(button("Caches", action: #selector(caches)))
         reviewRow.addArrangedSubview(button("Diagnostics", action: #selector(diagnostics)))
         reviewRow.addArrangedSubview(button("Packages", action: #selector(packages)))
+        reviewRow.addArrangedSubview(button("Receipts", action: #selector(receipts)))
         reviewRow.addArrangedSubview(button("Homebrew", action: #selector(homebrew)))
         reviewRow.addArrangedSubview(button("Toolchains", action: #selector(toolchains)))
         reviewRow.addArrangedSubview(button("Containers", action: #selector(containers)))
@@ -307,6 +308,10 @@ final class CleanroomAppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func packages() {
         runCommand("packages", title: "Packages")
+    }
+
+    @objc private func receipts() {
+        runCommand("receipts --limit 40", title: "Receipts")
     }
 
     @objc private func homebrew() {

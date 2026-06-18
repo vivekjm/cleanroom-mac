@@ -22,6 +22,7 @@ mkdir -p \
   "$TEST_HOME/Library/Caches/composer" \
   "$TEST_HOME/Library/Caches/Homebrew" \
   "$TEST_HOME/Library/Logs/Homebrew" \
+  "$TEST_HOME/Library/Receipts" \
   "$TEST_HOME/.bundle/cache" \
   "$TEST_HOME/Library/DiagnosticReports" \
   "$TEST_HOME/Library/Application Support/CrashReporter" \
@@ -99,6 +100,8 @@ printf 'maven cache\n' >"$TEST_HOME/.m2/repository/artifact.jar"
 printf 'composer cache\n' >"$TEST_HOME/Library/Caches/composer/pkg.zip"
 printf 'brew cache\n' >"$TEST_HOME/Library/Caches/Homebrew/bottle.tar.gz"
 printf 'brew log\n' >"$TEST_HOME/Library/Logs/Homebrew/build.log"
+printf 'receipt plist\n' >"$TEST_HOME/Library/Receipts/com.cleanroom.test.pkg.plist"
+printf 'receipt bom\n' >"$TEST_HOME/Library/Receipts/com.cleanroom.test.pkg.bom"
 printf 'bundler cache\n' >"$TEST_HOME/.bundle/cache/gem.gem"
 printf 'diagnostic\n' >"$TEST_HOME/Library/DiagnosticReports/OldApp.crash"
 printf 'crash reporter\n' >"$TEST_HOME/Library/Application Support/CrashReporter/OldApp.plist"
@@ -306,6 +309,7 @@ grep 'appdata-inventory' "$rules_json" >/dev/null
 grep 'cloud-inventory' "$rules_json" >/dev/null
 grep 'personal-inventory' "$rules_json" >/dev/null
 grep 'communications-inventory' "$rules_json" >/dev/null
+grep 'receipts-inventory' "$rules_json" >/dev/null
 rm -f "$rules_json"
 "$BIN" review | grep 'personal storage checklist' >/dev/null
 review_json="$(mktemp)"
@@ -526,6 +530,14 @@ grep 'pnpm-store' "$packages_json" >/dev/null
 grep 'homebrew-cache' "$packages_json" >/dev/null
 grep 'cleanroom clean --apply --trash --include-package-stores' "$packages_json" >/dev/null
 rm -f "$packages_json"
+"$BIN" receipts --limit 20 | grep 'com.cleanroom.test.pkg' >/dev/null
+receipts_json="$(mktemp)"
+"$BIN" receipts --json --limit 20 > "$receipts_json"
+python3 -m json.tool "$receipts_json" >/dev/null
+grep '"id":"com.cleanroom.test.pkg"' "$receipts_json" >/dev/null
+grep '"kind":"bom"' "$receipts_json" >/dev/null
+grep 'cleanroom leftovers com.cleanroom.test.pkg' "$receipts_json" >/dev/null
+rm -f "$receipts_json"
 "$BIN" homebrew | grep 'homebrew-cache' >/dev/null
 homebrew_json="$(mktemp)"
 "$BIN" homebrew --json > "$homebrew_json"

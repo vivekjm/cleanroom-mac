@@ -26,6 +26,7 @@ communications-inventory	communications	review-only	no	-	Mail, Mail Downloads, M
 old-logs	default	low-risk	yes	-	~/Library/Logs	Removes log files older than seven days and empty log subfolders.
 old-diagnostics	diagnostics	low-risk	no	--include-diagnostics	~/Library/DiagnosticReports; ~/Library/Application Support/CrashReporter	Removes old user diagnostic reports and CrashReporter files older than --days.
 package-stores	package-stores	rebuildable	no	--include-package-stores	~/Library/pnpm/store; ~/.pnpm-store; ~/.cocoapods/repos; ~/.cargo/registry/cache	Removes rebuildable package manager stores.
+receipts-inventory	receipts	review-only	no	-	/var/db/receipts; /Library/Receipts; ~/Library/Receipts	Read-only macOS package installer receipt inventory; receipts are records, not uninstall targets.
 toolchain-caches	toolchains	rebuildable	no	--include-toolchains	Go, pip, uv, Poetry, SwiftPM, Maven, Composer, RubyGems, and Bundler caches	Removes rebuildable language and toolchain caches that can be downloaded or rebuilt again.
 safe-app-caches	app-caches	rebuildable	no	--include-app-caches	Chrome, Brave, Edge, Arc, Code, Cursor, Slack, Comet, Trae nested cache folders	Removes nested cache folders only; does not remove browser profiles, cookies, bookmarks, settings, or password data.
 stale-node-modules	node-stale	rebuildable	no	--include-node-stale	node_modules under Desktop/Documents/Downloads older than --days	Removes stale node_modules folders under common personal project locations.

@@ -379,6 +379,16 @@ cleanroom packages
 cleanroom packages --json
 ```
 
+Inventory macOS package installer receipts:
+
+```sh
+cleanroom receipts
+cleanroom receipts --limit 50
+cleanroom receipts --json
+```
+
+`receipts` is read-only. It lists `.bom` and `.plist` installer receipt records from readable receipt folders, then points you to `cleanroom leftovers <package-id>` for app-specific review. Do not delete receipts to uninstall an app; use the vendor uninstaller first.
+
 Inventory language/toolchain caches:
 
 ```sh
@@ -695,6 +705,8 @@ Config files use simple `key=value` lines and are never executed as shell.
 `trash` inventories current `~/.Trash` contents. `--include-user-trash` empties Trash only when explicitly requested, and it is intentionally not included in presets.
 
 `packages` inventories npm, Yarn, pnpm, Gradle, CocoaPods, Cargo, and Homebrew stores with preview/apply commands for matching cleanup categories.
+
+`receipts` inventories macOS package installer receipt records from `/var/db/receipts`, `/Library/Receipts`, and `~/Library/Receipts`. It is useful when investigating software installed by `.pkg` installers, because package IDs often hint at vendor leftovers to inspect next. Cleanroom never removes receipt records.
 
 `homebrew` inventories Homebrew cache, logs, Cellar, Caskroom, and service/runtime folders. It is review-only and points to `brew cleanup -n` for Homebrew-native dry-run detail.
 
