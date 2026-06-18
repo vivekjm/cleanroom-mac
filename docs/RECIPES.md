@@ -110,6 +110,7 @@ cleanroom protect --json
 cleanroom guard --json ~/Library/Application\ Support/Google/Chrome
 cleanroom rules --json
 cleanroom report --output cleanroom-report.md
+cleanroom report --redact --output cleanroom-report.md
 cleanroom snapshot --output cleanroom-before.json
 cleanroom diff cleanroom-before.json cleanroom-after.json
 cleanroom state --json
@@ -216,7 +217,7 @@ cleanroom permissions --json
 
 `rules --json` emits cleanup rule metadata, including safety level, default status, opt-in flag, paths, and description.
 
-`report` writes a Markdown summary with disk state, cleanup candidates, largest known cleanup locations, large-file hints from Spotlight, protected personal-data paths, and safety notes. It is useful before asking for help because people can inspect what is taking space without deleting anything.
+`report` writes a Markdown summary with disk state, cleanup candidates, largest known cleanup locations, large-file hints from Spotlight, protected personal-data paths, and safety notes. Use `report --redact` before sharing the file publicly; it masks home, user, and temporary paths while preserving enough structure for storage triage.
 
 ## Developer Laptop
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.57.0"
+VERSION="0.58.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -15,6 +15,7 @@ CONFIG_LOADED=0
 OUTPUT_FILE=""
 LOG_FILE=""
 TRASH=0
+REDACT=0
 RUN_ID="$(date '+%Y%m%d-%H%M%S')-$$"
 EXCLUDES=()
 PATH_ARGS=()
@@ -91,7 +92,7 @@ Usage:
   cleanroom toolchains [--json]
   cleanroom containers [--json]
   cleanroom snapshots [--json]
-  cleanroom report [--output PATH]
+  cleanroom report [--output PATH] [--redact]
   cleanroom clean [options]
   cleanroom history [--limit N]
   cleanroom restore [--log PATH] [--apply]
@@ -174,6 +175,7 @@ Options:
                        trash, backups, xcode, caches, diagnostics, packages, receipts, homebrew, toolchains,
                        containers, android, snapshots, doctor, protect, guard, or rules.
   --output PATH        Output path for report.
+  --redact             Redact home, user, and temporary paths in Markdown reports.
   --log PATH           Write apply audit log here. Default: ~/.local/state/cleanroom/runs/*.log.
   --config PATH        Load config file. Default: ~/.config/cleanroom/config.
   --exclude PATH       Never remove this path. Can be passed multiple times.
@@ -322,6 +324,7 @@ Examples:
   cleanroom snapshots
   cleanroom snapshots --json
   cleanroom report --output cleanroom-report.md
+  cleanroom report --redact --output cleanroom-report.md
   cleanroom doctor
   cleanroom doctor --json
   cleanroom protect
@@ -636,6 +639,53 @@ disk_line() {
 
 json_escape() {
   LC_ALL=C sed 's/\\/\\\\/g; s/"/\\"/g'
+}
+
+redact_stream() {
+  if [[ "$REDACT" -ne 1 ]]; then
+    cat
+    return 0
+  fi
+
+  local home tmp short user_home tail
+  home="${HOME%/}"
+  tmp="${TMPDIR:-}"
+  tmp="${tmp%/}"
+  short="${USER:-}"
+  [[ -n "$short" ]] || short="$(id -un 2>/dev/null || true)"
+  user_home=""
+  if [[ "$home" == /Users/* ]]; then
+    tail="${home#/Users/}"
+    user_home="/Users/${tail%%/*}"
+  elif [[ -n "$short" ]]; then
+    user_home="/Users/$short"
+  fi
+
+  awk \
+    -v home="$home" \
+    -v user_home="$user_home" \
+    -v tmp="$tmp" \
+    -v tmp_repl='$TMPDIR' \
+    'function repl(s, from, to,    i, out) {
+       if (from == "") return s
+       out = ""
+       while ((i = index(s, from)) > 0) {
+         out = out substr(s, 1, i - 1) to
+         s = substr(s, i + length(from))
+       }
+       return out s
+     }
+     {
+       line = $0
+       line = repl(line, home, "~")
+       line = repl(line, user_home, "/Users/USER")
+       line = repl(line, tmp, tmp_repl)
+       print line
+     }'
+}
+
+redact_string() {
+  printf '%s\n' "$1" | redact_stream | sed -n '1p'
 }
 
 shell_quote() {
@@ -4715,10 +4765,10 @@ report_body() {
 
 report() {
   if [[ -n "$OUTPUT_FILE" ]]; then
-    report_body >"$(expand_path "$OUTPUT_FILE")"
-    ok "Wrote report: $(expand_path "$OUTPUT_FILE")"
+    report_body | redact_stream >"$(expand_path "$OUTPUT_FILE")"
+    ok "Wrote report: $(redact_string "$(expand_path "$OUTPUT_FILE")")"
   else
-    report_body
+    report_body | redact_stream
   fi
 }
 
@@ -5271,6 +5321,7 @@ while [[ "$#" -gt 0 ]]; do
     --yes) ASSUME_YES=1 ;;
     --verbose) VERBOSE=1 ;;
     --json) JSON=1 ;;
+    --redact) REDACT=1 ;;
     --output)
       shift
       [[ -n "${1:-}" ]] || die "--output requires a path"

@@ -282,7 +282,8 @@ struct SidebarView: View {
                         }
                         SidebarSection("REPORT") {
                             NavRow("camera.fill",             "Snapshot",    .run(title: "Snapshot",  args: "snapshot"), state)
-                            NavRow("doc.text.fill",           "History",     .run(title: "History",   args: "history"), state)
+                            NavRow("doc.text.fill",           "Report",      .run(title: "Redacted Report", args: "report --redact"), state)
+                            NavRow("clock.fill",              "History",     .run(title: "History",   args: "history"), state)
                             NavRow("shield.fill",             "Protected",   .run(title: "Protected", args: "protect"), state)
                             NavRow("flag.fill",               "Rules",       .run(title: "Rules",     args: "rules"), state)
                         }
@@ -292,7 +293,7 @@ struct SidebarView: View {
 
                 Rectangle().fill(DS.C.dividerOnDark).frame(height: 1)
                 HStack {
-                    Text(state.cliPath.isEmpty ? "CLI not found" : "v0.57.0")
+                    Text(state.cliPath.isEmpty ? "CLI not found" : "v0.58.0")
                         .font(DS.T.tag)
                         .foregroundColor(DS.C.textOnDark.opacity(0.35))
                     Spacer()

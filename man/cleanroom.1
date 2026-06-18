@@ -1,4 +1,4 @@
-.TH CLEANROOM 1 "June 2026" "cleanroom 0.57.0" "User Commands"
+.TH CLEANROOM 1 "June 2026" "cleanroom 0.58.0" "User Commands"
 .SH NAME
 cleanroom \- safe-by-default macOS storage cleaner
 .SH SYNOPSIS
@@ -141,7 +141,7 @@ cleanroom \- safe-by-default macOS storage cleaner
 .RI "snapshots [--json]"
 .br
 .B cleanroom
-.RI "report [--output path]"
+.RI "report [--output path] [--redact]"
 .br
 .B cleanroom
 .RI "clean [options]"
@@ -343,7 +343,9 @@ Lima, and Podman. Cleanup is high-impact and opt-in.
 List local Time Machine snapshots for review.
 .TP
 .B report
-Generate a Markdown cleanup report.
+Generate a Markdown cleanup report. Use
+.B --redact
+before sharing publicly to mask home, user, and temporary paths.
 .TP
 .B clean
 Preview or apply cleanup.
@@ -484,6 +486,7 @@ cleanroom toolchains --json
 cleanroom containers --json
 cleanroom snapshots --json
 cleanroom report --output cleanroom-report.md
+cleanroom report --redact --output cleanroom-report.md
 cleanroom doctor --json
 cleanroom clean --preset dev
 cleanroom clean --preset dev --apply --trash

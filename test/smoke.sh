@@ -715,6 +715,16 @@ report_file="$(mktemp)"
 grep '# cleanroom report' "$report_file" >/dev/null
 grep 'chrome-login-data' "$report_file" >/dev/null
 rm -f "$report_file"
+redacted_report="$(mktemp)"
+"$BIN" report --redact --output "$redacted_report" >/dev/null
+grep '# cleanroom report' "$redacted_report" >/dev/null
+grep 'Cleanup Candidates' "$redacted_report" >/dev/null
+grep '~/' "$redacted_report" >/dev/null
+if grep -F "$TEST_HOME" "$redacted_report" >/dev/null; then
+  echo "redacted report leaked TEST_HOME" >&2
+  exit 1
+fi
+rm -f "$redacted_report"
 
 json_file="$(mktemp)"
 "$BIN" scan --json > "$json_file"

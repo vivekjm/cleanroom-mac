@@ -449,6 +449,7 @@ Create a Markdown report for sharing, audits, or GitHub issues:
 
 ```sh
 cleanroom report --output cleanroom-report.md
+cleanroom report --redact --output cleanroom-report.md
 ```
 
 Check environment and safety assumptions:
@@ -694,6 +695,8 @@ Config files use simple `key=value` lines and are never executed as shell.
 `diagnostics` inventories user logs, diagnostic reports, and CrashReporter data. Default cleanup already removes old log files; diagnostic report cleanup is opt-in with `cleanroom clean --include-diagnostics --days N`.
 
 `doctor --json` emits platform, config, disk, dependency, and safety-catalog diagnostics for wrappers and support reports.
+
+`report` writes a Markdown summary with disk state, cleanup candidates, largest known cleanup locations, large-file hints from Spotlight, protected personal-data paths, and safety notes. Add `--redact` before sharing in GitHub issues or support chats; it masks home, user, and temporary paths while keeping storage categories readable.
 
 `plan` estimates cleanup opportunities and prints copyable dry-run commands plus explicit apply commands. It does not delete anything.
 
