@@ -55,6 +55,7 @@ cleanroom large --json ~/Documents
 cleanroom duplicates --json ~/Documents
 cleanroom documents --json ~/Documents
 cleanroom screenshots --json ~/Desktop
+cleanroom archives --json ~/Downloads
 cleanroom downloads --json
 cleanroom installers --json
 cleanroom nodes --json ~/Documents
@@ -100,6 +101,8 @@ cleanroom report --output cleanroom-report.md
 `documents --json [PATH]` emits top-level file/folder sizes with kind, guard status, and follow-up commands. It is intentionally review-only and helps explain a large Documents storage category before deleting anything.
 
 `screenshots --json [PATH]` emits screenshot and screen recording files with age, modified date, size, and Finder reveal command. It is intentionally review-only because screenshots can contain sensitive data.
+
+`archives --json [PATH]` emits archive and disk image files with type, age, modified date, size, and Finder reveal command. It is intentionally review-only because archives can be backups, deliverables, or installer sources.
 
 `downloads --json` emits old files in `~/Downloads` with age, modified date, path, and size. It is intentionally review-only and does not delete anything.
 
@@ -235,6 +238,7 @@ cleanroom large ~/Downloads --min-mb 100 --limit 50
 cleanroom duplicates ~/Documents --min-mb 100 --limit 20
 cleanroom documents ~/Documents --limit 40
 cleanroom screenshots ~/Desktop --days 7 --limit 50
+cleanroom archives ~/Downloads --days 7 --limit 50
 cleanroom downloads --days 30 --limit 50
 cleanroom installers --days 30 --limit 50
 cleanroom nodes ~/Documents --days 45 --limit 30

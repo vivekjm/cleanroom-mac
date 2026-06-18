@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.42.0"
+VERSION="0.43.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -53,6 +53,7 @@ Usage:
   cleanroom duplicates [PATH] [--min-mb N] [--limit N] [--json]
   cleanroom documents [PATH] [--limit N] [--json]
   cleanroom screenshots [PATH] [--days N] [--limit N] [--json]
+  cleanroom archives [PATH] [--days N] [--limit N] [--json]
   cleanroom downloads [--days N] [--limit N] [--json]
   cleanroom installers [--days N] [--limit N] [--json]
   cleanroom nodes [PATH] [--days N] [--limit N] [--json]
@@ -98,6 +99,7 @@ Actions:
   duplicates           Find exact duplicate files for review without deleting anything.
   documents            Rank top-level user folders/files for review without deleting anything.
   screenshots          List screenshot and screen recording files for review.
+  archives             List archive and disk image files for review.
   downloads            List old Downloads files for manual review.
   installers           List old downloaded installer files for review.
   nodes                List stale node_modules folders for review.
@@ -139,7 +141,7 @@ Options:
   --yes                Do not prompt before --apply cleanup.
   --verbose            Print every path touched.
   --json               Emit JSON for overview, scan, system-data, plan, large, duplicates,
-                       documents, screenshots, downloads, installers, nodes, venvs, apps, appdata, libraries, cloud, personal,
+                       documents, screenshots, archives, downloads, installers, nodes, venvs, apps, appdata, libraries, cloud, personal,
                        browsers, leftovers, startup,
                        trash, backups, xcode, caches, diagnostics, packages, homebrew, toolchains,
                        containers, android, snapshots, doctor, protect, guard, or rules.
@@ -206,6 +208,9 @@ Examples:
   cleanroom screenshots
   cleanroom screenshots ~/Desktop --days 7 --limit 50
   cleanroom screenshots --json
+  cleanroom archives
+  cleanroom archives ~/Downloads --days 7 --limit 50
+  cleanroom archives --json
   cleanroom downloads
   cleanroom downloads --days 30 --limit 50
   cleanroom downloads --json
@@ -1518,6 +1523,101 @@ screenshots() {
   while IFS=$'\t' read -r kb epoch age_days path; do
     [[ -z "${path:-}" ]] && continue
     printf '%-10s %4sd     %-12s %s\n' "$(human_kb "$kb")" "${age_days:-0}" "$(file_mtime_iso "${epoch:-0}")" "$path"
+    printf '  reveal: open -R %s\n' "$(shell_quote "$path")"
+  done <<<"$rows"
+}
+
+archive_roots() {
+  if [[ "${#PATH_ARGS[@]}" -gt 0 ]]; then
+    printf '%s\n' "$(expand_path "${PATH_ARGS[0]}")"
+  else
+    printf '%s\n' "$HOME/Downloads"
+    printf '%s\n' "$HOME/Desktop"
+    printf '%s\n' "$HOME/Documents"
+  fi
+}
+
+archive_kind() {
+  local name="$1" lower
+  lower="$(printf '%s' "$name" | tr '[:upper:]' '[:lower:]')"
+  case "$lower" in
+    *.dmg|*.iso|*.img) printf 'disk-image' ;;
+    *.zip|*.rar|*.7z|*.tar|*.tgz|*.tar.gz|*.tbz2|*.tar.bz2|*.txz|*.tar.xz|*.gz|*.bz2|*.xz) printf 'archive' ;;
+    *) printf '' ;;
+  esac
+}
+
+archive_rows() {
+  local now root path name kind kb epoch age_days
+  now="$(date '+%s')"
+  while IFS= read -r root; do
+    [[ -d "$root" ]] || continue
+    find "$root" -xdev -maxdepth 1 -type f -mtime +"$DAYS" -print0 2>/dev/null |
+      while IFS= read -r -d '' path; do
+        name="$(basename "$path")"
+        kind="$(archive_kind "$name")"
+        [[ -n "$kind" ]] || continue
+        kb="$(size_kb "$path")"
+        epoch="$(path_mtime_epoch "$path")"
+        if [[ "$epoch" -gt 0 && "$now" -ge "$epoch" ]]; then
+          age_days=$(((now - epoch) / 86400))
+        else
+          age_days=0
+        fi
+        printf '%012d\t%s\t%s\t%s\t%s\n' "$kb" "$epoch" "$age_days" "$kind" "$path"
+      done
+  done < <(archive_roots) |
+    sort -rn |
+    head -n "$LIMIT" || true
+}
+
+archives() {
+  local rows
+  rows="$(archive_rows)"
+
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '['
+    local first=1 kb epoch age_days kind path kb_num
+    while IFS=$'\t' read -r kb epoch age_days kind path; do
+      [[ -z "${path:-}" ]] && continue
+      kb_num="$(printf '%s\n' "$kb" | sed 's/^0*//; s/^$/0/')"
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '{"path":"%s","name":"%s","kind":"%s","size_kb":%s,"size":"%s","modified_epoch":%s,"modified":"%s","age_days":%s,"review_command":"%s"}' \
+        "$(printf '%s' "$path" | json_escape)" \
+        "$(basename "$path" | json_escape)" \
+        "$(printf '%s' "$kind" | json_escape)" \
+        "$kb_num" \
+        "$(human_kb "${kb:-0}" | json_escape)" \
+        "${epoch:-0}" \
+        "$(file_mtime_iso "${epoch:-0}" | json_escape)" \
+        "${age_days:-0}" \
+        "$(printf 'open -R %s' "$(shell_quote "$path")" | json_escape)"
+    done <<<"$rows"
+    printf ']\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}cleanroom archives${RESET}"
+  printf 'Review-only list. cleanroom does not delete archives or disk images.\n'
+  printf 'Older than: %s days  Limit: %s\n' "$DAYS" "$LIMIT"
+  printf 'Paths: '
+  local root first_root=1
+  while IFS= read -r root; do
+    [[ "$first_root" -eq 0 ]] && printf '; '
+    first_root=0
+    printf '%s' "$root"
+  done < <(archive_roots)
+  printf '\n\n'
+  if [[ -z "$rows" ]]; then
+    printf 'No matching archive or disk image files found.\n'
+    return 0
+  fi
+  printf '%-10s %-10s %-9s %-12s %s\n' "size" "kind" "age" "modified" "path"
+  local kb epoch age_days kind path
+  while IFS=$'\t' read -r kb epoch age_days kind path; do
+    [[ -z "${path:-}" ]] && continue
+    printf '%-10s %-10s %4sd     %-12s %s\n' "$(human_kb "$kb")" "$kind" "${age_days:-0}" "$(file_mtime_iso "${epoch:-0}")" "$path"
     printf '  reveal: open -R %s\n' "$(shell_quote "$path")"
   done <<<"$rows"
 }
@@ -4016,7 +4116,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  overview|scan|system-data|plan|large|duplicates|documents|screenshots|downloads|installers|nodes|venvs|virtualenvs|apps|appdata|libraries|cloud|personal|browsers|leftovers|backups|xcode|android|startup|trash|caches|diagnostics|packages|homebrew|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
+  overview|scan|system-data|plan|large|duplicates|documents|screenshots|archives|downloads|installers|nodes|venvs|virtualenvs|apps|appdata|libraries|cloud|personal|browsers|leftovers|backups|xcode|android|startup|trash|caches|diagnostics|packages|homebrew|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -4100,7 +4200,7 @@ while [[ "$#" -gt 0 ]]; do
     -h|--help) usage; exit 0 ;;
     -v|--version) echo "$VERSION"; exit 0 ;;
     *)
-      if [[ "$ACTION" == "guard" || "$ACTION" == "large" || "$ACTION" == "duplicates" || "$ACTION" == "documents" || "$ACTION" == "screenshots" || "$ACTION" == "nodes" || "$ACTION" == "venvs" || "$ACTION" == "virtualenvs" || "$ACTION" == "apps" || "$ACTION" == "leftovers" ]]; then
+      if [[ "$ACTION" == "guard" || "$ACTION" == "large" || "$ACTION" == "duplicates" || "$ACTION" == "documents" || "$ACTION" == "screenshots" || "$ACTION" == "archives" || "$ACTION" == "nodes" || "$ACTION" == "venvs" || "$ACTION" == "virtualenvs" || "$ACTION" == "apps" || "$ACTION" == "leftovers" ]]; then
         PATH_ARGS+=("$1")
       else
         die "Unknown option: $1"
@@ -4119,6 +4219,7 @@ case "$ACTION" in
   duplicates) duplicates ;;
   documents) documents ;;
   screenshots) screenshots ;;
+  archives) archives ;;
   downloads) downloads ;;
   installers) installers ;;
   nodes) nodes ;;
