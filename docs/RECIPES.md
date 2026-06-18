@@ -53,6 +53,7 @@ cleanroom system-data --json
 cleanroom plan --json
 cleanroom large --json ~/Documents
 cleanroom duplicates --json ~/Documents
+cleanroom documents --json ~/Documents
 cleanroom downloads --json
 cleanroom installers --json
 cleanroom nodes --json ~/Documents
@@ -94,6 +95,8 @@ cleanroom report --output cleanroom-report.md
 `large --json [PATH]` emits large files above `--min-mb` for review. It is intentionally review-only and does not delete anything.
 
 `duplicates --json [PATH]` emits exact duplicate groups with SHA-256 hashes, paths, and estimated possible reclaim. It is intentionally review-only and does not delete anything.
+
+`documents --json [PATH]` emits top-level file/folder sizes with kind, guard status, and follow-up commands. It is intentionally review-only and helps explain a large Documents storage category before deleting anything.
 
 `downloads --json` emits old files in `~/Downloads` with age, modified date, path, and size. It is intentionally review-only and does not delete anything.
 
@@ -227,6 +230,7 @@ cleanroom android --json
 cleanroom large ~/Documents --min-mb 250 --limit 50
 cleanroom large ~/Downloads --min-mb 100 --limit 50
 cleanroom duplicates ~/Documents --min-mb 100 --limit 20
+cleanroom documents ~/Documents --limit 40
 cleanroom downloads --days 30 --limit 50
 cleanroom installers --days 30 --limit 50
 cleanroom nodes ~/Documents --days 45 --limit 30

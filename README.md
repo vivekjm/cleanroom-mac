@@ -169,6 +169,14 @@ cleanroom duplicates ~/Documents --min-mb 100 --limit 20
 cleanroom duplicates --json ~/Downloads
 ```
 
+Break down Documents or any folder by top-level item:
+
+```sh
+cleanroom documents
+cleanroom documents ~/Documents --limit 40
+cleanroom documents --json
+```
+
 Review old Downloads files:
 
 ```sh
@@ -562,6 +570,8 @@ Config files use simple `key=value` lines and are never executed as shell.
 `overview` summarizes disk state, top recommendations, package-store size, toolchain-cache size, container storage size, diagnostic-report size, protected-data presence, snapshots, app bundle count, and useful next commands without deleting anything.
 
 `system-data` breaks common macOS System Data locations into focused buckets such as Application Support, caches, Developer data, container storage, diagnostics, MobileSync backups, Group Containers, HTTPStorages, and saved app state. It is review-only and points to the safest next command for each bucket.
+
+`documents` ranks the top-level files and folders inside `~/Documents` or a provided directory. It is review-only, includes each item's guard status, and prints follow-up `documents` and `large` commands so you can drill down safely.
 
 `android --json` emits Android SDK, NDK, system image, emulator, AVD, platform, build-tool, command-line tool, and Android Studio cache sizes with safety labels. NDKs, system images, and temporary SDK downloads are opt-in through `--include-dev-heavy`; full SDK roots and AVDs stay review-only.
 

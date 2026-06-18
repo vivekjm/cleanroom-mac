@@ -79,6 +79,7 @@ mkdir -p \
   "$TEST_HOME/Applications/FakeBig.app/Contents/MacOS" \
   "$TEST_HOME/Downloads" \
   "$TEST_HOME/Documents/duplicates" \
+  "$TEST_HOME/Documents/media-project" \
   "$TEST_HOME/Documents/example/node_modules" \
   "$TEST_HOME/Documents/python-app/.venv/bin"
 
@@ -144,6 +145,8 @@ printf 'music library\n' >"$TEST_HOME/Music/Music Library.musiclibrary/Library.m
 printf 'imovie library\n' >"$TEST_HOME/Movies/iMovie Library.imovielibrary/CurrentVersion.flexolibrary"
 printf 'garageband project\n' >"$TEST_HOME/Music/GarageBand/song.band"
 printf 'trashed\n' >"$TEST_HOME/.Trash/old-trash.txt"
+printf 'document\n' >"$TEST_HOME/Documents/readme.txt"
+dd if=/dev/zero of="$TEST_HOME/Documents/media-project/clip.mov" bs=1024 count=64 >/dev/null 2>&1
 printf 'old dependency\n' >"$TEST_HOME/Documents/example/node_modules/package.txt"
 printf 'home = /usr/bin\n' >"$TEST_HOME/Documents/python-app/.venv/pyvenv.cfg"
 printf 'python shim\n' >"$TEST_HOME/Documents/python-app/.venv/bin/python"
@@ -224,6 +227,7 @@ grep 'ai-models' "$rules_json" >/dev/null
 grep 'old-diagnostics' "$rules_json" >/dev/null
 grep 'toolchain-caches' "$rules_json" >/dev/null
 grep 'stale-python-virtualenvs' "$rules_json" >/dev/null
+grep 'documents-inventory' "$rules_json" >/dev/null
 grep 'android-inventory' "$rules_json" >/dev/null
 grep 'appdata-inventory' "$rules_json" >/dev/null
 grep 'cloud-inventory' "$rules_json" >/dev/null
@@ -253,6 +257,15 @@ python3 -m json.tool "$duplicates_json" >/dev/null
 grep 'potential_reclaim_kb' "$duplicates_json" >/dev/null
 grep 'copy-b.bin' "$duplicates_json" >/dev/null
 rm -f "$duplicates_json"
+"$BIN" documents "$HOME/Documents" --limit 10 | grep 'media-project' >/dev/null
+documents_json="$(mktemp)"
+"$BIN" documents --json "$HOME/Documents" --limit 10 > "$documents_json"
+python3 -m json.tool "$documents_json" >/dev/null
+grep '"name":"media-project"' "$documents_json" >/dev/null
+grep '"kind":"directory"' "$documents_json" >/dev/null
+grep '"guard_status":"review"' "$documents_json" >/dev/null
+grep 'cleanroom large' "$documents_json" >/dev/null
+rm -f "$documents_json"
 "$BIN" downloads --days 30 --limit 5 | grep 'old-installer.dmg' >/dev/null
 downloads_json="$(mktemp)"
 "$BIN" downloads --json --days 30 --limit 5 > "$downloads_json"

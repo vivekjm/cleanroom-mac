@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.40.0"
+VERSION="0.41.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -51,6 +51,7 @@ Usage:
   cleanroom plan [--json]
   cleanroom large [PATH] [--min-mb N] [--limit N] [--json]
   cleanroom duplicates [PATH] [--min-mb N] [--limit N] [--json]
+  cleanroom documents [PATH] [--limit N] [--json]
   cleanroom downloads [--days N] [--limit N] [--json]
   cleanroom installers [--days N] [--limit N] [--json]
   cleanroom nodes [PATH] [--days N] [--limit N] [--json]
@@ -94,6 +95,7 @@ Actions:
   plan                 Rank safe cleanup opportunities and show copyable commands.
   large                List largest files for review without deleting anything.
   duplicates           Find exact duplicate files for review without deleting anything.
+  documents            Rank top-level user folders/files for review without deleting anything.
   downloads            List old Downloads files for manual review.
   installers           List old downloaded installer files for review.
   nodes                List stale node_modules folders for review.
@@ -135,7 +137,7 @@ Options:
   --yes                Do not prompt before --apply cleanup.
   --verbose            Print every path touched.
   --json               Emit JSON for overview, scan, system-data, plan, large, duplicates,
-                       downloads, installers, nodes, venvs, apps, appdata, libraries, cloud, personal,
+                       documents, downloads, installers, nodes, venvs, apps, appdata, libraries, cloud, personal,
                        browsers, leftovers, startup,
                        trash, backups, xcode, caches, diagnostics, packages, homebrew, toolchains,
                        containers, android, snapshots, doctor, protect, guard, or rules.
@@ -196,6 +198,9 @@ Examples:
   cleanroom large --json ~/Downloads
   cleanroom duplicates ~/Documents --min-mb 100
   cleanroom duplicates --json ~/Downloads
+  cleanroom documents
+  cleanroom documents ~/Documents --limit 40
+  cleanroom documents --json
   cleanroom downloads
   cleanroom downloads --days 30 --limit 50
   cleanroom downloads --json
@@ -1313,6 +1318,103 @@ large() {
   while IFS=$'\t' read -r kb path; do
     [[ -z "${path:-}" ]] && continue
     printf '%8s  %s\n' "$(human_kb "$kb")" "$path"
+  done <<<"$rows"
+}
+
+document_guard_status() {
+  local path="$1"
+  if is_dangerous_path "$path"; then
+    printf 'refused-dangerous'
+  elif is_protected_removal_path "$path"; then
+    printf 'refused-protected'
+  elif is_excluded "$path"; then
+    printf 'excluded'
+  else
+    printf 'review'
+  fi
+}
+
+document_item_kind() {
+  local path="$1"
+  if [[ -d "$path" ]]; then
+    printf 'directory'
+  elif [[ -f "$path" ]]; then
+    printf 'file'
+  else
+    printf 'other'
+  fi
+}
+
+documents_default_root() {
+  if [[ -d "$HOME/Documents" ]]; then
+    printf '%s\n' "$HOME/Documents"
+  else
+    printf '%s\n' "$HOME"
+  fi
+}
+
+documents_rows() {
+  local root="$1"
+  find "$root" -xdev -mindepth 1 -maxdepth 1 -print0 2>/dev/null |
+    while IFS= read -r -d '' path; do
+      printf '%012d\t%s\t%s\t%s\n' "$(size_kb "$path")" "$(document_item_kind "$path")" "$(document_guard_status "$path")" "$path"
+    done |
+    sort -rn |
+    head -n "$LIMIT" || true
+}
+
+documents() {
+  local root
+  if [[ "${#PATH_ARGS[@]}" -gt 0 ]]; then
+    root="$(expand_path "${PATH_ARGS[0]}")"
+  else
+    root="$(documents_default_root)"
+  fi
+  [[ -e "$root" ]] || die "documents path not found: $root"
+  [[ -d "$root" ]] || die "documents path must be a directory: $root"
+
+  local rows
+  rows="$(documents_rows "$root")"
+
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '['
+    local first=1 kb kb_num kind guard path name
+    while IFS=$'\t' read -r kb kind guard path; do
+      [[ -z "${path:-}" ]] && continue
+      kb_num="$(printf '%s\n' "$kb" | sed 's/^0*//; s/^$/0/')"
+      name="$(basename "$path")"
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '{"path":"%s","name":"%s","kind":"%s","guard_status":"%s","size_kb":%s,"size":"%s","review_command":"%s","large_files_command":"%s"}' \
+        "$(printf '%s' "$path" | json_escape)" \
+        "$(printf '%s' "$name" | json_escape)" \
+        "$(printf '%s' "$kind" | json_escape)" \
+        "$(printf '%s' "$guard" | json_escape)" \
+        "$kb_num" \
+        "$(human_kb "${kb:-0}" | json_escape)" \
+        "$(printf 'cleanroom documents %s --limit %s' "$(shell_quote "$path")" "$LIMIT" | json_escape)" \
+        "$(printf 'cleanroom large %s --min-mb %s --limit %s' "$(shell_quote "$path")" "$MIN_MB" "$LIMIT" | json_escape)"
+    done <<<"$rows"
+    printf ']\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}cleanroom Documents storage${RESET}"
+  printf 'Review-only top-level size breakdown. cleanroom does not delete these files or folders.\n'
+  printf 'Path: %s  Limit: %s\n\n' "$root" "$LIMIT"
+  if [[ -z "$rows" ]]; then
+    printf 'No top-level items found.\n'
+    return 0
+  fi
+  printf '%-10s %-10s %-18s %s\n' "size" "kind" "guard" "path"
+  local kb kind guard path
+  while IFS=$'\t' read -r kb kind guard path; do
+    [[ -z "${path:-}" ]] && continue
+    printf '%-10s %-10s %-18s %s\n' "$(human_kb "$kb")" "$kind" "$guard" "$path"
+    if [[ "$kind" == "directory" ]]; then
+      printf '  inspect: cleanroom documents %s --limit %s\n' "$(shell_quote "$path")" "$LIMIT"
+      printf '  large files: cleanroom large %s --min-mb %s --limit %s\n' "$(shell_quote "$path")" "$MIN_MB" "$LIMIT"
+    fi
   done <<<"$rows"
 }
 
@@ -3162,6 +3264,7 @@ overview() {
   printf '\n%s\n' "${BOLD}Useful next commands${RESET}"
   printf 'cleanroom plan\n'
   printf 'cleanroom system-data\n'
+  printf 'cleanroom documents ~/Documents --limit 50\n'
   printf 'cleanroom large ~/Documents --min-mb 250 --limit 50\n'
   printf 'cleanroom downloads --days 30 --limit 50\n'
   printf 'cleanroom venvs --days 30 --limit 50\n'
@@ -3318,7 +3421,7 @@ report_body() {
   done < <(report_candidate_paths) | sort -n | tail -20 | awk -F '\t' '{printf "%8s  %s\n", $2, $3}'
   printf '```\n\n'
 
-  printf 'Broad personal folders such as `~/Documents`, `~/Desktop`, `~/Downloads`, and `~/Library/Application Support` are intentionally not recursively measured in this quick report. Run `cleanroom scan` when you want the heavier full view.\n\n'
+  printf 'Broad personal folders such as `~/Documents`, `~/Desktop`, `~/Downloads`, and `~/Library/Application Support` are intentionally not recursively measured in this quick report. Run `cleanroom documents ~/Documents --limit 50` to drill into Documents, or `cleanroom scan` when you want the heavier full view.\n\n'
 
   printf '## Large File Hints Over 500MB\n\n```text\n'
   if command -v mdfind >/dev/null 2>&1; then
@@ -3809,7 +3912,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  overview|scan|system-data|plan|large|duplicates|downloads|installers|nodes|venvs|virtualenvs|apps|appdata|libraries|cloud|personal|browsers|leftovers|backups|xcode|android|startup|trash|caches|diagnostics|packages|homebrew|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
+  overview|scan|system-data|plan|large|duplicates|documents|downloads|installers|nodes|venvs|virtualenvs|apps|appdata|libraries|cloud|personal|browsers|leftovers|backups|xcode|android|startup|trash|caches|diagnostics|packages|homebrew|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -3893,7 +3996,7 @@ while [[ "$#" -gt 0 ]]; do
     -h|--help) usage; exit 0 ;;
     -v|--version) echo "$VERSION"; exit 0 ;;
     *)
-      if [[ "$ACTION" == "guard" || "$ACTION" == "large" || "$ACTION" == "duplicates" || "$ACTION" == "nodes" || "$ACTION" == "venvs" || "$ACTION" == "virtualenvs" || "$ACTION" == "apps" || "$ACTION" == "leftovers" ]]; then
+      if [[ "$ACTION" == "guard" || "$ACTION" == "large" || "$ACTION" == "duplicates" || "$ACTION" == "documents" || "$ACTION" == "nodes" || "$ACTION" == "venvs" || "$ACTION" == "virtualenvs" || "$ACTION" == "apps" || "$ACTION" == "leftovers" ]]; then
         PATH_ARGS+=("$1")
       else
         die "Unknown option: $1"
@@ -3910,6 +4013,7 @@ case "$ACTION" in
   plan) plan ;;
   large) large ;;
   duplicates) duplicates ;;
+  documents) documents ;;
   downloads) downloads ;;
   installers) installers ;;
   nodes) nodes ;;

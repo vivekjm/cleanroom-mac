@@ -10,6 +10,7 @@ _cleanroom() {
     'plan:Rank cleanup opportunities'
     'large:List large files for review'
     'duplicates:Find exact duplicate files for review'
+    'documents:Rank top-level user folders/files'
     'downloads:List old Downloads files'
     'installers:List old downloaded installer files'
     'nodes:List stale node_modules folders'
