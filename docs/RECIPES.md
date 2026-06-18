@@ -17,6 +17,7 @@ cleanroom plan
 cleanroom large
 cleanroom brokenlinks
 cleanroom quarantine
+cleanroom metadata
 cleanroom duplicates
 cleanroom downloads
 cleanroom installers
@@ -74,6 +75,7 @@ cleanroom plan --json
 cleanroom large --json ~/Documents
 cleanroom brokenlinks --json ~/Documents
 cleanroom quarantine --json ~/Downloads
+cleanroom metadata --json ~/Documents ~/Downloads
 cleanroom duplicates --json ~/Documents
 cleanroom documents --json ~/Documents
 cleanroom desktop --json
@@ -149,6 +151,8 @@ cleanroom permissions --json
 `brokenlinks --json [PATH]` emits dangling symlinks with link path, stored target, parent folder, modified date, and Finder reveal command. It is intentionally review-only and does not delete links.
 
 `quarantine --json [PATH]` emits files and apps carrying macOS quarantine metadata with path, size, modified date, raw quarantine value, and Finder reveal command. It is intentionally review-only and does not delete files or clear attributes.
+
+`metadata --json [PATH...]` emits removable filesystem metadata clutter such as `.DS_Store`, AppleDouble `._*` files, `__MACOSX`, `Thumbs.db`, and `Desktop.ini` with guard status and matching apply command. Direct apply mode requires `--trash`.
 
 `duplicates --json [PATH]` emits exact duplicate groups with SHA-256 hashes, paths, and estimated possible reclaim. It is intentionally review-only and does not delete anything.
 
@@ -330,6 +334,18 @@ cleanroom clean --apply --trash --include-installers --days 30
 ```
 
 Use this for old `.dmg`, `.pkg`, `.mpkg`, `.xip`, `.ipsw`, and `.iso` files in `~/Downloads`. The inventory is review-only; cleanup requires the explicit `--include-installers` flag.
+
+## Metadata Clutter
+
+```sh
+cleanroom metadata
+cleanroom metadata ~/Documents ~/Downloads --limit 50
+cleanroom metadata --apply --trash
+cleanroom clean --include-metadata
+cleanroom clean --apply --trash --include-metadata
+```
+
+Use this after unzipping archives, working with network shares, or copying files between macOS and Windows. It targets removable metadata clutter such as `.DS_Store`, AppleDouble `._*` files, `__MACOSX` folders, `Thumbs.db`, and `Desktop.ini`; direct `metadata --apply` requires Trash mode.
 
 ## Applications Storage
 

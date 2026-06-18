@@ -166,6 +166,9 @@ printf 'recording\n' >"$TEST_HOME/Downloads/Screen Recording 2026-06-01 at 10.00
 dd if=/dev/zero of="$TEST_HOME/Downloads/old-archive.zip" bs=1024 count=512 >/dev/null 2>&1
 dd if=/dev/zero of="$TEST_HOME/Desktop/old-disk-image.dmg" bs=1024 count=512 >/dev/null 2>&1
 printf 'document\n' >"$TEST_HOME/Documents/readme.txt"
+printf 'finder metadata\n' >"$TEST_HOME/Documents/.DS_Store"
+printf 'appledouble metadata\n' >"$TEST_HOME/Downloads/._old-installer.dmg"
+printf 'windows metadata\n' >"$TEST_HOME/Desktop/Thumbs.db"
 dd if=/dev/zero of="$TEST_HOME/Documents/media-project/clip.mov" bs=1024 count=64 >/dev/null 2>&1
 printf 'old dependency\n' >"$TEST_HOME/Documents/example/node_modules/package.txt"
 printf 'home = /usr/bin\n' >"$TEST_HOME/Documents/python-app/.venv/pyvenv.cfg"
@@ -327,6 +330,7 @@ grep 'documents-inventory' "$rules_json" >/dev/null
 grep 'desktop-inventory' "$rules_json" >/dev/null
 grep 'brokenlinks-inventory' "$rules_json" >/dev/null
 grep 'quarantine-inventory' "$rules_json" >/dev/null
+grep 'metadata-clutter' "$rules_json" >/dev/null
 grep 'screenshots-inventory' "$rules_json" >/dev/null
 grep 'archives-inventory' "$rules_json" >/dev/null
 grep 'android-inventory' "$rules_json" >/dev/null
@@ -360,6 +364,7 @@ grep 'cleanroom clean --apply --trash --include-toolchains' "$plan_json" >/dev/n
 grep 'cleanroom clean --apply --trash --include-venv-stale --days 30' "$plan_json" >/dev/null
 grep 'cleanroom clean --apply --trash --include-containers' "$plan_json" >/dev/null
 grep 'cleanroom clean --apply --trash --include-diagnostics --days 30' "$plan_json" >/dev/null
+grep 'cleanroom metadata --apply --trash' "$plan_json" >/dev/null
 rm -f "$plan_json"
 "$BIN" large "$HOME/Downloads" --min-mb 1 --limit 5 | grep 'big-test.bin' >/dev/null
 large_json="$(mktemp)"
@@ -385,6 +390,27 @@ grep '"quarantine":"' "$quarantine_json" >/dev/null
 grep 'Safari' "$quarantine_json" >/dev/null
 grep 'open -R' "$quarantine_json" >/dev/null
 rm -f "$quarantine_json"
+"$BIN" metadata "$HOME/Documents" "$HOME/Downloads" "$HOME/Desktop" --limit 10 | grep '.DS_Store' >/dev/null
+"$BIN" metadata "$HOME/Documents" "$HOME/Downloads" "$HOME/Desktop" --limit 10 | grep 'Thumbs.db' >/dev/null
+metadata_json="$(mktemp)"
+"$BIN" metadata --json "$HOME/Documents" "$HOME/Downloads" "$HOME/Desktop" --limit 10 > "$metadata_json"
+python3 -m json.tool "$metadata_json" >/dev/null
+grep '"kind":"finder-metadata"' "$metadata_json" >/dev/null
+grep '"kind":"appledouble"' "$metadata_json" >/dev/null
+grep '"kind":"windows-metadata"' "$metadata_json" >/dev/null
+grep 'cleanroom metadata --apply --trash' "$metadata_json" >/dev/null
+rm -f "$metadata_json"
+if "$BIN" metadata "$HOME/Documents" --apply --yes --limit 1 >/dev/null 2>&1; then
+  echo "metadata apply without --trash should fail" >&2
+  exit 1
+fi
+metadata_log="$TEST_HOME/metadata-apply.log"
+"$BIN" metadata "$HOME/Documents" --apply --trash --yes --limit 10 --log "$metadata_log" | grep 'metadata summary' >/dev/null
+test ! -e "$TEST_HOME/Documents/.DS_Store"
+test -f "$metadata_log"
+grep $'\ttrash\tok\t' "$metadata_log" >/dev/null
+"$BIN" restore --log "$metadata_log" --apply --yes >/dev/null
+test -e "$TEST_HOME/Documents/.DS_Store"
 "$BIN" duplicates "$HOME/Documents" --min-mb 1 --limit 5 | grep 'copy-a.bin' >/dev/null
 "$BIN" duplicates "$HOME/Documents" --min-mb 1 --limit 5 | grep 'copy-b.bin' >/dev/null
 duplicates_json="$(mktemp)"
@@ -718,6 +744,7 @@ config_file="$(mktemp)"
 rm -f "$config_file"
 "$BIN" init-config --config "$config_file" --yes >/dev/null
 grep '^preset=dev' "$config_file" >/dev/null
+grep '^include_metadata=false' "$config_file" >/dev/null
 "$BIN" doctor --config "$config_file" | grep "$config_file" >/dev/null
 
 report_stdout="$("$BIN" report)"
@@ -752,12 +779,15 @@ preflight_output="$("$BIN" clean --preset dev --preflight)"
 grep 'cleanroom clean preflight' <<<"$preflight_output" >/dev/null
 grep 'app-caches' <<<"$preflight_output" >/dev/null
 grep 'node-modules' <<<"$preflight_output" >/dev/null
+metadata_preflight="$("$BIN" clean --include-metadata --preflight)"
+grep 'metadata' <<<"$metadata_preflight" >/dev/null
 preflight_json="$(mktemp)"
-"$BIN" clean --preset deep --include-ai-models --include-containers --include-user-trash --apply --trash --yes --preflight --json > "$preflight_json"
+"$BIN" clean --preset deep --include-ai-models --include-containers --include-user-trash --include-metadata --apply --trash --yes --preflight --json > "$preflight_json"
 python3 -m json.tool "$preflight_json" >/dev/null
 grep '"apply":true' "$preflight_json" >/dev/null
 grep '"trash":true' "$preflight_json" >/dev/null
 grep '"id":"containers"' "$preflight_json" >/dev/null
+grep '"id":"metadata"' "$preflight_json" >/dev/null
 grep '"id":"user-trash"' "$preflight_json" >/dev/null
 grep '"safety":"irreversible"' "$preflight_json" >/dev/null
 grep 'Container cleanup can remove local containers' "$preflight_json" >/dev/null

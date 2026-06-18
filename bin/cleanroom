@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.60.0"
+VERSION="0.61.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -35,6 +35,7 @@ INCLUDE_APP_CACHES=0
 INCLUDE_SNAPSHOTS=0
 INCLUDE_USER_TRASH=0
 INCLUDE_INSTALLERS=0
+INCLUDE_METADATA=0
 
 RED="$(printf '\033[31m')"
 GREEN="$(printf '\033[32m')"
@@ -60,6 +61,7 @@ Usage:
   cleanroom large [PATH] [--min-mb N] [--limit N] [--json]
   cleanroom brokenlinks [PATH] [--limit N] [--json]
   cleanroom quarantine [PATH] [--limit N] [--json]
+  cleanroom metadata [PATH...] [--limit N] [--json] [--apply --trash]
   cleanroom duplicates [PATH] [--min-mb N] [--limit N] [--json]
   cleanroom documents [PATH] [--limit N] [--json]
   cleanroom desktop [--limit N] [--json]
@@ -121,6 +123,7 @@ Actions:
   large                List largest files for review without deleting anything.
   brokenlinks          List broken symlinks for review without deleting anything.
   quarantine           List files with macOS quarantine metadata for review.
+  metadata             Find .DS_Store, AppleDouble, Thumbs.db, and similar metadata clutter.
   duplicates           Find exact duplicate files for review without deleting anything.
   documents            Rank top-level user folders/files for review without deleting anything.
   desktop              Rank top-level Desktop folders/files for review without deleting anything.
@@ -172,7 +175,7 @@ Options:
   --trash              Move deleted files to ~/.Trash/cleanroom-* instead of rm -rf.
   --yes                Do not prompt before --apply cleanup.
   --verbose            Print every path touched.
-  --json               Emit JSON for overview, map, snapshot, diff, state, permissions, review, scan, system-data, plan, large, brokenlinks, quarantine, duplicates,
+  --json               Emit JSON for overview, map, snapshot, diff, state, permissions, review, scan, system-data, plan, large, brokenlinks, quarantine, metadata, duplicates,
                        documents, desktop, screenshots, archives, downloads, installers, nodes, venvs, apps, uninstallers, appreview, appdata, libraries, cloud, cloudfiles, personal, communications,
                        browsers, leftovers, startup, loginitems,
                        trash, backups, xcode, caches, diagnostics, packages, receipts, homebrew, toolchains,
@@ -207,6 +210,7 @@ Options:
   --include-snapshots  Ask Time Machine to thin local snapshots.
   --include-user-trash Empty ~/.Trash during apply. This is irreversible.
   --include-installers Remove old downloaded installer files from ~/Downloads.
+  --include-metadata   Remove filesystem metadata clutter from Desktop, Documents, and Downloads.
   --include-ai-workspaces
                        Remove generated AI-agent workspace state: recordings, scratch, brain,
                        implicit data, and local conversation caches where known.
@@ -252,6 +256,10 @@ Examples:
   cleanroom quarantine
   cleanroom quarantine ~/Downloads --limit 50
   cleanroom quarantine --json
+  cleanroom metadata
+  cleanroom metadata ~/Documents ~/Downloads --limit 50
+  cleanroom metadata --apply --trash
+  cleanroom metadata --json
   cleanroom duplicates ~/Documents --min-mb 100
   cleanroom duplicates --json ~/Downloads
   cleanroom documents
@@ -471,6 +479,7 @@ load_config() {
       include_containers) truthy "$value" && INCLUDE_CONTAINERS=1 ;;
       include_user_trash) truthy "$value" && INCLUDE_USER_TRASH=1 ;;
       include_installers) truthy "$value" && INCLUDE_INSTALLERS=1 ;;
+      include_metadata) truthy "$value" && INCLUDE_METADATA=1 ;;
       trash) truthy "$value" && TRASH=1 ;;
       log_file) LOG_FILE="$(expand_path "$value")" ;;
       exclude) add_exclude "$value" ;;
@@ -731,6 +740,7 @@ preflight_rows() {
   [[ "$INCLUDE_TOOLCHAINS" -eq 1 ]] && printf '%s\t%s\t%s\t%s\n' "toolchains" "Language/toolchain caches" "rebuildable" "Dependencies and build caches may need to be downloaded or rebuilt."
   [[ "$INCLUDE_DIAGNOSTICS" -eq 1 ]] && printf '%s\t%s\t%s\t%s\n' "diagnostics" "Old diagnostic reports" "low-risk" "Trash mode can recover direct removals when --trash is used."
   [[ "$INCLUDE_INSTALLERS" -eq 1 ]] && printf '%s\t%s\t%s\t%s\n' "installers" "Old downloaded installers" "opt-in" "Trash mode can recover direct removals when --trash is used."
+  [[ "$INCLUDE_METADATA" -eq 1 ]] && printf '%s\t%s\t%s\t%s\n' "metadata" "Filesystem metadata clutter" "low-risk" "Trash mode can recover direct removals when --trash is used."
   [[ "$INCLUDE_NODE_STALE" -eq 1 ]] && printf '%s\t%s\t%s\t%s\n' "node-modules" "Stale node_modules" "rebuildable" "Dependencies may need to be installed again."
   [[ "$INCLUDE_VENV_STALE" -eq 1 ]] && printf '%s\t%s\t%s\t%s\n' "python-virtualenvs" "Stale Python virtualenvs" "rebuildable" "Virtualenvs may need to be recreated."
   [[ "$INCLUDE_DEV_HEAVY" -eq 1 ]] && printf '%s\t%s\t%s\t%s\n' "dev-heavy" "Heavy SDK and simulator data" "high-impact" "Some SDKs, symbols, or simulator app state may need reinstalling or resetting."
@@ -1930,6 +1940,182 @@ quarantine() {
     printf '  quarantine: %s\n' "$value"
     printf '  reveal: open -R %s\n' "$(shell_quote "$path")"
   done <<<"$rows"
+}
+
+metadata_roots() {
+  if [[ "${#PATH_ARGS[@]}" -gt 0 ]]; then
+    local path
+    for path in "${PATH_ARGS[@]}"; do
+      printf '%s\n' "$(expand_path "$path")"
+    done
+  else
+    printf '%s\n' "$HOME/Desktop"
+    printf '%s\n' "$HOME/Documents"
+    printf '%s\n' "$HOME/Downloads"
+  fi
+}
+
+metadata_kind() {
+  local name="$1"
+  case "$name" in
+    .DS_Store) printf 'finder-metadata' ;;
+    ._*|__MACOSX) printf 'appledouble' ;;
+    Thumbs.db|ehthumbs.db|Desktop.ini) printf 'windows-metadata' ;;
+    .TemporaryItems|.Trashes|.fseventsd) printf 'volume-metadata' ;;
+    *) printf '' ;;
+  esac
+}
+
+metadata_rows() {
+  local root path name kind kb epoch
+  while IFS= read -r root; do
+    [[ -d "$root" ]] || continue
+    while IFS= read -r -d '' path; do
+      name="$(basename "$path")"
+      kind="$(metadata_kind "$name")"
+      [[ -n "$kind" ]] || continue
+      kb="$(size_kb "$path")"
+      epoch="$(path_mtime_epoch "$path")"
+      printf '%012d\t%012d\t%s\t%s\t%s\n' "$kb" "$epoch" "$kind" "$name" "$path"
+    done < <(find "$root" -xdev \( \
+      -name '.DS_Store' -o -name '._*' -o -name '__MACOSX' \
+      -o -name 'Thumbs.db' -o -name 'ehthumbs.db' -o -name 'Desktop.ini' \
+      -o -name '.TemporaryItems' -o -name '.Trashes' -o -name '.fseventsd' \
+    \) -print0 2>/dev/null)
+  done < <(metadata_roots) | sort -t $'\t' -k1,1rn -k2,2rn | head -n "$LIMIT"
+}
+
+metadata() {
+  local rows
+  rows="$(metadata_rows)"
+
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '['
+    local first=1 kb epoch kind name path kb_num epoch_num status reason line
+    while IFS=$'\t' read -r kb epoch kind name path; do
+      [[ -z "${path:-}" ]] && continue
+      kb_num="$(printf '%s\n' "${kb:-0}" | sed 's/^0*//; s/^$/0/')"
+      epoch_num="$(printf '%s\n' "${epoch:-0}" | sed 's/^0*//; s/^$/0/')"
+      line="$(guard_status "$path")"
+      status="${line%%$'\t'*}"
+      reason="${line#*$'\t'}"
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '{"path":"%s","name":"%s","kind":"%s","size_kb":%s,"size":"%s","modified_epoch":%s,"modified":"%s","status":"%s","reason":"%s","preview_command":"%s","apply_command":"%s"}' \
+        "$(printf '%s' "$path" | json_escape)" \
+        "$(printf '%s' "$name" | json_escape)" \
+        "$(printf '%s' "$kind" | json_escape)" \
+        "$kb_num" \
+        "$(human_kb "${kb:-0}" | json_escape)" \
+        "${epoch_num:-0}" \
+        "$(file_mtime_iso "${epoch_num:-0}" | json_escape)" \
+        "$(printf '%s' "$status" | json_escape)" \
+        "$(printf '%s' "$reason" | json_escape)" \
+        "$(printf 'cleanroom metadata --limit %s' "$LIMIT" | json_escape)" \
+        "$(printf 'cleanroom metadata --apply --trash --limit %s' "$LIMIT" | json_escape)"
+    done <<<"$rows"
+    printf ']\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}cleanroom metadata clutter${RESET}"
+  if [[ "$APPLY" -eq 1 ]]; then
+    [[ "$TRASH" -eq 1 ]] || die "metadata apply requires --trash so files can be restored from the apply log."
+    warn "Apply mode enabled for metadata clutter."
+    warn "Trash mode required and enabled; matches move to ~/.Trash/cleanroom-$RUN_ID."
+    [[ "$ASSUME_YES" -eq 1 ]] || {
+      printf 'Continue? Type "metadata" to proceed: '
+      local answer
+      read -r answer
+      [[ "$answer" == "metadata" ]] || die "Cancelled."
+    }
+    ensure_apply_log
+    warn "Apply log: $LOG_FILE"
+  else
+    printf 'Preview list. Pass --apply --trash to move matched metadata files to a recoverable Trash folder.\n'
+  fi
+
+  printf 'Limit: %s\n' "$LIMIT"
+  printf 'Paths: '
+  local root first_root=1
+  while IFS= read -r root; do
+    [[ "$first_root" -eq 0 ]] && printf '; '
+    first_root=0
+    printf '%s' "$root"
+  done < <(metadata_roots)
+  printf '\n\n'
+
+  if [[ -z "$rows" ]]; then
+    printf 'No filesystem metadata clutter found.\n'
+    return 0
+  fi
+
+  printf '%-10s %-18s %-12s %s\n' "size" "kind" "modified" "path"
+  local kb epoch kind name path epoch_num removed refused skipped status_line status reason
+  removed=0
+  refused=0
+  skipped=0
+  while IFS=$'\t' read -r kb epoch kind name path; do
+    [[ -z "${path:-}" ]] && continue
+    epoch_num="$(printf '%s\n' "${epoch:-0}" | sed 's/^0*//; s/^$/0/')"
+    if [[ "$APPLY" -eq 1 ]]; then
+      if [[ ! -e "$path" ]]; then
+        skipped=$((skipped + 1))
+        continue
+      fi
+      status_line="$(guard_status "$path")"
+      status="${status_line%%$'\t'*}"
+      reason="${status_line#*$'\t'}"
+      if [[ "$status" != "allowed" ]]; then
+        refused=$((refused + 1))
+        warn "refusing metadata file: $path ($status: $reason)"
+        record_apply "metadata" "$status" "$kb" "$path" ""
+        continue
+      fi
+      printf '%-10s %-18s %-12s %s\n' "$(human_kb "$kb")" "$kind" "$(file_mtime_iso "${epoch_num:-0}")" "$path"
+      delete_path "$path"
+      removed=$((removed + 1))
+    else
+      printf '%-10s %-18s %-12s %s\n' "$(human_kb "$kb")" "$kind" "$(file_mtime_iso "${epoch_num:-0}")" "$path"
+      printf '  reveal: open -R %s\n' "$(shell_quote "$path")"
+    fi
+  done <<<"$rows"
+
+  if [[ "$APPLY" -eq 1 ]]; then
+    printf '\nmetadata summary: moved=%s refused=%s skipped=%s\n' "$removed" "$refused" "$skipped"
+    printf 'Restore with: cleanroom restore --log %s --apply\n' "$(shell_quote "$LOG_FILE")"
+  else
+    printf '\nApply cleanup with: cleanroom metadata --apply --trash\n'
+  fi
+}
+
+clean_metadata() {
+  [[ "$INCLUDE_METADATA" -eq 1 ]] || return 0
+  log "${BOLD}Filesystem metadata clutter${RESET}"
+  local path kb epoch kind name
+  if [[ "$APPLY" -eq 1 ]]; then
+    metadata_rows |
+      while IFS=$'\t' read -r kb epoch kind name path; do
+        [[ -z "${path:-}" ]] && continue
+        run_rm "$path"
+      done || true
+  else
+    metadata_rows |
+      while IFS=$'\t' read -r kb epoch kind name path; do
+        [[ -z "${path:-}" ]] && continue
+        printf 'would remove %8s  %s\n' "$(human_kb "$kb")" "$path"
+      done
+  fi
+}
+
+metadata_total_kb() {
+  local total=0 kb epoch kind name path kb_num
+  while IFS=$'\t' read -r kb epoch kind name path; do
+    [[ -z "${path:-}" ]] && continue
+    kb_num="$(printf '%s\n' "${kb:-0}" | sed 's/^0*//; s/^$/0/')"
+    total=$((total + kb_num))
+  done < <(metadata_rows)
+  printf '%s\n' "$total"
 }
 
 document_guard_status() {
@@ -4923,7 +5109,7 @@ snapshots() {
 }
 
 plan_rows() {
-  local safe package toolchain app installers node venv dev diagnostics ai_workspaces ai_models containers user_trash
+  local safe package toolchain app installers metadata_total node venv dev diagnostics ai_workspaces ai_models containers user_trash
   safe="$(sum_existing_kb \
     "~/Library/Caches" "~/.cache" "~/.npm/_cacache" "~/.npm/_logs" "~/.npm/_npx" \
     "~/.yarn/cache" "~/.yarn/berry" "~/.gradle/caches" "~/.gradle/daemon" \
@@ -4934,6 +5120,7 @@ plan_rows() {
   toolchain="$(toolchain_total_kb)"
   app="$(app_cache_kb)"
   installers="$(installer_total_kb)"
+  metadata_total="$(metadata_total_kb)"
   node="$(stale_node_kb)"
   venv="$(stale_venv_kb)"
   dev="$(sum_existing_kb \
@@ -4950,6 +5137,7 @@ plan_rows() {
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$safe" "safe" "Default safe cleanup" "cleanroom clean" "cleanroom clean --apply --trash" "Rebuildable caches and old logs. Recommended first step."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$app" "app-caches" "Safe app cache folders" "cleanroom clean --include-app-caches" "cleanroom clean --apply --trash --include-app-caches" "Nested cache folders only; browser profiles and passwords stay protected."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$installers" "old-installers" "Old downloaded installers" "cleanroom clean --include-installers --days $DAYS" "cleanroom clean --apply --trash --include-installers --days $DAYS" "Downloaded .dmg, .pkg, .mpkg, .xip, .ipsw, and .iso files older than $DAYS days in ~/Downloads."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$metadata_total" "metadata" "Filesystem metadata clutter" "cleanroom metadata" "cleanroom metadata --apply --trash" ".DS_Store, AppleDouble, Thumbs.db, Desktop.ini, and similar clutter under Desktop, Documents, and Downloads."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$package" "package-stores" "Package-manager stores" "cleanroom clean --include-package-stores" "cleanroom clean --apply --trash --include-package-stores" "Rebuildable package stores such as pnpm, CocoaPods, Cargo, and Gradle-related stores."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$toolchain" "toolchains" "Language toolchain caches" "cleanroom toolchains" "cleanroom clean --apply --trash --include-toolchains" "Rebuildable caches for Go, Python, SwiftPM, Maven, Composer, RubyGems, Bundler, uv, and Poetry."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$node" "node-stale" "Stale node_modules" "cleanroom clean --include-node-stale --days $DAYS" "cleanroom clean --apply --trash --include-node-stale --days $DAYS" "node_modules older than $DAYS days under Desktop, Documents, and Downloads."
@@ -5418,6 +5606,7 @@ include_ai_workspaces=false
 include_ai_models=false
 include_containers=false
 include_installers=false
+include_metadata=false
 
 # Apply safety
 trash=false
@@ -5449,6 +5638,7 @@ interactive() {
   ask_yes_no "Include language/toolchain caches?" && INCLUDE_TOOLCHAINS=1
   ask_yes_no "Include old diagnostic reports older than ${DAYS} days?" && INCLUDE_DIAGNOSTICS=1
   ask_yes_no "Include old downloaded installers older than ${DAYS} days?" && INCLUDE_INSTALLERS=1
+  ask_yes_no "Include filesystem metadata clutter?" && INCLUDE_METADATA=1
   ask_yes_no "Include stale node_modules older than ${DAYS} days?" && INCLUDE_NODE_STALE=1
   ask_yes_no "Include stale Python virtualenvs older than ${DAYS} days?" && INCLUDE_VENV_STALE=1
   ask_yes_no "Include heavy SDK/simulator cleanup?" && INCLUDE_DEV_HEAVY=1
@@ -5492,6 +5682,11 @@ Default safe cleanup:
 --include-installers:
   Old downloaded installer files in ~/Downloads, such as .dmg, .pkg, .mpkg,
   .xip, .ipsw, and .iso files older than --days.
+
+--include-metadata:
+  Filesystem metadata clutter such as .DS_Store, AppleDouble ._* files,
+  __MACOSX folders, Thumbs.db, Desktop.ini, and similar removable metadata
+  under Desktop/Documents/Downloads or paths passed to cleanroom metadata.
 
 --include-dev-heavy:
   Xcode device support, unavailable simulators, simulator app data, Android NDK,
@@ -5547,6 +5742,7 @@ clean() {
   clean_app_caches
   clean_dev_heavy
   clean_installers
+  clean_metadata
   clean_node_stale
   clean_venv_stale
   clean_snapshots
@@ -5593,7 +5789,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  overview|map|snapshot|diff|state|permissions|review|scan|system-data|plan|large|brokenlinks|quarantine|duplicates|documents|desktop|screenshots|archives|downloads|installers|nodes|venvs|virtualenvs|apps|uninstallers|appreview|appdata|libraries|cloud|cloudfiles|cloud-files|personal|communications|comms|browsers|leftovers|backups|xcode|android|startup|loginitems|trash|caches|diagnostics|packages|receipts|homebrew|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
+  overview|map|snapshot|diff|state|permissions|review|scan|system-data|plan|large|brokenlinks|quarantine|metadata|duplicates|documents|desktop|screenshots|archives|downloads|installers|nodes|venvs|virtualenvs|apps|uninstallers|appreview|appdata|libraries|cloud|cloudfiles|cloud-files|personal|communications|comms|browsers|leftovers|backups|xcode|android|startup|loginitems|trash|caches|diagnostics|packages|receipts|homebrew|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -5674,12 +5870,13 @@ while [[ "$#" -gt 0 ]]; do
     --include-ai-workspaces) INCLUDE_AI_WORKSPACES=1 ;;
     --include-ai-models) INCLUDE_AI_MODELS=1 ;;
     --include-containers) INCLUDE_CONTAINERS=1 ;;
+    --include-metadata) INCLUDE_METADATA=1 ;;
     --include-gemini) INCLUDE_GEMINI=1; INCLUDE_AI_WORKSPACES=1 ;;
     --include-lmstudio) INCLUDE_LMSTUDIO=1; INCLUDE_AI_MODELS=1 ;;
     -h|--help) usage; exit 0 ;;
     -v|--version) echo "$VERSION"; exit 0 ;;
     *)
-      if [[ "$ACTION" == "guard" || "$ACTION" == "diff" || "$ACTION" == "large" || "$ACTION" == "brokenlinks" || "$ACTION" == "quarantine" || "$ACTION" == "duplicates" || "$ACTION" == "documents" || "$ACTION" == "screenshots" || "$ACTION" == "archives" || "$ACTION" == "nodes" || "$ACTION" == "venvs" || "$ACTION" == "virtualenvs" || "$ACTION" == "apps" || "$ACTION" == "uninstallers" || "$ACTION" == "appreview" || "$ACTION" == "cloudfiles" || "$ACTION" == "cloud-files" || "$ACTION" == "leftovers" ]]; then
+      if [[ "$ACTION" == "guard" || "$ACTION" == "diff" || "$ACTION" == "large" || "$ACTION" == "brokenlinks" || "$ACTION" == "quarantine" || "$ACTION" == "metadata" || "$ACTION" == "duplicates" || "$ACTION" == "documents" || "$ACTION" == "screenshots" || "$ACTION" == "archives" || "$ACTION" == "nodes" || "$ACTION" == "venvs" || "$ACTION" == "virtualenvs" || "$ACTION" == "apps" || "$ACTION" == "uninstallers" || "$ACTION" == "appreview" || "$ACTION" == "cloudfiles" || "$ACTION" == "cloud-files" || "$ACTION" == "leftovers" ]]; then
         PATH_ARGS+=("$1")
       else
         die "Unknown option: $1"
@@ -5703,6 +5900,7 @@ case "$ACTION" in
   large) large ;;
   brokenlinks) brokenlinks ;;
   quarantine) quarantine ;;
+  metadata) metadata ;;
   duplicates) duplicates ;;
   documents) documents ;;
   desktop) desktop ;;

@@ -258,6 +258,7 @@ struct SidebarView: View {
                             NavRow("doc.on.doc.fill",         "Duplicates",  .run(title: "Duplicates",   args: "duplicates --limit 20 --min-mb 100"), state)
                             NavRow("link.badge.plus",         "Broken Links",.run(title: "Broken Links", args: "brokenlinks --limit 40"), state)
                             NavRow("lock.shield.fill",        "Quarantine",  .run(title: "Quarantine",   args: "quarantine --limit 40"), state)
+                            NavRow("sparkle.magnifyingglass", "Metadata",    .run(title: "Metadata",     args: "metadata --limit 40"), state)
                             NavRow("magnifyingglass.circle.fill","Leftovers", .dashboard, state, onTap: { state.showLeftovers = true })
                         }
                         SidebarSection("CATEGORIES") {
@@ -295,7 +296,7 @@ struct SidebarView: View {
 
                 Rectangle().fill(DS.C.dividerOnDark).frame(height: 1)
                 HStack {
-                    Text(state.cliPath.isEmpty ? "CLI not found" : "v0.60.0")
+                    Text(state.cliPath.isEmpty ? "CLI not found" : "v0.61.0")
                         .font(DS.T.tag)
                         .foregroundColor(DS.C.textOnDark.opacity(0.35))
                     Spacer()

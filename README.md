@@ -28,6 +28,7 @@ macOS Storage often labels hidden user folders as **Documents** or **System Data
 - app leftovers after manual uninstalls
 - old logs, crash reports, and diagnostic reports
 - old downloaded installer files
+- `.DS_Store`, AppleDouble, and cross-platform filesystem metadata clutter
 - local iPhone and iPad backups
 
 `cleanroom` makes those visible and gives you a cautious way to clean them.
@@ -200,6 +201,15 @@ Review downloaded files with macOS quarantine metadata:
 cleanroom quarantine
 cleanroom quarantine ~/Downloads --limit 50
 cleanroom quarantine --json
+```
+
+Review removable filesystem metadata clutter:
+
+```sh
+cleanroom metadata
+cleanroom metadata ~/Documents ~/Downloads --limit 50
+cleanroom metadata --apply --trash
+cleanroom metadata --json
 ```
 
 Find exact duplicate files for manual review:
@@ -576,6 +586,15 @@ cleanroom clean --include-installers --days 30
 cleanroom clean --apply --trash --include-installers --days 30
 ```
 
+Clean filesystem metadata clutter:
+
+```sh
+cleanroom metadata
+cleanroom metadata --apply --trash
+cleanroom clean --include-metadata
+cleanroom clean --apply --trash --include-metadata
+```
+
 Empty current user Trash:
 
 ```sh
@@ -669,6 +688,8 @@ Config files use simple `key=value` lines and are never executed as shell.
 
 `--include-containers` removes local container VM disks and image stores for known runtimes such as Docker Desktop, Colima, Lima, and Podman. This can remove local containers, images, and volumes.
 
+`--include-metadata` removes filesystem metadata clutter such as `.DS_Store`, AppleDouble `._*` files, `__MACOSX` folders, `Thumbs.db`, `Desktop.ini`, and similar removable metadata from Desktop, Documents, and Downloads.
+
 `--trash` applies to paths that `cleanroom` removes directly. System commands delegated to macOS or developer tools, such as Time Machine snapshot thinning or simulator reset, may still be irreversible.
 
 `restore` only restores entries that were moved by `--trash` and still exist in the cleanroom Trash folder. It skips destinations that already exist.
@@ -716,6 +737,8 @@ Config files use simple `key=value` lines and are never executed as shell.
 `brokenlinks` lists dangling symlinks from common user folders or a path you provide. It never deletes links; review them first because source trees, package managers, and managed apps may intentionally leave links behind.
 
 `quarantine` lists files and apps carrying macOS `com.apple.quarantine` metadata, usually downloaded from browsers, chat apps, or email. It never deletes files or clears attributes; use it to review downloaded content before deciding what to keep.
+
+`metadata` lists `.DS_Store`, AppleDouble `._*` files, `__MACOSX` folders, `Thumbs.db`, `Desktop.ini`, and similar cross-platform metadata clutter under Desktop, Documents, Downloads, or paths you provide. Its direct apply mode requires `--trash`.
 
 `duplicates` hashes files above `--min-mb`, groups exact matches, estimates possible reclaim, and never deletes anything.
 
