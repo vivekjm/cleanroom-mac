@@ -269,6 +269,7 @@ struct SidebarView: View {
                             NavRow("terminal.fill",           "Virtualenvs", .run(title: "Virtualenvs", args: "venvs --limit 30 --days 30"), state)
                             NavRow("apps.iphone",             "Apps",        .run(title: "Apps",        args: "apps --limit 30"), state)
                             NavRow("trash.fill",              "Trash",       .run(title: "Trash",       args: "trash"), state)
+                            NavRow("icloud.fill",             "Cloud Files", .run(title: "Cloud Files", args: "cloudfiles --min-mb 250 --limit 40"), state)
                         }
                         SidebarSection("SYSTEM") {
                             NavRow("hammer.fill",             "Xcode",       .run(title: "Xcode",       args: "xcode"), state)
@@ -291,7 +292,7 @@ struct SidebarView: View {
 
                 Rectangle().fill(DS.C.dividerOnDark).frame(height: 1)
                 HStack {
-                    Text(state.cliPath.isEmpty ? "CLI not found" : "v0.56.0")
+                    Text(state.cliPath.isEmpty ? "CLI not found" : "v0.57.0")
                         .font(DS.T.tag)
                         .foregroundColor(DS.C.textOnDark.opacity(0.35))
                     Spacer()

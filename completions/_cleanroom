@@ -31,6 +31,8 @@ _cleanroom() {
     'appdata:Rank large app support and container folders'
     'libraries:Inventory protected media and creative libraries'
     'cloud:Inventory protected cloud-sync storage'
+    'cloudfiles:List large local cloud-sync files'
+    'cloud-files:Alias for cloudfiles'
     'personal:Inventory protected personal app data'
     'communications:Inventory protected Mail and Messages storage'
     'comms:Alias for communications'

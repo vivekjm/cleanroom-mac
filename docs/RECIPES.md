@@ -27,6 +27,7 @@ cleanroom uninstallers
 cleanroom appdata
 cleanroom libraries
 cleanroom cloud
+cleanroom cloudfiles
 cleanroom personal
 cleanroom communications
 cleanroom browsers
@@ -85,6 +86,7 @@ cleanroom uninstallers --json
 cleanroom appdata --json
 cleanroom libraries --json
 cleanroom cloud --json
+cleanroom cloudfiles --json
 cleanroom personal --json
 cleanroom communications --json
 cleanroom browsers --json
@@ -135,6 +137,8 @@ cleanroom permissions --json
 `plan --json` emits ranked cleanup recommendations with estimated reclaim size, preview commands, and explicit apply commands.
 
 `large --json [PATH]` emits large files above `--min-mb` for review. It is intentionally review-only and does not delete anything.
+
+`cloudfiles --json [PATH]` emits large local files inside cloud-sync roots with provider, root, size, modified date, and Finder reveal command. It is intentionally review-only and does not delete files or evict local copies.
 
 `brokenlinks --json [PATH]` emits dangling symlinks with link path, stored target, parent folder, modified date, and Finder reveal command. It is intentionally review-only and does not delete links.
 
@@ -297,6 +301,7 @@ cleanroom screenshots ~/Desktop --days 7 --limit 50
 cleanroom archives ~/Downloads --days 7 --limit 50
 cleanroom downloads --days 30 --limit 50
 cleanroom installers --days 30 --limit 50
+cleanroom cloudfiles --min-mb 250 --limit 50
 cleanroom nodes ~/Documents --days 45 --limit 30
 cleanroom venvs ~/Documents --days 45 --limit 30
 cleanroom appdata --limit 30

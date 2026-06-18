@@ -152,6 +152,7 @@ printf 'reminder\n' >"$TEST_HOME/Library/Group Containers/group.com.apple.remind
 printf 'voice memo\n' >"$TEST_HOME/Library/Group Containers/group.com.apple.VoiceMemos.shared/recording.m4a"
 printf 'icloud doc\n' >"$TEST_HOME/Library/Mobile Documents/document.txt"
 printf 'cloudstorage doc\n' >"$TEST_HOME/Library/CloudStorage/Dropbox-Test/document.txt"
+dd if=/dev/zero of="$TEST_HOME/Library/CloudStorage/Dropbox-Test/big-cloud.bin" bs=1024 count=2048 >/dev/null 2>&1
 printf 'dropbox doc\n' >"$TEST_HOME/Dropbox/document.txt"
 printf 'sync doc\n' >"$TEST_HOME/Sync/document.txt"
 printf 'photo library\n' >"$TEST_HOME/Pictures/Photos Library.photoslibrary/database"
@@ -252,6 +253,7 @@ map_json="$(mktemp)"
 python3 -m json.tool "$map_json" >/dev/null
 grep '"id":"documents"' "$map_json" >/dev/null
 grep '"id":"app-support"' "$map_json" >/dev/null
+grep '"id":"cloud-files"' "$map_json" >/dev/null
 grep '"id":"communications"' "$map_json" >/dev/null
 grep '"command":"cleanroom communications"' "$map_json" >/dev/null
 rm -f "$map_json"
@@ -332,6 +334,7 @@ grep 'loginitems-inventory' "$rules_json" >/dev/null
 grep 'uninstallers-inventory' "$rules_json" >/dev/null
 grep 'appdata-inventory' "$rules_json" >/dev/null
 grep 'cloud-inventory' "$rules_json" >/dev/null
+grep 'cloudfiles-inventory' "$rules_json" >/dev/null
 grep 'personal-inventory' "$rules_json" >/dev/null
 grep 'communications-inventory' "$rules_json" >/dev/null
 grep 'receipts-inventory' "$rules_json" >/dev/null
@@ -486,6 +489,14 @@ python3 -m json.tool "$cloud_json" >/dev/null
 grep 'cloudstorage' "$cloud_json" >/dev/null
 grep '"protected":true' "$cloud_json" >/dev/null
 rm -f "$cloud_json"
+"$BIN" cloudfiles "$HOME/Library/CloudStorage" --min-mb 1 --limit 10 | grep 'big-cloud.bin' >/dev/null
+cloudfiles_json="$(mktemp)"
+"$BIN" cloudfiles --json "$HOME/Library/CloudStorage" --min-mb 1 --limit 10 > "$cloudfiles_json"
+python3 -m json.tool "$cloudfiles_json" >/dev/null
+grep 'big-cloud.bin' "$cloudfiles_json" >/dev/null
+grep '"provider":"Dropbox-Test"' "$cloudfiles_json" >/dev/null
+grep 'open -R' "$cloudfiles_json" >/dev/null
+rm -f "$cloudfiles_json"
 "$BIN" personal | grep 'Messages' >/dev/null
 personal_json="$(mktemp)"
 "$BIN" personal --json > "$personal_json"

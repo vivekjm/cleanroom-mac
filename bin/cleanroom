@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.56.0"
+VERSION="0.57.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -72,6 +72,7 @@ Usage:
   cleanroom appdata [--limit N] [--json]
   cleanroom libraries [--json]
   cleanroom cloud [--json]
+  cleanroom cloudfiles [PATH] [--min-mb N] [--limit N] [--json]
   cleanroom personal [--json]
   cleanroom communications [--json]
   cleanroom browsers [--json]
@@ -131,6 +132,7 @@ Actions:
   appdata              Rank large app support, container, and group container folders.
   libraries            Inventory protected media and creative libraries.
   cloud                Inventory protected cloud-sync storage locations.
+  cloudfiles           List large local cloud-sync files for review.
   personal             Inventory protected Mail, Messages, Notes, and contacts data.
   communications       Inventory protected Mail and Messages storage in detail.
   browsers             Inventory browser profile and cache footprint.
@@ -167,7 +169,7 @@ Options:
   --yes                Do not prompt before --apply cleanup.
   --verbose            Print every path touched.
   --json               Emit JSON for overview, map, snapshot, diff, state, permissions, review, scan, system-data, plan, large, brokenlinks, quarantine, duplicates,
-                       documents, desktop, screenshots, archives, downloads, installers, nodes, venvs, apps, uninstallers, appdata, libraries, cloud, personal, communications,
+                       documents, desktop, screenshots, archives, downloads, installers, nodes, venvs, apps, uninstallers, appdata, libraries, cloud, cloudfiles, personal, communications,
                        browsers, leftovers, startup, loginitems,
                        trash, backups, xcode, caches, diagnostics, packages, receipts, homebrew, toolchains,
                        containers, android, snapshots, doctor, protect, guard, or rules.
@@ -279,6 +281,9 @@ Examples:
   cleanroom libraries --json
   cleanroom cloud
   cleanroom cloud --json
+  cleanroom cloudfiles
+  cleanroom cloudfiles ~/Library/CloudStorage --min-mb 250 --limit 50
+  cleanroom cloudfiles --json
   cleanroom personal
   cleanroom personal --json
   cleanroom communications
@@ -1356,6 +1361,7 @@ map_rows() {
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "app-support" "Application Support" "$HOME/Library/Application Support" "review" "cleanroom appdata --limit 50" "Large app support folders. Use app-specific review before removing anything."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "containers" "App Containers" "$HOME/Library/Containers; $HOME/Library/Group Containers" "review" "cleanroom appdata --limit 50" "Sandbox and shared app containers can contain account data."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "cloud" "Cloud Storage" "$HOME/Library/Mobile Documents; $HOME/Library/CloudStorage; $HOME/Dropbox; $HOME/Google Drive; $HOME/OneDrive; $HOME/Box; $HOME/Sync" "protected" "cleanroom cloud" "Cloud-synced files can change remote data if changed locally."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "cloud-files" "Large Cloud Files" "$HOME/Library/Mobile Documents; $HOME/Library/CloudStorage; $HOME/Dropbox; $HOME/Google Drive; $HOME/OneDrive; $HOME/Box; $HOME/Sync" "protected" "cleanroom cloudfiles --min-mb 250 --limit 50" "Large local copies inside cloud-sync roots. Review through Finder or provider UI."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "media" "Media Libraries" "$HOME/Pictures; $HOME/Music; $HOME/Movies" "protected" "cleanroom libraries" "Photos, music, videos, and creative projects."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "communications" "Mail and Messages" "$HOME/Library/Mail; $HOME/Library/Mail Downloads; $HOME/Library/Containers/com.apple.mail/Data/Library/Mail Downloads; $HOME/Library/Messages" "protected" "cleanroom communications" "Mail, chats, and communication attachments are protected."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "developer" "Developer Data" "$HOME/Library/Developer; $HOME/Library/Android; $HOME/.android" "mixed" "cleanroom system-data" "Xcode, simulators, Android SDKs, and emulator data."
@@ -3123,6 +3129,97 @@ cloud() {
   printf '\nUse this to explain large Documents/iCloud/CloudStorage usage. Change files through the provider UI or after verified backups.\n'
 }
 
+cloudfiles_roots() {
+  if [[ "${#PATH_ARGS[@]}" -gt 0 ]]; then
+    local path
+    for path in "${PATH_ARGS[@]}"; do
+      printf '%s\n' "$(expand_path "$path")"
+    done
+  else
+    printf '%s\n' "$HOME/Library/Mobile Documents"
+    printf '%s\n' "$HOME/Library/CloudStorage"
+    printf '%s\n' "$HOME/Dropbox"
+    printf '%s\n' "$HOME/Google Drive"
+    printf '%s\n' "$HOME/OneDrive"
+    printf '%s\n' "$HOME/Box"
+    printf '%s\n' "$HOME/Sync"
+  fi
+}
+
+cloudfile_provider() {
+  local root="$1" path="$2" rel first
+  case "$root" in
+    "$HOME/Library/Mobile Documents") printf '%s\n' "iCloud Drive"; return ;;
+    "$HOME/Library/CloudStorage")
+      rel="${path#"$root"/}"
+      first="${rel%%/*}"
+      [[ -n "$first" && "$first" != "$rel" ]] || first="CloudStorage"
+      printf '%s\n' "$first"
+      return
+      ;;
+  esac
+  basename "$root"
+}
+
+cloudfiles_rows() {
+  local root path kb epoch provider
+  while IFS= read -r root; do
+    [[ -d "$root" ]] || continue
+    while IFS= read -r -d '' path; do
+      kb="$(size_kb "$path")"
+      epoch="$(path_mtime_epoch "$path")"
+      provider="$(cloudfile_provider "$root" "$path")"
+      printf '%012d\t%012d\t%s\t%s\t%s\n' "$kb" "$epoch" "$provider" "$root" "$path"
+    done < <(find "$root" -xdev -type f -size "+${MIN_MB}M" -print0 2>/dev/null)
+  done < <(cloudfiles_roots) | sort -t $'\t' -k1,1rn -k2,2rn | head -n "$LIMIT"
+}
+
+cloudfiles() {
+  local rows
+  rows="$(cloudfiles_rows)"
+
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '['
+    local first=1 kb epoch provider root path kb_num epoch_num
+    while IFS=$'\t' read -r kb epoch provider root path; do
+      [[ -z "${path:-}" ]] && continue
+      kb_num="$(printf '%s\n' "${kb:-0}" | sed 's/^0*//; s/^$/0/')"
+      epoch_num="$(printf '%s\n' "${epoch:-0}" | sed 's/^0*//; s/^$/0/')"
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '{"path":"%s","root":"%s","provider":"%s","size_kb":%s,"size":"%s","modified_epoch":%s,"modified":"%s","review_command":"%s","guidance":"%s"}' \
+        "$(printf '%s' "$path" | json_escape)" \
+        "$(printf '%s' "$root" | json_escape)" \
+        "$(printf '%s' "$provider" | json_escape)" \
+        "$kb_num" \
+        "$(human_kb "${kb:-0}" | json_escape)" \
+        "${epoch_num:-0}" \
+        "$(file_mtime_iso "${epoch_num:-0}" | json_escape)" \
+        "$(printf 'open -R %s' "$(shell_quote "$path")" | json_escape)" \
+        "$(printf '%s' "Review cloud files in Finder or the provider UI. Deleting local files may sync deletes remotely." | json_escape)"
+    done <<<"$rows"
+    printf ']\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}cleanroom local cloud files${RESET}"
+  printf 'Review-only list. cleanroom does not delete cloud files or evict local copies.\n'
+  printf 'Minimum: %sMB  Limit: %s\n\n' "$MIN_MB" "$LIMIT"
+  if [[ -z "$rows" ]]; then
+    printf 'No local cloud-sync files found over %sMB in readable roots.\n' "$MIN_MB"
+    return 0
+  fi
+  printf '%-10s %-12s %-18s %s\n' "size" "modified" "provider" "path"
+  local kb epoch provider root path epoch_num
+  while IFS=$'\t' read -r kb epoch provider root path; do
+    [[ -z "${path:-}" ]] && continue
+    epoch_num="$(printf '%s\n' "${epoch:-0}" | sed 's/^0*//; s/^$/0/')"
+    printf '%-10s %-12s %-18s %s\n' "$(human_kb "$kb")" "$(file_mtime_iso "${epoch_num:-0}")" "$provider" "$path"
+    printf '  reveal: open -R %s\n' "$(shell_quote "$path")"
+  done <<<"$rows"
+  printf '\nReview these through Finder or the cloud provider UI. Local deletes can sync remotely.\n'
+}
+
 personal_rows() {
   printf '%s\t%s\t%s\t%s\t%s\n' "mail" "Mail" "mail" "~/Library/Mail" "Local mail downloads, indexes, and account data. Manage from Mail account settings."
   printf '%s\t%s\t%s\t%s\t%s\n' "messages" "Messages" "messages" "~/Library/Messages" "Chats and attachments. Manage from Messages or backup before changing."
@@ -4432,6 +4529,7 @@ overview() {
   printf 'cleanroom toolchains\n'
   printf 'cleanroom containers\n'
   printf 'cleanroom cloud\n'
+  printf 'cleanroom cloudfiles --min-mb 250 --limit 50\n'
   printf 'cleanroom personal\n'
   printf 'cleanroom communications\n'
   printf 'cleanroom diagnostics\n'
@@ -5144,7 +5242,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  overview|map|snapshot|diff|state|permissions|review|scan|system-data|plan|large|brokenlinks|quarantine|duplicates|documents|desktop|screenshots|archives|downloads|installers|nodes|venvs|virtualenvs|apps|uninstallers|appdata|libraries|cloud|personal|communications|comms|browsers|leftovers|backups|xcode|android|startup|loginitems|trash|caches|diagnostics|packages|receipts|homebrew|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
+  overview|map|snapshot|diff|state|permissions|review|scan|system-data|plan|large|brokenlinks|quarantine|duplicates|documents|desktop|screenshots|archives|downloads|installers|nodes|venvs|virtualenvs|apps|uninstallers|appdata|libraries|cloud|cloudfiles|cloud-files|personal|communications|comms|browsers|leftovers|backups|xcode|android|startup|loginitems|trash|caches|diagnostics|packages|receipts|homebrew|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -5228,7 +5326,7 @@ while [[ "$#" -gt 0 ]]; do
     -h|--help) usage; exit 0 ;;
     -v|--version) echo "$VERSION"; exit 0 ;;
     *)
-      if [[ "$ACTION" == "guard" || "$ACTION" == "diff" || "$ACTION" == "large" || "$ACTION" == "brokenlinks" || "$ACTION" == "quarantine" || "$ACTION" == "duplicates" || "$ACTION" == "documents" || "$ACTION" == "screenshots" || "$ACTION" == "archives" || "$ACTION" == "nodes" || "$ACTION" == "venvs" || "$ACTION" == "virtualenvs" || "$ACTION" == "apps" || "$ACTION" == "uninstallers" || "$ACTION" == "leftovers" ]]; then
+      if [[ "$ACTION" == "guard" || "$ACTION" == "diff" || "$ACTION" == "large" || "$ACTION" == "brokenlinks" || "$ACTION" == "quarantine" || "$ACTION" == "duplicates" || "$ACTION" == "documents" || "$ACTION" == "screenshots" || "$ACTION" == "archives" || "$ACTION" == "nodes" || "$ACTION" == "venvs" || "$ACTION" == "virtualenvs" || "$ACTION" == "apps" || "$ACTION" == "uninstallers" || "$ACTION" == "cloudfiles" || "$ACTION" == "cloud-files" || "$ACTION" == "leftovers" ]]; then
         PATH_ARGS+=("$1")
       else
         die "Unknown option: $1"
@@ -5266,6 +5364,7 @@ case "$ACTION" in
   appdata) appdata ;;
   libraries) libraries ;;
   cloud) cloud ;;
+  cloudfiles|cloud-files) cloudfiles ;;
   personal) personal ;;
   communications|comms) communications ;;
   browsers) browsers ;;

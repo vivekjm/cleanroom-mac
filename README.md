@@ -309,6 +309,9 @@ Review protected cloud-sync storage:
 ```sh
 cleanroom cloud
 cleanroom cloud --json
+cleanroom cloudfiles
+cleanroom cloudfiles ~/Library/CloudStorage --min-mb 250 --limit 50
+cleanroom cloudfiles --json
 ```
 
 Review protected personal app data:
@@ -681,6 +684,8 @@ Config files use simple `key=value` lines and are never executed as shell.
 `screenshots` lists screenshot and screen recording files in Desktop, Downloads, and Documents, or a provided folder. It is review-only because screenshots often contain private account, work, or payment information.
 
 `archives` lists archive and disk image files such as `.zip`, `.rar`, `.7z`, `.tar.*`, `.dmg`, `.iso`, and `.img` in Downloads, Desktop, and Documents, or a provided folder. It is review-only because archives may be backups, deliverables, or installer sources.
+
+`cloudfiles` lists large local files inside iCloud Drive, File Provider CloudStorage, Dropbox, Google Drive, OneDrive, Box, and Sync roots. It is review-only and does not delete files or evict local copies, because local deletes can sync remotely.
 
 `android --json` emits Android SDK, NDK, system image, emulator, AVD, platform, build-tool, command-line tool, and Android Studio cache sizes with safety labels. NDKs, system images, and temporary SDK downloads are opt-in through `--include-dev-heavy`; full SDK roots and AVDs stay review-only.
 
