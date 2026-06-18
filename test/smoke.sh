@@ -229,6 +229,19 @@ grep '"id":"app-support"' "$map_json" >/dev/null
 grep '"id":"communications"' "$map_json" >/dev/null
 grep '"command":"cleanroom communications"' "$map_json" >/dev/null
 rm -f "$map_json"
+snapshot_json="$(mktemp)"
+"$BIN" snapshot --json > "$snapshot_json"
+python3 -m json.tool "$snapshot_json" >/dev/null
+grep '"created_at"' "$snapshot_json" >/dev/null
+grep '"buckets"' "$snapshot_json" >/dev/null
+grep '"id":"documents"' "$snapshot_json" >/dev/null
+rm -f "$snapshot_json"
+snapshot_output="$TEST_HOME/snapshot-output.json"
+"$BIN" snapshot --output "$snapshot_output" | grep 'Wrote snapshot' >/dev/null
+test -f "$snapshot_output"
+python3 -m json.tool "$snapshot_output" >/dev/null
+"$BIN" snapshot | grep 'Wrote snapshot' >/dev/null
+find "$TEST_HOME/.local/state/cleanroom/snapshots" -type f -name 'snapshot-*.json' | grep 'snapshot-' >/dev/null
 "$BIN" system-data | grep 'System Data breakdown' >/dev/null
 system_data_json="$(mktemp)"
 "$BIN" system-data --json > "$system_data_json"
@@ -249,6 +262,7 @@ grep 'old-diagnostics' "$rules_json" >/dev/null
 grep 'toolchain-caches' "$rules_json" >/dev/null
 grep 'stale-python-virtualenvs' "$rules_json" >/dev/null
 grep 'storage-map' "$rules_json" >/dev/null
+grep 'storage-snapshot' "$rules_json" >/dev/null
 grep 'review-dashboard' "$rules_json" >/dev/null
 grep 'documents-inventory' "$rules_json" >/dev/null
 grep 'desktop-inventory' "$rules_json" >/dev/null

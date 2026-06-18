@@ -1,4 +1,4 @@
-.TH CLEANROOM 1 "June 2026" "cleanroom 0.47.0" "User Commands"
+.TH CLEANROOM 1 "June 2026" "cleanroom 0.48.0" "User Commands"
 .SH NAME
 cleanroom \- safe-by-default macOS storage cleaner
 .SH SYNOPSIS
@@ -7,6 +7,9 @@ cleanroom \- safe-by-default macOS storage cleaner
 .br
 .B cleanroom
 .RI "map [--json]"
+.br
+.B cleanroom
+.RI "snapshot [--json] [--output path]"
 .br
 .B cleanroom
 .RI "review [--json]"
@@ -155,6 +158,11 @@ Rank focused major storage buckets such as Documents, Downloads, user
 Applications, Application Support, cloud storage, media, developer data,
 package stores, toolchains, container VMs, and Trash.
 Buckets may overlap because smaller folders can also be part of larger parents.
+.TP
+.B snapshot
+Write disk state and focused storage-map buckets into a timestamped JSON file
+under ~/.local/state/cleanroom/snapshots, or to --output path. With --json,
+emit the snapshot to stdout.
 .TP
 .B scan
 Show disk usage, cleanup candidates, largest home folders, and large files.
@@ -368,6 +376,7 @@ when they contain pyvenv.cfg.
 .nf
 cleanroom overview
 cleanroom map --json
+cleanroom snapshot --output ~/Desktop/cleanroom-before.json
 cleanroom scan
 cleanroom system-data
 cleanroom plan --json
