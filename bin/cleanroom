@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.50.0"
+VERSION="0.51.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -50,6 +50,7 @@ Usage:
   cleanroom snapshot [--json] [--output PATH]
   cleanroom diff [BEFORE.json AFTER.json] [--json]
   cleanroom state [--json]
+  cleanroom permissions [--json]
   cleanroom review [--json]
   cleanroom scan [options]
   cleanroom system-data [--json]
@@ -103,6 +104,7 @@ Actions:
   snapshot             Write a timestamped storage-map snapshot for before/after tracking.
   diff                 Compare two storage snapshots, or the latest two by default.
   state                Inventory cleanroom logs, snapshots, and recoverable Trash folders.
+  permissions          Audit access to common macOS privacy-sensitive storage.
   review               Show a read-only personal storage review checklist.
   scan                 Show disk usage and likely cleanup candidates.
   system-data          Break down common macOS System Data buckets.
@@ -154,7 +156,7 @@ Options:
   --trash              Move deleted files to ~/.Trash/cleanroom-* instead of rm -rf.
   --yes                Do not prompt before --apply cleanup.
   --verbose            Print every path touched.
-  --json               Emit JSON for overview, map, snapshot, diff, state, review, scan, system-data, plan, large, duplicates,
+  --json               Emit JSON for overview, map, snapshot, diff, state, permissions, review, scan, system-data, plan, large, duplicates,
                        documents, desktop, screenshots, archives, downloads, installers, nodes, venvs, apps, appdata, libraries, cloud, personal, communications,
                        browsers, leftovers, startup,
                        trash, backups, xcode, caches, diagnostics, packages, homebrew, toolchains,
@@ -214,6 +216,8 @@ Examples:
   cleanroom diff before.json after.json --json
   cleanroom state
   cleanroom state --json
+  cleanroom permissions
+  cleanroom permissions --json
   cleanroom review
   cleanroom review --json
   cleanroom scan
@@ -3968,6 +3972,7 @@ overview() {
   printf 'cleanroom snapshot\n'
   printf 'cleanroom diff\n'
   printf 'cleanroom state\n'
+  printf 'cleanroom permissions\n'
   printf 'cleanroom review\n'
   printf 'cleanroom plan\n'
   printf 'cleanroom system-data\n'
@@ -4258,6 +4263,82 @@ protect() {
     printf '%-10s %-18s %-8s %-18s %s\n' "$status" "$type" "$(human_kb "$kb")" "$id" "$expanded"
     printf '  %s\n' "$reason"
   done
+}
+
+permission_rows() {
+  printf '%s\t%s\t%s\t%s\t%s\n' "home-library" "User Library" "~/Library" "cleanroom system-data" "Main hidden user Library. Many macOS storage categories live here."
+  printf '%s\t%s\t%s\t%s\t%s\n' "application-support" "Application Support" "~/Library/Application Support" "cleanroom appdata --limit 50" "Large app data and support folders. Some apps protect account state."
+  printf '%s\t%s\t%s\t%s\t%s\n' "mail" "Mail" "~/Library/Mail" "cleanroom communications" "Mail data may require Full Disk Access for complete inventory."
+  printf '%s\t%s\t%s\t%s\t%s\n' "messages" "Messages" "~/Library/Messages" "cleanroom communications" "Messages chats and attachments may require Full Disk Access for complete inventory."
+  printf '%s\t%s\t%s\t%s\t%s\n' "mobile-backups" "Device Backups" "~/Library/Application Support/MobileSync/Backup" "cleanroom backups" "Local iPhone/iPad backups are protected and may require extra access."
+  printf '%s\t%s\t%s\t%s\t%s\n' "photos" "Photos Library" "~/Pictures/Photos Library.photoslibrary" "cleanroom libraries" "Photos libraries are protected personal media."
+  printf '%s\t%s\t%s\t%s\t%s\n' "cloudstorage" "CloudStorage" "~/Library/CloudStorage" "cleanroom cloud" "Modern cloud provider roots often live here."
+  printf '%s\t%s\t%s\t%s\t%s\n' "icloud-drive" "iCloud Drive" "~/Library/Mobile Documents" "cleanroom cloud" "iCloud Drive and app document storage."
+  printf '%s\t%s\t%s\t%s\t%s\n' "browser-profiles" "Browser Profiles" "~/Library/Application Support/Google/Chrome" "cleanroom browsers" "Browser profiles are protected; Cleanroom only inventories and cleans nested caches."
+  printf '%s\t%s\t%s\t%s\t%s\n' "keychains" "Keychains" "~/Library/Keychains" "cleanroom protect" "Credential storage should remain protected and is never cleaned by Cleanroom."
+}
+
+permission_status() {
+  local path="$1"
+  if [[ ! -e "$path" ]]; then
+    printf 'missing'
+  elif [[ -d "$path" ]]; then
+    if ls "$path" >/dev/null 2>&1; then
+      printf 'accessible'
+    elif [[ -r "$path" || -x "$path" ]]; then
+      printf 'limited'
+    else
+      printf 'blocked'
+    fi
+  elif [[ -r "$path" ]]; then
+    printf 'accessible'
+  else
+    printf 'blocked'
+  fi
+}
+
+permissions() {
+  local rows
+  rows="$(permission_rows)"
+
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '['
+    local first=1 id title path command guidance expanded exists_flag readable listable status
+    while IFS=$'\t' read -r id title path command guidance; do
+      [[ -z "${id:-}" ]] && continue
+      expanded="$(expand_path "$path")"
+      if [[ -e "$expanded" ]]; then exists_flag=true; else exists_flag=false; fi
+      if [[ -r "$expanded" ]]; then readable=true; else readable=false; fi
+      if [[ -d "$expanded" ]] && ls "$expanded" >/dev/null 2>&1; then listable=true; else listable=false; fi
+      status="$(permission_status "$expanded")"
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '{"id":"%s","title":"%s","path":"%s","exists":%s,"readable":%s,"listable":%s,"status":"%s","command":"%s","guidance":"%s"}' \
+        "$(printf '%s' "$id" | json_escape)" \
+        "$(printf '%s' "$title" | json_escape)" \
+        "$(printf '%s' "$expanded" | json_escape)" \
+        "$exists_flag" \
+        "$readable" \
+        "$listable" \
+        "$(printf '%s' "$status" | json_escape)" \
+        "$(printf '%s' "$command" | json_escape)" \
+        "$(printf '%s' "$guidance" | json_escape)"
+    done <<<"$rows"
+    printf ']\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}cleanroom permissions${RESET}"
+  printf 'Read-only access audit. If important existing paths show blocked/limited, grant Full Disk Access to the terminal or app running cleanroom.\n\n'
+  printf '%-12s %-22s %-28s %s\n' "status" "id" "next command" "path"
+  local id title path command guidance expanded status
+  while IFS=$'\t' read -r id title path command guidance; do
+    [[ -z "${id:-}" ]] && continue
+    expanded="$(expand_path "$path")"
+    status="$(permission_status "$expanded")"
+    printf '%-12s %-22s %-28s %s\n' "$status" "$id" "$command" "$expanded"
+    printf '  %s\n' "$guidance"
+  done <<<"$rows"
 }
 
 guard_status() {
@@ -4620,7 +4701,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  overview|map|snapshot|diff|state|review|scan|system-data|plan|large|duplicates|documents|desktop|screenshots|archives|downloads|installers|nodes|venvs|virtualenvs|apps|appdata|libraries|cloud|personal|communications|comms|browsers|leftovers|backups|xcode|android|startup|trash|caches|diagnostics|packages|homebrew|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
+  overview|map|snapshot|diff|state|permissions|review|scan|system-data|plan|large|duplicates|documents|desktop|screenshots|archives|downloads|installers|nodes|venvs|virtualenvs|apps|appdata|libraries|cloud|personal|communications|comms|browsers|leftovers|backups|xcode|android|startup|trash|caches|diagnostics|packages|homebrew|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -4720,6 +4801,7 @@ case "$ACTION" in
   snapshot) snapshot ;;
   diff) snapshot_diff ;;
   state) state ;;
+  permissions) permissions ;;
   review) review ;;
   scan) scan ;;
   system-data) system_data ;;

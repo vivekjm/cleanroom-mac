@@ -12,6 +12,7 @@ storage-map	map	review-only	no	-	Documents, Desktop, Downloads, user Application
 storage-snapshot	snapshot	review-only	no	-	~/.local/state/cleanroom/snapshots/*.json	Read-only timestamped storage-map snapshots for before/after tracking and support reports.
 storage-diff	diff	review-only	no	-	Two cleanroom snapshot JSON files	Read-only before/after snapshot comparison showing storage bucket deltas.
 cleanroom-state	state	review-only	no	-	~/.local/state/cleanroom and ~/.Trash/cleanroom-*	Read-only inventory of cleanroom-created logs, snapshots, and recoverable Trash folders.
+permissions-audit	permissions	review-only	no	-	Library, Mail, Messages, backups, Photos, cloud, browser profile, and Keychain access checks	Read-only access audit for macOS privacy-sensitive storage locations.
 review-dashboard	review	review-only	no	-	Documents, Desktop, Downloads, screenshots, archives, installers, app data, and app bundles	Read-only personal storage review checklist that routes to focused commands.
 documents-inventory	documents	review-only	no	-	Top-level files and folders under ~/Documents or a provided folder	Review-only user-folder storage inventory with guard status and drill-down commands.
 desktop-inventory	desktop	review-only	no	-	Top-level files and folders under ~/Desktop	Review-only Desktop storage inventory with guard status and drill-down commands.

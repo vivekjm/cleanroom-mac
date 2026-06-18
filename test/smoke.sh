@@ -264,6 +264,14 @@ grep '"id":"run-logs"' "$state_json" >/dev/null
 grep '"id":"snapshots"' "$state_json" >/dev/null
 grep '"id":"recoverable-trash"' "$state_json" >/dev/null
 rm -f "$state_json"
+"$BIN" permissions | grep 'cleanroom permissions' >/dev/null
+permissions_json="$(mktemp)"
+"$BIN" permissions --json > "$permissions_json"
+python3 -m json.tool "$permissions_json" >/dev/null
+grep '"id":"mail"' "$permissions_json" >/dev/null
+grep '"id":"messages"' "$permissions_json" >/dev/null
+grep '"status":"accessible"' "$permissions_json" >/dev/null
+rm -f "$permissions_json"
 "$BIN" system-data | grep 'System Data breakdown' >/dev/null
 system_data_json="$(mktemp)"
 "$BIN" system-data --json > "$system_data_json"
@@ -287,6 +295,7 @@ grep 'storage-map' "$rules_json" >/dev/null
 grep 'storage-snapshot' "$rules_json" >/dev/null
 grep 'storage-diff' "$rules_json" >/dev/null
 grep 'cleanroom-state' "$rules_json" >/dev/null
+grep 'permissions-audit' "$rules_json" >/dev/null
 grep 'review-dashboard' "$rules_json" >/dev/null
 grep 'documents-inventory' "$rules_json" >/dev/null
 grep 'desktop-inventory' "$rules_json" >/dev/null
