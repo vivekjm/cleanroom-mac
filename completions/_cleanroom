@@ -11,6 +11,7 @@ _cleanroom() {
     'large:List large files for review'
     'duplicates:Find exact duplicate files for review'
     'documents:Rank top-level user folders/files'
+    'desktop:Rank top-level Desktop files'
     'screenshots:List screenshots and screen recordings'
     'archives:List archive and disk image files'
     'downloads:List old Downloads files'

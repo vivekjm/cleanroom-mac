@@ -234,6 +234,7 @@ grep 'old-diagnostics' "$rules_json" >/dev/null
 grep 'toolchain-caches' "$rules_json" >/dev/null
 grep 'stale-python-virtualenvs' "$rules_json" >/dev/null
 grep 'documents-inventory' "$rules_json" >/dev/null
+grep 'desktop-inventory' "$rules_json" >/dev/null
 grep 'screenshots-inventory' "$rules_json" >/dev/null
 grep 'archives-inventory' "$rules_json" >/dev/null
 grep 'android-inventory' "$rules_json" >/dev/null
@@ -274,6 +275,14 @@ grep '"kind":"directory"' "$documents_json" >/dev/null
 grep '"guard_status":"review"' "$documents_json" >/dev/null
 grep 'cleanroom large' "$documents_json" >/dev/null
 rm -f "$documents_json"
+"$BIN" desktop --limit 10 | grep 'old-disk-image.dmg' >/dev/null
+desktop_json="$(mktemp)"
+"$BIN" desktop --json --limit 10 > "$desktop_json"
+python3 -m json.tool "$desktop_json" >/dev/null
+grep '"name":"old-disk-image.dmg"' "$desktop_json" >/dev/null
+grep '"guard_status":"review"' "$desktop_json" >/dev/null
+grep 'cleanroom large' "$desktop_json" >/dev/null
+rm -f "$desktop_json"
 "$BIN" screenshots "$HOME/Desktop" --days 7 --limit 10 | grep 'Screenshot 2026' >/dev/null
 screenshots_json="$(mktemp)"
 "$BIN" screenshots --json "$HOME/Desktop" --days 7 --limit 10 > "$screenshots_json"

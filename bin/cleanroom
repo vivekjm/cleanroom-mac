@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.43.0"
+VERSION="0.44.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -52,6 +52,7 @@ Usage:
   cleanroom large [PATH] [--min-mb N] [--limit N] [--json]
   cleanroom duplicates [PATH] [--min-mb N] [--limit N] [--json]
   cleanroom documents [PATH] [--limit N] [--json]
+  cleanroom desktop [--limit N] [--json]
   cleanroom screenshots [PATH] [--days N] [--limit N] [--json]
   cleanroom archives [PATH] [--days N] [--limit N] [--json]
   cleanroom downloads [--days N] [--limit N] [--json]
@@ -98,6 +99,7 @@ Actions:
   large                List largest files for review without deleting anything.
   duplicates           Find exact duplicate files for review without deleting anything.
   documents            Rank top-level user folders/files for review without deleting anything.
+  desktop              Rank top-level Desktop folders/files for review without deleting anything.
   screenshots          List screenshot and screen recording files for review.
   archives             List archive and disk image files for review.
   downloads            List old Downloads files for manual review.
@@ -141,7 +143,7 @@ Options:
   --yes                Do not prompt before --apply cleanup.
   --verbose            Print every path touched.
   --json               Emit JSON for overview, scan, system-data, plan, large, duplicates,
-                       documents, screenshots, archives, downloads, installers, nodes, venvs, apps, appdata, libraries, cloud, personal,
+                       documents, desktop, screenshots, archives, downloads, installers, nodes, venvs, apps, appdata, libraries, cloud, personal,
                        browsers, leftovers, startup,
                        trash, backups, xcode, caches, diagnostics, packages, homebrew, toolchains,
                        containers, android, snapshots, doctor, protect, guard, or rules.
@@ -205,6 +207,8 @@ Examples:
   cleanroom documents
   cleanroom documents ~/Documents --limit 40
   cleanroom documents --json
+  cleanroom desktop
+  cleanroom desktop --json
   cleanroom screenshots
   cleanroom screenshots ~/Desktop --days 7 --limit 50
   cleanroom screenshots --json
@@ -1426,6 +1430,11 @@ documents() {
       printf '  large files: cleanroom large %s --min-mb %s --limit %s\n' "$(shell_quote "$path")" "$MIN_MB" "$LIMIT"
     fi
   done <<<"$rows"
+}
+
+desktop() {
+  PATH_ARGS=("$HOME/Desktop")
+  documents
 }
 
 screenshot_roots() {
@@ -4116,7 +4125,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  overview|scan|system-data|plan|large|duplicates|documents|screenshots|archives|downloads|installers|nodes|venvs|virtualenvs|apps|appdata|libraries|cloud|personal|browsers|leftovers|backups|xcode|android|startup|trash|caches|diagnostics|packages|homebrew|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
+  overview|scan|system-data|plan|large|duplicates|documents|desktop|screenshots|archives|downloads|installers|nodes|venvs|virtualenvs|apps|appdata|libraries|cloud|personal|browsers|leftovers|backups|xcode|android|startup|trash|caches|diagnostics|packages|homebrew|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -4218,6 +4227,7 @@ case "$ACTION" in
   large) large ;;
   duplicates) duplicates ;;
   documents) documents ;;
+  desktop) desktop ;;
   screenshots) screenshots ;;
   archives) archives ;;
   downloads) downloads ;;

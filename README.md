@@ -177,6 +177,13 @@ cleanroom documents ~/Documents --limit 40
 cleanroom documents --json
 ```
 
+Break down Desktop clutter:
+
+```sh
+cleanroom desktop
+cleanroom desktop --json
+```
+
 Review screenshot and screen recording clutter:
 
 ```sh
@@ -588,6 +595,8 @@ Config files use simple `key=value` lines and are never executed as shell.
 `system-data` breaks common macOS System Data locations into focused buckets such as Application Support, caches, Developer data, container storage, diagnostics, MobileSync backups, Group Containers, HTTPStorages, and saved app state. It is review-only and points to the safest next command for each bucket.
 
 `documents` ranks the top-level files and folders inside `~/Documents` or a provided directory. It is review-only, includes each item's guard status, and prints follow-up `documents` and `large` commands so you can drill down safely.
+
+`desktop` is a convenience shortcut for the same guarded top-level inventory on `~/Desktop`, useful when screenshots, exports, archives, and loose project folders have piled up.
 
 `screenshots` lists screenshot and screen recording files in Desktop, Downloads, and Documents, or a provided folder. It is review-only because screenshots often contain private account, work, or payment information.
 
