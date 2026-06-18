@@ -52,7 +52,10 @@ mkdir -p \
   "$TEST_HOME/Library/Preferences" \
   "$TEST_HOME/Library/Keychains" \
   "$TEST_HOME/Library/Mail" \
+  "$TEST_HOME/Library/Mail Downloads" \
+  "$TEST_HOME/Library/Containers/com.apple.mail/Data/Library/Mail Downloads" \
   "$TEST_HOME/Library/Messages" \
+  "$TEST_HOME/Library/Messages/Attachments" \
   "$TEST_HOME/Library/Calendars" \
   "$TEST_HOME/Library/Group Containers/group.com.apple.notes" \
   "$TEST_HOME/Library/Group Containers/group.com.apple.reminders" \
@@ -132,7 +135,10 @@ printf 'adobe cache\n' >"$TEST_HOME/Library/Caches/com.cleanroomtestadobe.acc/ca
 printf 'adobe prefs\n' >"$TEST_HOME/Library/Preferences/com.cleanroomtestadobe.acc.plist"
 printf 'keychain\n' >"$TEST_HOME/Library/Keychains/login.keychain-db"
 printf 'mail\n' >"$TEST_HOME/Library/Mail/envelope-index"
+printf 'mail attachment\n' >"$TEST_HOME/Library/Mail Downloads/attachment.pdf"
+printf 'container mail attachment\n' >"$TEST_HOME/Library/Containers/com.apple.mail/Data/Library/Mail Downloads/container-attachment.pdf"
 printf 'message\n' >"$TEST_HOME/Library/Messages/chat.db"
+printf 'message attachment\n' >"$TEST_HOME/Library/Messages/Attachments/photo.jpg"
 printf 'calendar\n' >"$TEST_HOME/Library/Calendars/Calendar.sqlitedb"
 printf 'note\n' >"$TEST_HOME/Library/Group Containers/group.com.apple.notes/NoteStore.sqlite"
 printf 'reminder\n' >"$TEST_HOME/Library/Group Containers/group.com.apple.reminders/Container.sqlite"
@@ -242,6 +248,7 @@ grep 'android-inventory' "$rules_json" >/dev/null
 grep 'appdata-inventory' "$rules_json" >/dev/null
 grep 'cloud-inventory' "$rules_json" >/dev/null
 grep 'personal-inventory' "$rules_json" >/dev/null
+grep 'communications-inventory' "$rules_json" >/dev/null
 rm -f "$rules_json"
 "$BIN" review | grep 'personal storage checklist' >/dev/null
 review_json="$(mktemp)"
@@ -251,6 +258,7 @@ grep '"id":"documents"' "$review_json" >/dev/null
 grep '"id":"desktop"' "$review_json" >/dev/null
 grep '"id":"screenshots"' "$review_json" >/dev/null
 grep '"id":"archives"' "$review_json" >/dev/null
+grep '"id":"communications"' "$review_json" >/dev/null
 grep '"command":"cleanroom appdata --limit 20"' "$review_json" >/dev/null
 rm -f "$review_json"
 "$BIN" plan | grep 'cleanroom plan' >/dev/null
@@ -373,6 +381,15 @@ python3 -m json.tool "$personal_json" >/dev/null
 grep 'Voice Memos' "$personal_json" >/dev/null
 grep '"protected":true' "$personal_json" >/dev/null
 rm -f "$personal_json"
+"$BIN" communications | grep 'Messages Attachments' >/dev/null
+communications_json="$(mktemp)"
+"$BIN" communications --json > "$communications_json"
+python3 -m json.tool "$communications_json" >/dev/null
+grep '"id":"mail-downloads"' "$communications_json" >/dev/null
+grep '"id":"mail-container-downloads"' "$communications_json" >/dev/null
+grep '"id":"messages-attachments"' "$communications_json" >/dev/null
+grep '"protected":true' "$communications_json" >/dev/null
+rm -f "$communications_json"
 "$BIN" browsers | grep 'Google Chrome' >/dev/null
 "$BIN" browsers | grep 'protected' >/dev/null
 browsers_json="$(mktemp)"

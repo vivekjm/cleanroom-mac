@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.45.0"
+VERSION="0.46.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -65,6 +65,7 @@ Usage:
   cleanroom libraries [--json]
   cleanroom cloud [--json]
   cleanroom personal [--json]
+  cleanroom communications [--json]
   cleanroom browsers [--json]
   cleanroom leftovers QUERY... [--limit N] [--json] [--apply --trash]
   cleanroom backups [--json]
@@ -113,6 +114,7 @@ Actions:
   libraries            Inventory protected media and creative libraries.
   cloud                Inventory protected cloud-sync storage locations.
   personal             Inventory protected Mail, Messages, Notes, and contacts data.
+  communications       Inventory protected Mail and Messages storage in detail.
   browsers             Inventory browser profile and cache footprint.
   leftovers            Find app leftovers by search term. Apply requires --trash.
   backups              Inventory local iPhone/iPad backups for review.
@@ -145,7 +147,7 @@ Options:
   --yes                Do not prompt before --apply cleanup.
   --verbose            Print every path touched.
   --json               Emit JSON for overview, review, scan, system-data, plan, large, duplicates,
-                       documents, desktop, screenshots, archives, downloads, installers, nodes, venvs, apps, appdata, libraries, cloud, personal,
+                       documents, desktop, screenshots, archives, downloads, installers, nodes, venvs, apps, appdata, libraries, cloud, personal, communications,
                        browsers, leftovers, startup,
                        trash, backups, xcode, caches, diagnostics, packages, homebrew, toolchains,
                        containers, android, snapshots, doctor, protect, guard, or rules.
@@ -241,6 +243,8 @@ Examples:
   cleanroom cloud --json
   cleanroom personal
   cleanroom personal --json
+  cleanroom communications
+  cleanroom communications --json
   cleanroom browsers
   cleanroom browsers --json
   cleanroom leftovers adobe
@@ -2631,6 +2635,67 @@ personal() {
   printf '\nUse this to explain large Mail, Messages, Notes, or Contacts storage. Manage these from their owning apps or after verified backups.\n'
 }
 
+communications_rows() {
+  printf '%s\t%s\t%s\t%s\t%s\n' "mail" "Mail Store" "mail" "~/Library/Mail" "Mail accounts, indexes, and local message data. Manage accounts and downloaded attachments from Mail settings."
+  printf '%s\t%s\t%s\t%s\t%s\n' "mail-downloads" "Mail Downloads" "mail-attachments" "~/Library/Mail Downloads" "Attachments opened or saved by Mail. Review from Finder or Mail before removing."
+  printf '%s\t%s\t%s\t%s\t%s\n' "mail-container-downloads" "Mail Container Downloads" "mail-attachments" "~/Library/Containers/com.apple.mail/Data/Library/Mail Downloads" "Sandboxed Mail attachment downloads. Review carefully because files may still matter."
+  printf '%s\t%s\t%s\t%s\t%s\n' "messages" "Messages Store" "messages" "~/Library/Messages" "Chat database and message state. Manage from Messages/iCloud settings or after a verified backup."
+  printf '%s\t%s\t%s\t%s\t%s\n' "messages-attachments" "Messages Attachments" "message-attachments" "~/Library/Messages/Attachments" "Photos, videos, and files received in Messages. Review in Messages before deleting anything."
+}
+
+communications_total_kb() {
+  local total=0 id title kind path guidance expanded kb
+  while IFS=$'\t' read -r id title kind path guidance; do
+    [[ -z "${id:-}" ]] && continue
+    expanded="$(expand_path "$path")"
+    kb="$(size_kb "$expanded")"
+    total=$((total + kb))
+  done < <(communications_rows)
+  printf '%s\n' "$total"
+}
+
+communications() {
+  local rows
+  rows="$(communications_rows)"
+
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '['
+    local first=1 id title kind path guidance expanded kb
+    while IFS=$'\t' read -r id title kind path guidance; do
+      [[ -z "${id:-}" ]] && continue
+      expanded="$(expand_path "$path")"
+      kb="$(size_kb "$expanded")"
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '{"id":"%s","title":"%s","kind":"%s","path":"%s","exists":%s,"size_kb":%s,"size":"%s","protected":true,"guidance":"%s"}' \
+        "$(printf '%s' "$id" | json_escape)" \
+        "$(printf '%s' "$title" | json_escape)" \
+        "$(printf '%s' "$kind" | json_escape)" \
+        "$(printf '%s' "$expanded" | json_escape)" \
+        "$(if [[ -e "$expanded" ]]; then echo true; else echo false; fi)" \
+        "$kb" \
+        "$(human_kb "$kb" | json_escape)" \
+        "$(printf '%s' "$guidance" | json_escape)"
+    done <<<"$rows"
+    printf ']\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}cleanroom protected communications storage${RESET}"
+  printf 'Review-only inventory. cleanroom does not delete Mail or Messages data, attachments, accounts, chats, or indexes.\n\n'
+  printf '%-10s %-20s %-26s %s\n' "size" "kind" "location" "path"
+  local id title kind path guidance expanded kb
+  while IFS=$'\t' read -r id title kind path guidance; do
+    [[ -z "${id:-}" ]] && continue
+    expanded="$(expand_path "$path")"
+    [[ -e "$expanded" ]] || continue
+    kb="$(size_kb "$expanded")"
+    printf '%-10s %-20s %-26s %s\n' "$(human_kb "$kb")" "$kind" "$title" "$expanded"
+    printf '  %s\n' "$guidance"
+  done <<<"$rows"
+  printf '\nUse this to explain large Mail/Messages storage. Manage cleanup inside Mail, Messages, iCloud settings, or after verified backups.\n'
+}
+
 backup_value() {
   local file="$1"
   local key="$2"
@@ -3419,7 +3484,7 @@ tab_rows_count() {
 }
 
 review_rows() {
-  local documents_kb desktop_kb downloads_rows_value downloads_kb downloads_count screenshots_rows_value screenshots_kb screenshots_count archives_rows_value archives_kb archives_count installers_rows_value installers_kb installers_count appdata_rows_value appdata_kb appdata_count app_count
+  local documents_kb desktop_kb downloads_rows_value downloads_kb downloads_count screenshots_rows_value screenshots_kb screenshots_count archives_rows_value archives_kb archives_count installers_rows_value installers_kb installers_count appdata_rows_value appdata_kb appdata_count communications_kb app_count
 
   documents_kb="$(size_kb "$HOME/Documents")"
   desktop_kb="$(size_kb "$HOME/Desktop")"
@@ -3438,6 +3503,7 @@ review_rows() {
   appdata_rows_value="$(appdata_rows)"
   appdata_kb="$(printf '%s\n' "$appdata_rows_value" | tab_rows_total_kb)"
   appdata_count="$(printf '%s\n' "$appdata_rows_value" | sed '/^$/d' | tab_rows_count)"
+  communications_kb="$(communications_total_kb)"
   app_count="$(app_bundle_count)"
 
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$documents_kb" "documents" "Documents folder" "cleanroom documents ~/Documents --limit 50" "Top-level Documents folders and files with guard status." "review-only"
@@ -3447,6 +3513,7 @@ review_rows() {
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$archives_kb" "archives" "Archives and disk images" "cleanroom archives --days $DAYS --limit $LIMIT" "Top ${archives_count} archive and disk image files from Downloads, Desktop, and Documents." "review-only"
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$installers_kb" "installers" "Old installers" "cleanroom installers --days $DAYS --limit $LIMIT" "Top ${installers_count} downloaded installers that have an opt-in cleanup path." "review-only"
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$appdata_kb" "appdata" "Large app data folders" "cleanroom appdata --limit $LIMIT" "Top ${appdata_count} app support/container folders with guard status." "review-only"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$communications_kb" "communications" "Mail and Messages" "cleanroom communications" "Protected Mail, Mail Downloads, Messages, and Messages attachments. Review-only." "review-only"
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$app_count" "apps" "Installed app bundles" "cleanroom apps --limit $LIMIT" "Count of app bundles found in application folders; run the command for sizes." "count"
 }
 
@@ -3591,6 +3658,7 @@ overview() {
   printf 'cleanroom containers\n'
   printf 'cleanroom cloud\n'
   printf 'cleanroom personal\n'
+  printf 'cleanroom communications\n'
   printf 'cleanroom diagnostics\n'
   printf 'cleanroom protect\n'
 }
@@ -4225,7 +4293,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  overview|review|scan|system-data|plan|large|duplicates|documents|desktop|screenshots|archives|downloads|installers|nodes|venvs|virtualenvs|apps|appdata|libraries|cloud|personal|browsers|leftovers|backups|xcode|android|startup|trash|caches|diagnostics|packages|homebrew|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
+  overview|review|scan|system-data|plan|large|duplicates|documents|desktop|screenshots|archives|downloads|installers|nodes|venvs|virtualenvs|apps|appdata|libraries|cloud|personal|communications|comms|browsers|leftovers|backups|xcode|android|startup|trash|caches|diagnostics|packages|homebrew|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -4340,6 +4408,7 @@ case "$ACTION" in
   libraries) libraries ;;
   cloud) cloud ;;
   personal) personal ;;
+  communications|comms) communications ;;
   browsers) browsers ;;
   leftovers) leftovers ;;
   backups) backups ;;

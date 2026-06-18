@@ -17,6 +17,7 @@ android-inventory	android	review-only	no	-	Android SDK, NDK, system images, AVDs
 appdata-inventory	appdata	review-only	no	-	Application Support, Containers, Group Containers, HTTPStorages, WebKit, and saved state	Review-only app data inventory; use leftovers or vendor tools before removing app state.
 cloud-inventory	cloud	review-only	no	-	iCloud Drive, CloudStorage, Dropbox, Google Drive, OneDrive, Box, and Sync	Review-only cloud-sync storage inventory; cleanroom does not remove synced folders.
 personal-inventory	personal	review-only	no	-	Mail, Messages, Contacts, Calendars, Notes, Reminders, Voice Memos, and call history	Review-only personal app data inventory; cleanroom does not remove these protected stores.
+communications-inventory	communications	review-only	no	-	Mail, Mail Downloads, Messages, and Messages Attachments	Review-only communications storage inventory; cleanroom does not remove account, chat, or attachment data.
 old-logs	default	low-risk	yes	-	~/Library/Logs	Removes log files older than seven days and empty log subfolders.
 old-diagnostics	diagnostics	low-risk	no	--include-diagnostics	~/Library/DiagnosticReports; ~/Library/Application Support/CrashReporter	Removes old user diagnostic reports and CrashReporter files older than --days.
 package-stores	package-stores	rebuildable	no	--include-package-stores	~/Library/pnpm/store; ~/.pnpm-store; ~/.cocoapods/repos; ~/.cargo/registry/cache	Removes rebuildable package manager stores.

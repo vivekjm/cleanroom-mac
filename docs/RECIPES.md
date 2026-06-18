@@ -20,6 +20,7 @@ cleanroom appdata
 cleanroom libraries
 cleanroom cloud
 cleanroom personal
+cleanroom communications
 cleanroom browsers
 cleanroom leftovers adobe
 cleanroom backups
@@ -67,6 +68,7 @@ cleanroom appdata --json
 cleanroom libraries --json
 cleanroom cloud --json
 cleanroom personal --json
+cleanroom communications --json
 cleanroom browsers --json
 cleanroom leftovers adobe --json
 cleanroom backups --json
@@ -127,6 +129,8 @@ cleanroom report --output cleanroom-report.md
 `cloud --json` emits protected iCloud Drive, File Provider CloudStorage, Dropbox, Google Drive, OneDrive, Box, and Sync sizes. It is intentionally review-only and does not delete synced data.
 
 `personal --json` emits protected Mail, Messages, Contacts, Calendars, Notes, Reminders, Voice Memos, and call history sizes. It is intentionally review-only and does not delete account or app data.
+
+`communications --json` emits protected Mail, Mail Downloads, Messages, and Messages Attachments sizes. It is intentionally review-only and does not delete account, chat, or attachment data.
 
 `browsers --json` emits browser profile size, cache size, protected status, and matching preview/apply commands. It is intentionally review-only and does not delete profiles, passwords, cookies, bookmarks, or sessions.
 

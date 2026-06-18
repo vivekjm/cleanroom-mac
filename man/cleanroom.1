@@ -1,4 +1,4 @@
-.TH CLEANROOM 1 "June 2026" "cleanroom 0.45.0" "User Commands"
+.TH CLEANROOM 1 "June 2026" "cleanroom 0.46.0" "User Commands"
 .SH NAME
 cleanroom \- safe-by-default macOS storage cleaner
 .SH SYNOPSIS
@@ -61,6 +61,9 @@ cleanroom \- safe-by-default macOS storage cleaner
 .br
 .B cleanroom
 .RI "personal [--json]"
+.br
+.B cleanroom
+.RI "communications [--json]"
 .br
 .B cleanroom
 .RI "browsers [--json]"
@@ -204,6 +207,10 @@ Dropbox, Google Drive, OneDrive, Box, and Sync without deleting anything.
 .B personal
 Inventory protected Mail, Messages, Contacts, Calendars, Notes, Reminders,
 Voice Memos, and call-history data without deleting anything.
+.TP
+.B communications
+Inventory protected Mail, Mail Downloads, Messages, and Messages Attachments
+storage without deleting accounts, chats, attachments, or indexes.
 .TP
 .B browsers
 Inventory browser profile and cache footprint without deleting profiles,
@@ -369,6 +376,7 @@ cleanroom appdata --limit 30
 cleanroom libraries --json
 cleanroom cloud --json
 cleanroom personal --json
+cleanroom communications --json
 cleanroom browsers --json
 cleanroom leftovers adobe --limit 50
 cleanroom leftovers adobe --apply --trash

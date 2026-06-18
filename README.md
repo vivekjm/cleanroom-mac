@@ -276,6 +276,13 @@ cleanroom personal
 cleanroom personal --json
 ```
 
+Review protected Mail and Messages storage in detail:
+
+```sh
+cleanroom communications
+cleanroom communications --json
+```
+
 Review Homebrew storage:
 
 ```sh
@@ -644,6 +651,8 @@ Config files use simple `key=value` lines and are never executed as shell.
 `cloud` inventories protected cloud-sync folders such as iCloud Drive, File Provider CloudStorage, Dropbox, Google Drive, OneDrive, Box, and Sync. It is review-only because local deletes can affect remote cloud or peer data.
 
 `personal` inventories protected app data such as Mail, Messages, Contacts, Calendars, Notes, Reminders, Voice Memos, and call history. It is review-only and helps explain large personal app storage without deleting account data.
+
+`communications` inventories protected Mail, Mail Downloads, Messages, and Messages Attachments storage in more detail. It is review-only and helps explain large communication attachments without deleting accounts, chats, or message files.
 
 `browsers` separates safe browser cache candidates from protected profile storage. It reports Chrome, Brave, Edge, Arc, Firefox, and Safari profile sizes, but cleanup commands still remove only cache folders and never profiles, passwords, cookies, bookmarks, or sessions.
 
