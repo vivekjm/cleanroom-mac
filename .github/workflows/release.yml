@@ -9,12 +9,27 @@ jobs:
   release:
     name: Build release archive
     runs-on: macos-latest
+    timeout-minutes: 30
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
+
       - name: Validate and package
         run: make dist homebrew-formula macos-app
+
+      - name: Validate release artifacts
+        run: |
+          version="$(tr -d '[:space:]' < VERSION)"
+          ruby -c dist/Formula/cleanroom.rb
+          dist/Cleanroom.app/Contents/Resources/bin/cleanroom --version | grep -Fx "$version"
+          HOME=/tmp/cleanroom-release USER=runner TMPDIR=/tmp/cleanroom-release-tmp \
+            dist/Cleanroom.app/Contents/Resources/bin/cleanroom report --redact | grep -F '~/Library/Caches'
+          codesign --verify --deep --strict dist/Cleanroom.app
+          cd dist
+          shasum -a 256 -c "cleanroom-${version}.tar.gz.sha256"
+          shasum -a 256 -c "Cleanroom.app.zip.sha256"
+
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:

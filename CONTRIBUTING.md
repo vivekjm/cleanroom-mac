@@ -19,6 +19,8 @@ Run:
 make test
 ```
 
+GitHub Actions runs the same macOS smoke suite on pushes and pull requests. CI also builds the release archive, renders the Homebrew formula, builds the macOS app, verifies checksums, verifies the ad-hoc app signature, and checks that redacted reports mask local paths.
+
 Or run the individual checks:
 
 ```sh

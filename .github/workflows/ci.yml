@@ -4,17 +4,65 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  smoke:
-    name: Smoke tests
+  verify:
+    name: Verify on macOS
     runs-on: macos-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+
+      - name: Show tool versions
+        run: |
+          sw_vers
+          bash --version
+          make --version
+          ruby --version
+          python3 --version
+
+      - name: Lint scripts and catalogs
+        run: make lint
+
       - name: Run test suite
         run: make test
+
       - name: Build release archive
         run: make package
+
       - name: Render Homebrew formula
         run: make homebrew-formula
+
       - name: Build macOS app
         run: make macos-app
+
+      - name: Validate generated artifacts
+        run: |
+          version="$(tr -d '[:space:]' < VERSION)"
+          ruby -c dist/Formula/cleanroom.rb
+          dist/Cleanroom.app/Contents/Resources/bin/cleanroom --version | grep -Fx "$version"
+          HOME=/tmp/cleanroom-ci USER=runner TMPDIR=/tmp/cleanroom-ci-tmp \
+            dist/Cleanroom.app/Contents/Resources/bin/cleanroom report --redact | grep -F '~/Library/Caches'
+          codesign --verify --deep --strict dist/Cleanroom.app
+          cd dist
+          shasum -a 256 -c "cleanroom-${version}.tar.gz.sha256"
+          shasum -a 256 -c "Cleanroom.app.zip.sha256"
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cleanroom-${{ github.sha }}
+          if-no-files-found: error
+          retention-days: 7
+          path: |
+            dist/cleanroom-*.tar.gz
+            dist/cleanroom-*.tar.gz.sha256
+            dist/Formula/cleanroom.rb
+            dist/Cleanroom.app.zip
+            dist/Cleanroom.app.zip.sha256
