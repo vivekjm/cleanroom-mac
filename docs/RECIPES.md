@@ -6,6 +6,7 @@ Common `cleanroom` workflows.
 
 ```sh
 cleanroom overview
+cleanroom map
 cleanroom scan
 cleanroom system-data
 cleanroom plan
@@ -49,6 +50,7 @@ cleanroom clean
 
 ```sh
 cleanroom overview --json
+cleanroom map --json
 cleanroom review --json
 cleanroom scan --json
 cleanroom system-data --json
@@ -91,6 +93,8 @@ cleanroom report --output cleanroom-report.md
 ```
 
 `overview --json` emits a compact dashboard with disk state, summary counts, and top cleanup recommendations.
+
+`map --json` emits a read-only focused storage bucket map with paths, safety category, size, next command, and description. Buckets can overlap when a smaller folder is also part of a larger parent.
 
 `review --json` emits a read-only checklist of personal storage hotspots with estimates, counts, descriptions, and next commands.
 

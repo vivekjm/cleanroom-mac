@@ -1,9 +1,12 @@
-.TH CLEANROOM 1 "June 2026" "cleanroom 0.46.0" "User Commands"
+.TH CLEANROOM 1 "June 2026" "cleanroom 0.47.0" "User Commands"
 .SH NAME
 cleanroom \- safe-by-default macOS storage cleaner
 .SH SYNOPSIS
 .B cleanroom
 .RI "overview [--json]"
+.br
+.B cleanroom
+.RI "map [--json]"
 .br
 .B cleanroom
 .RI "review [--json]"
@@ -146,6 +149,12 @@ Keychains, Photos libraries, Mail, iCloud Drive, or arbitrary personal files.
 .TP
 .B overview
 Show a read-only storage dashboard with disk state, summaries, and next steps.
+.TP
+.B map
+Rank focused major storage buckets such as Documents, Downloads, user
+Applications, Application Support, cloud storage, media, developer data,
+package stores, toolchains, container VMs, and Trash.
+Buckets may overlap because smaller folders can also be part of larger parents.
 .TP
 .B scan
 Show disk usage, cleanup candidates, largest home folders, and large files.
@@ -358,6 +367,7 @@ when they contain pyvenv.cfg.
 .SH EXAMPLES
 .nf
 cleanroom overview
+cleanroom map --json
 cleanroom scan
 cleanroom system-data
 cleanroom plan --json

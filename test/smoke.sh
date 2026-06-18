@@ -220,6 +220,15 @@ grep '"container_kb"' "$overview_json" >/dev/null
 grep '"diagnostic_kb"' "$overview_json" >/dev/null
 grep '"recommendations"' "$overview_json" >/dev/null
 rm -f "$overview_json"
+"$BIN" map | grep 'storage map' >/dev/null
+map_json="$(mktemp)"
+"$BIN" map --json > "$map_json"
+python3 -m json.tool "$map_json" >/dev/null
+grep '"id":"documents"' "$map_json" >/dev/null
+grep '"id":"app-support"' "$map_json" >/dev/null
+grep '"id":"communications"' "$map_json" >/dev/null
+grep '"command":"cleanroom communications"' "$map_json" >/dev/null
+rm -f "$map_json"
 "$BIN" system-data | grep 'System Data breakdown' >/dev/null
 system_data_json="$(mktemp)"
 "$BIN" system-data --json > "$system_data_json"
@@ -239,6 +248,7 @@ grep 'ai-models' "$rules_json" >/dev/null
 grep 'old-diagnostics' "$rules_json" >/dev/null
 grep 'toolchain-caches' "$rules_json" >/dev/null
 grep 'stale-python-virtualenvs' "$rules_json" >/dev/null
+grep 'storage-map' "$rules_json" >/dev/null
 grep 'review-dashboard' "$rules_json" >/dev/null
 grep 'documents-inventory' "$rules_json" >/dev/null
 grep 'desktop-inventory' "$rules_json" >/dev/null

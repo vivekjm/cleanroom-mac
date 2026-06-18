@@ -133,6 +133,13 @@ cleanroom overview
 cleanroom overview --json
 ```
 
+Map major storage buckets:
+
+```sh
+cleanroom map
+cleanroom map --json
+```
+
 Scan:
 
 ```sh
@@ -605,6 +612,8 @@ Config files use simple `key=value` lines and are never executed as shell.
 `restore` only restores entries that were moved by `--trash` and still exist in the cleanroom Trash folder. It skips destinations that already exist.
 
 `overview` summarizes disk state, top recommendations, package-store size, toolchain-cache size, container storage size, diagnostic-report size, protected-data presence, snapshots, app bundle count, and useful next commands without deleting anything.
+
+`map` ranks focused major storage buckets such as Documents, Desktop, Downloads, user Applications, Application Support, app containers, cloud storage, media libraries, communication data, developer data, package stores, toolchains, container VMs, and Trash. It is review-only. Buckets can overlap when a smaller folder is also part of a larger parent.
 
 `review` gives normal users a read-only checklist of personal storage hotspots: Documents, Desktop, old Downloads, screenshots, archives, installers, app data, and installed app bundles. It points to the next focused command for each item.
 
