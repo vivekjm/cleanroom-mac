@@ -289,6 +289,13 @@ cleanroom uninstallers ~/Applications --limit 20
 cleanroom uninstallers --json
 ```
 
+Review an app before removal:
+
+```sh
+cleanroom appreview adobe
+cleanroom appreview zoom --json
+```
+
 Review large app data folders:
 
 ```sh
@@ -723,6 +730,8 @@ Config files use simple `key=value` lines and are never executed as shell.
 `apps` lists `.app` bundle sizes from `/Applications` and `~/Applications`, or a path you provide. It never uninstalls apps.
 
 `uninstallers` lists likely vendor uninstallers, remover apps, packages, and scripts from common application and Application Support locations, or a path you provide. It never runs or removes them; use these official tools before manual leftover cleanup.
+
+`appreview` combines matching app bundles, vendor uninstallers, package receipts, and leftover candidates into one read-only workflow. Use it before removing apps so official uninstallers and package records are visible before leftover cleanup.
 
 `appdata` ranks top-level Application Support, Containers, Group Containers, HTTPStorages, WebKit, and saved-state folders. It is review-only and includes the central guard status so protected profiles and personal data stand out before you investigate with `leftovers APPNAME`.
 

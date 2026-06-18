@@ -24,6 +24,7 @@ cleanroom nodes
 cleanroom venvs
 cleanroom apps
 cleanroom uninstallers
+cleanroom appreview adobe
 cleanroom appdata
 cleanroom libraries
 cleanroom cloud
@@ -84,6 +85,7 @@ cleanroom nodes --json ~/Documents
 cleanroom venvs --json ~/Documents
 cleanroom apps --json
 cleanroom uninstallers --json
+cleanroom appreview adobe --json
 cleanroom appdata --json
 cleanroom libraries --json
 cleanroom cloud --json
@@ -169,6 +171,8 @@ cleanroom permissions --json
 `apps --json [PATH]` emits app bundle sizes for `/Applications`, `~/Applications`, or a provided path. It is intentionally review-only and does not uninstall anything.
 
 `uninstallers --json [PATH]` emits likely vendor uninstallers, remover apps, packages, and scripts with path, size, modified date, and launch/reveal command. It is intentionally review-only and does not run or remove these tools.
+
+`appreview --json QUERY...` emits matching app bundles, vendor uninstallers, package receipts, and leftover candidates in one read-only object. Use it before removing apps so official uninstallers and package records are visible before leftover cleanup.
 
 `appdata --json` emits large top-level app support/container folders with size and guard status. It is intentionally review-only and does not remove app state.
 
@@ -339,13 +343,14 @@ Review large app bundles manually. cleanroom does not uninstall apps because app
 ## App Leftovers
 
 ```sh
+cleanroom appreview adobe
 cleanroom leftovers adobe
 cleanroom leftovers "creative cloud" --limit 50
 cleanroom leftovers adobe --apply --trash
 cleanroom leftovers zoom --json
 ```
 
-Use this after uninstalling or removing a large app. It searches common macOS support, cache, preference, container, saved-state, WebKit, log, and launch-item locations by name. Plain `leftovers` is a preview. Applied cleanup requires `--trash`, writes the normal cleanroom apply log, and can be restored with `cleanroom restore --log PATH --apply`. Use the vendor uninstaller when one exists, especially for apps with helper services or account-specific data.
+Use `appreview` before uninstalling or removing a large app. It shows matching app bundles, official uninstallers, receipts, and leftovers in one place. Use `leftovers` after uninstalling; plain `leftovers` is a preview, while applied cleanup requires `--trash`, writes the normal cleanroom apply log, and can be restored with `cleanroom restore --log PATH --apply`.
 
 ## Browser Storage
 

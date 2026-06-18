@@ -1,4 +1,4 @@
-.TH CLEANROOM 1 "June 2026" "cleanroom 0.59.0" "User Commands"
+.TH CLEANROOM 1 "June 2026" "cleanroom 0.60.0" "User Commands"
 .SH NAME
 cleanroom \- safe-by-default macOS storage cleaner
 .SH SYNOPSIS
@@ -73,6 +73,9 @@ cleanroom \- safe-by-default macOS storage cleaner
 .br
 .B cleanroom
 .RI "uninstallers [path] [--limit n] [--json]"
+.br
+.B cleanroom
+.RI "appreview query... [--limit n] [--json]"
 .br
 .B cleanroom
 .RI "appdata [--limit n] [--json]"
@@ -258,6 +261,10 @@ List largest app bundles for review without uninstalling anything.
 .B uninstallers
 List vendor uninstallers, remover apps, packages, and scripts without running
 or removing them.
+.TP
+.B appreview
+Review matching app bundles, vendor uninstallers, package receipts, and leftover
+candidates in one read-only workflow.
 .TP
 .B appdata
 Rank large app support, container, group-container, HTTP storage, WebKit, and
@@ -465,6 +472,7 @@ cleanroom nodes ~/Documents --days 45 --limit 30
 cleanroom venvs ~/Documents --days 45 --limit 30
 cleanroom apps --limit 30
 cleanroom uninstallers --limit 50
+cleanroom appreview adobe --limit 50
 cleanroom appdata --limit 30
 cleanroom libraries --json
 cleanroom cloud --json

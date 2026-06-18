@@ -145,7 +145,7 @@ final class AppState: ObservableObject {
 
     func runLeftovers(_ query: String) {
         let safe = query.replacingOccurrences(of: "'", with: "'\\''")
-        run("leftovers '\(safe)' --limit 40", title: "Leftovers: \(query)")
+        run("appreview '\(safe)' --limit 40", title: "App Review: \(query)")
     }
 
     func copyCmd(_ cmd: String) {
@@ -268,6 +268,7 @@ struct SidebarView: View {
                             NavRow("shippingbox.fill",        "Node Modules",.run(title: "Node Modules",args: "nodes --limit 30 --days 30"), state)
                             NavRow("terminal.fill",           "Virtualenvs", .run(title: "Virtualenvs", args: "venvs --limit 30 --days 30"), state)
                             NavRow("apps.iphone",             "Apps",        .run(title: "Apps",        args: "apps --limit 30"), state)
+                            NavRow("app.badge.checkmark.fill","App Review",  .dashboard, state, onTap: { state.showLeftovers = true })
                             NavRow("trash.fill",              "Trash",       .run(title: "Trash",       args: "trash"), state)
                             NavRow("icloud.fill",             "Cloud Files", .run(title: "Cloud Files", args: "cloudfiles --min-mb 250 --limit 40"), state)
                         }
@@ -294,7 +295,7 @@ struct SidebarView: View {
 
                 Rectangle().fill(DS.C.dividerOnDark).frame(height: 1)
                 HStack {
-                    Text(state.cliPath.isEmpty ? "CLI not found" : "v0.59.0")
+                    Text(state.cliPath.isEmpty ? "CLI not found" : "v0.60.0")
                         .font(DS.T.tag)
                         .foregroundColor(DS.C.textOnDark.opacity(0.35))
                     Spacer()

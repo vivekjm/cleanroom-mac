@@ -332,6 +332,7 @@ grep 'archives-inventory' "$rules_json" >/dev/null
 grep 'android-inventory' "$rules_json" >/dev/null
 grep 'loginitems-inventory' "$rules_json" >/dev/null
 grep 'uninstallers-inventory' "$rules_json" >/dev/null
+grep 'appreview-inventory' "$rules_json" >/dev/null
 grep 'appdata-inventory' "$rules_json" >/dev/null
 grep 'cloud-inventory' "$rules_json" >/dev/null
 grep 'cloudfiles-inventory' "$rules_json" >/dev/null
@@ -467,6 +468,20 @@ grep '"name":"Cleanroom Test Uninstaller.app"' "$uninstallers_json" >/dev/null
 grep '"kind":"app"' "$uninstallers_json" >/dev/null
 grep 'open ' "$uninstallers_json" >/dev/null
 rm -f "$uninstallers_json"
+"$BIN" appreview cleanroom --limit 20 | grep 'cleanroom app removal review' >/dev/null
+"$BIN" appreview cleanroom --limit 20 | grep 'Cleanroom Test Uninstaller.app' >/dev/null
+"$BIN" appreview cleanroom --limit 20 | grep 'com.cleanroom.test.pkg' >/dev/null
+appreview_json="$(mktemp)"
+"$BIN" appreview cleanroom --json --limit 20 > "$appreview_json"
+python3 -m json.tool "$appreview_json" >/dev/null
+grep '"apps"' "$appreview_json" >/dev/null
+grep '"uninstallers"' "$appreview_json" >/dev/null
+grep '"receipts"' "$appreview_json" >/dev/null
+grep '"leftovers"' "$appreview_json" >/dev/null
+grep 'Cleanroom Test Uninstaller.app' "$appreview_json" >/dev/null
+grep 'com.cleanroom.test.pkg' "$appreview_json" >/dev/null
+grep 'CleanroomTestAdobe' "$appreview_json" >/dev/null
+rm -f "$appreview_json"
 "$BIN" appdata --limit 20 | grep 'CleanroomTestAdobe' >/dev/null
 appdata_json="$(mktemp)"
 "$BIN" appdata --json --limit 20 > "$appdata_json"

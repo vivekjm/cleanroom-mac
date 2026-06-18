@@ -28,6 +28,7 @@ _cleanroom() {
     'venvs:List stale Python virtualenv folders'
     'apps:List large app bundles for review'
     'uninstallers:List vendor uninstallers and remover tools'
+    'appreview:Review app bundles, uninstallers, receipts, and leftovers'
     'appdata:Rank large app support and container folders'
     'libraries:Inventory protected media and creative libraries'
     'cloud:Inventory protected cloud-sync storage'
