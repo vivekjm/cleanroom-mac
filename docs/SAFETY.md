@@ -93,6 +93,8 @@ Excludes apply centrally to deletion helpers and should be respected by new clea
 
 `cleanroom` is dry-run by default and requires `--apply` before deleting anything.
 
+Use `cleanroom clean --preflight` before apply runs to summarize selected categories, warnings, and recovery limits without scanning or deleting files. Add `--json` when building GUI confirmations or automation.
+
 Use `--trash` to move cleanroom-managed path removals to `~/.Trash/cleanroom-*` instead of deleting them immediately. Applied runs write an audit log under `~/.local/state/cleanroom/runs/` unless `--log` is provided.
 
 Use `cleanroom history` to find recent logs, and `cleanroom restore --log PATH` to preview restoring Trash-mode entries. Add `--apply` only after reviewing the restore preview.

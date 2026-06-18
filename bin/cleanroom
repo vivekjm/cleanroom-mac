@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.58.0"
+VERSION="0.59.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -16,6 +16,7 @@ OUTPUT_FILE=""
 LOG_FILE=""
 TRASH=0
 REDACT=0
+PREFLIGHT=0
 RUN_ID="$(date '+%Y%m%d-%H%M%S')-$$"
 EXCLUDES=()
 PATH_ARGS=()
@@ -93,7 +94,7 @@ Usage:
   cleanroom containers [--json]
   cleanroom snapshots [--json]
   cleanroom report [--output PATH] [--redact]
-  cleanroom clean [options]
+  cleanroom clean [options] [--preflight] [--json]
   cleanroom history [--limit N]
   cleanroom restore [--log PATH] [--apply]
   cleanroom interactive [options]
@@ -173,9 +174,10 @@ Options:
                        documents, desktop, screenshots, archives, downloads, installers, nodes, venvs, apps, uninstallers, appdata, libraries, cloud, cloudfiles, personal, communications,
                        browsers, leftovers, startup, loginitems,
                        trash, backups, xcode, caches, diagnostics, packages, receipts, homebrew, toolchains,
-                       containers, android, snapshots, doctor, protect, guard, or rules.
+                       containers, android, snapshots, clean --preflight, doctor, protect, guard, or rules.
   --output PATH        Output path for report.
   --redact             Redact home, user, and temporary paths in Markdown reports.
+  --preflight          Summarize selected clean options without scanning or deleting.
   --log PATH           Write apply audit log here. Default: ~/.local/state/cleanroom/runs/*.log.
   --config PATH        Load config file. Default: ~/.config/cleanroom/config.
   --exclude PATH       Never remove this path. Can be passed multiple times.
@@ -336,6 +338,8 @@ Examples:
   cleanroom init-config
   cleanroom interactive
   cleanroom clean
+  cleanroom clean --preset dev --preflight
+  cleanroom clean --preset dev --preflight --json
   cleanroom clean --preset dev
   cleanroom clean --apply --trash --preset dev
   cleanroom history
@@ -713,6 +717,95 @@ disk_json() {
     split(values, a, " ")
     printf "\"disk\":{\"size_kb\":%s,\"used_kb\":%s,\"available_kb\":%s,\"capacity\":\"%s\",\"mount\":\"%s\"}", a[1], a[2], a[3], a[4], a[5]
   }'
+}
+
+preflight_rows() {
+  printf '%s\t%s\t%s\t%s\n' "default-caches" "Default rebuildable caches" "rebuildable" "Trash mode can recover direct removals when --trash is used."
+  printf '%s\t%s\t%s\t%s\n' "old-logs" "Old user logs" "low-risk" "Trash mode can recover direct removals when --trash is used."
+  [[ "$INCLUDE_APP_CACHES" -eq 1 ]] && printf '%s\t%s\t%s\t%s\n' "app-caches" "Nested app cache folders" "rebuildable" "Profiles, passwords, cookies, bookmarks, and settings stay protected."
+  [[ "$INCLUDE_PACKAGE_STORES" -eq 1 ]] && printf '%s\t%s\t%s\t%s\n' "package-stores" "Package-manager stores" "rebuildable" "Dependencies may need to be downloaded again."
+  [[ "$INCLUDE_TOOLCHAINS" -eq 1 ]] && printf '%s\t%s\t%s\t%s\n' "toolchains" "Language/toolchain caches" "rebuildable" "Dependencies and build caches may need to be downloaded or rebuilt."
+  [[ "$INCLUDE_DIAGNOSTICS" -eq 1 ]] && printf '%s\t%s\t%s\t%s\n' "diagnostics" "Old diagnostic reports" "low-risk" "Trash mode can recover direct removals when --trash is used."
+  [[ "$INCLUDE_INSTALLERS" -eq 1 ]] && printf '%s\t%s\t%s\t%s\n' "installers" "Old downloaded installers" "opt-in" "Trash mode can recover direct removals when --trash is used."
+  [[ "$INCLUDE_NODE_STALE" -eq 1 ]] && printf '%s\t%s\t%s\t%s\n' "node-modules" "Stale node_modules" "rebuildable" "Dependencies may need to be installed again."
+  [[ "$INCLUDE_VENV_STALE" -eq 1 ]] && printf '%s\t%s\t%s\t%s\n' "python-virtualenvs" "Stale Python virtualenvs" "rebuildable" "Virtualenvs may need to be recreated."
+  [[ "$INCLUDE_DEV_HEAVY" -eq 1 ]] && printf '%s\t%s\t%s\t%s\n' "dev-heavy" "Heavy SDK and simulator data" "high-impact" "Some SDKs, symbols, or simulator app state may need reinstalling or resetting."
+  [[ "$INCLUDE_SNAPSHOTS" -eq 1 ]] && printf '%s\t%s\t%s\t%s\n' "snapshots" "Local Time Machine snapshots" "system-tool" "Snapshot thinning is delegated to tmutil and is not recoverable through cleanroom Trash."
+  [[ "$INCLUDE_AI_WORKSPACES" -eq 1 || "$INCLUDE_GEMINI" -eq 1 ]] && printf '%s\t%s\t%s\t%s\n' "ai-workspaces" "Generated AI workspace state" "destructive-opt-in" "Generated recordings, scratch, brain, implicit data, and local conversations may be removed."
+  [[ "$INCLUDE_AI_MODELS" -eq 1 || "$INCLUDE_LMSTUDIO" -eq 1 ]] && printf '%s\t%s\t%s\t%s\n' "ai-models" "Downloaded local AI models" "large-opt-in" "Model files and backends may need to be downloaded again."
+  [[ "$INCLUDE_CONTAINERS" -eq 1 ]] && printf '%s\t%s\t%s\t%s\n' "containers" "Container VM disks and stores" "high-impact" "This can remove local containers, images, volumes, and VM disks."
+  [[ "$INCLUDE_USER_TRASH" -eq 1 ]] && printf '%s\t%s\t%s\t%s\n' "user-trash" "Current user Trash" "irreversible" "Emptying ~/.Trash is irreversible and ignores --trash."
+  return 0
+}
+
+preflight_warnings() {
+  [[ "$APPLY" -eq 1 ]] && printf '%s\n' "Apply mode is enabled; without --preflight this run would delete selected data."
+  [[ "$APPLY" -eq 0 ]] && printf '%s\n' "Dry-run mode is selected; clean would preview removals without deleting."
+  [[ "$TRASH" -eq 1 ]] && printf '%s\n' "Trash mode is enabled for cleanroom-managed direct path removals."
+  [[ "$TRASH" -eq 0 && "$APPLY" -eq 1 ]] && printf '%s\n' "Trash mode is not enabled; cleanroom-managed direct removals would use rm -rf."
+  [[ "$INCLUDE_USER_TRASH" -eq 1 ]] && printf '%s\n' "User Trash cleanup is irreversible and is not recoverable through cleanroom Trash mode."
+  [[ "$INCLUDE_SNAPSHOTS" -eq 1 ]] && printf '%s\n' "Snapshot thinning is delegated to tmutil and is not recoverable through cleanroom Trash mode."
+  [[ "$INCLUDE_CONTAINERS" -eq 1 ]] && printf '%s\n' "Container cleanup can remove local containers, images, volumes, and VM disks."
+  [[ "$INCLUDE_DEV_HEAVY" -eq 1 ]] && printf '%s\n' "Heavy developer cleanup can remove SDK/support files or simulator app state."
+  [[ "$INCLUDE_AI_MODELS" -eq 1 || "$INCLUDE_LMSTUDIO" -eq 1 ]] && printf '%s\n' "AI model cleanup removes downloaded model files and backend extensions."
+  printf '%s\n' "Protected browser profiles, password databases, Keychains, Photos, Mail, Messages, and cloud-sync roots stay guarded."
+  return 0
+}
+
+preflight() {
+  local rows warnings
+  rows="$(preflight_rows)"
+  warnings="$(preflight_warnings)"
+
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '{'
+    printf '"version":"%s",' "$(printf '%s' "$VERSION" | json_escape)"
+    printf '"action":"clean",'
+    printf '"apply":%s,"trash":%s,"yes":%s,"days":%s,' \
+      "$(if [[ "$APPLY" -eq 1 ]]; then echo true; else echo false; fi)" \
+      "$(if [[ "$TRASH" -eq 1 ]]; then echo true; else echo false; fi)" \
+      "$(if [[ "$ASSUME_YES" -eq 1 ]]; then echo true; else echo false; fi)" \
+      "$DAYS"
+    printf '"log_path":"%s",' "$(printf '%s' "${LOG_FILE:-$(default_log_file)}" | json_escape)"
+    printf '"categories":['
+    local first=1 id title safety recoverability
+    while IFS=$'\t' read -r id title safety recoverability; do
+      [[ -z "${id:-}" ]] && continue
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '{"id":"%s","title":"%s","safety":"%s","recoverability":"%s"}' \
+        "$(printf '%s' "$id" | json_escape)" \
+        "$(printf '%s' "$title" | json_escape)" \
+        "$(printf '%s' "$safety" | json_escape)" \
+        "$(printf '%s' "$recoverability" | json_escape)"
+    done <<<"$rows"
+    printf '],"warnings":['
+    first=1
+    local warning
+    while IFS= read -r warning; do
+      [[ -z "$warning" ]] && continue
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '"%s"' "$(printf '%s' "$warning" | json_escape)"
+    done <<<"$warnings"
+    printf ']}\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}cleanroom clean preflight${RESET}"
+  printf 'No files are scanned or deleted in preflight mode.\n\n'
+  printf '%-18s %-26s %-18s %s\n' "id" "category" "safety" "recoverability"
+  local id title safety recoverability
+  while IFS=$'\t' read -r id title safety recoverability; do
+    [[ -z "${id:-}" ]] && continue
+    printf '%-18s %-26s %-18s %s\n' "$id" "$title" "$safety" "$recoverability"
+  done <<<"$rows"
+  printf '\n%s\n' "${BOLD}Warnings${RESET}"
+  local warning
+  while IFS= read -r warning; do
+    [[ -z "$warning" ]] && continue
+    printf '%s\n' "- $warning"
+  done <<<"$warnings"
 }
 
 confirm_apply() {
@@ -5228,6 +5321,10 @@ EOF
 }
 
 clean() {
+  if [[ "$PREFLIGHT" -eq 1 ]]; then
+    preflight
+    return 0
+  fi
   if [[ "$APPLY" -eq 1 ]]; then
     warn "Apply mode enabled."
     [[ "$TRASH" -eq 1 ]] && warn "Trash mode enabled."
@@ -5322,6 +5419,7 @@ while [[ "$#" -gt 0 ]]; do
     --verbose) VERBOSE=1 ;;
     --json) JSON=1 ;;
     --redact) REDACT=1 ;;
+    --preflight) PREFLIGHT=1 ;;
     --output)
       shift
       [[ -n "${1:-}" ]] || die "--output requires a path"

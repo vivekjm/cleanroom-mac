@@ -502,7 +502,11 @@ Preview safe cleanup:
 
 ```sh
 cleanroom clean
+cleanroom clean --preset dev --preflight
+cleanroom clean --preset dev --preflight --json
 ```
+
+`--preflight` summarizes selected cleanup categories, warnings, and recovery limits without scanning or deleting files. Use it before `--apply`, especially for opt-in categories such as containers, snapshots, AI models, SDKs, or current user Trash.
 
 Apply safe cleanup:
 

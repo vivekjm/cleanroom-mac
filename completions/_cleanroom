@@ -73,6 +73,7 @@ _cleanroom() {
     '--verbose[Print every path touched]'
     '--json[Emit JSON where supported]'
     '--redact[Redact personal paths in Markdown reports]'
+    '--preflight[Summarize clean options without scanning or deleting]'
     '--output[Output path for report]:file:_files'
     '--log[Apply audit log path]:file:_files'
     '--limit[Number of history entries]:limit:'

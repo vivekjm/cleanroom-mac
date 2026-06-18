@@ -61,7 +61,7 @@ final class AppState: ObservableObject {
         CleanCategory(title: "Downloads",    tagline: "Old downloads, DMGs, and forgotten installers",  icon: "arrow.down.to.line",    color: DS.C.cardAmber,    args: "downloads --limit 30 --days 30"),
         CleanCategory(title: "Large Files",  tagline: "Files over 500 MB that may no longer be needed", icon: "doc.fill",              color: DS.C.cardSlate,    args: "large --limit 30 --min-mb 500"),
         CleanCategory(title: "Archives",     tagline: "Old zip archives, tar files, and disk images",   icon: "archivebox.fill",       color: DS.C.cardRose,     args: "archives --limit 30 --days 7"),
-        CleanCategory(title: "Developer",    tagline: "Build artifacts, virtualenvs, and toolchains",   icon: "hammer.fill",           color: DS.C.cardTeal,     args: "clean --preset dev"),
+        CleanCategory(title: "Developer",    tagline: "Build artifacts, virtualenvs, and toolchains",   icon: "hammer.fill",           color: DS.C.cardTeal,     args: "clean --preset dev --preflight"),
         CleanCategory(title: "Screenshots",  tagline: "Old screenshots accumulating on Desktop",        icon: "camera.viewfinder",     color: DS.C.cardBark,     args: "screenshots --limit 30 --days 7"),
         CleanCategory(title: "Trash",        tagline: "Files waiting in macOS Trash",                   icon: "trash.fill",            color: DS.C.cardCharcoal, args: "trash"),
     ]
@@ -282,6 +282,7 @@ struct SidebarView: View {
                         }
                         SidebarSection("REPORT") {
                             NavRow("camera.fill",             "Snapshot",    .run(title: "Snapshot",  args: "snapshot"), state)
+                            NavRow("checkmark.shield.fill",   "Preflight",   .run(title: "Clean Preflight", args: "clean --preset dev --preflight"), state)
                             NavRow("doc.text.fill",           "Report",      .run(title: "Redacted Report", args: "report --redact"), state)
                             NavRow("clock.fill",              "History",     .run(title: "History",   args: "history"), state)
                             NavRow("shield.fill",             "Protected",   .run(title: "Protected", args: "protect"), state)
@@ -293,7 +294,7 @@ struct SidebarView: View {
 
                 Rectangle().fill(DS.C.dividerOnDark).frame(height: 1)
                 HStack {
-                    Text(state.cliPath.isEmpty ? "CLI not found" : "v0.58.0")
+                    Text(state.cliPath.isEmpty ? "CLI not found" : "v0.59.0")
                         .font(DS.T.tag)
                         .foregroundColor(DS.C.textOnDark.opacity(0.35))
                     Spacer()

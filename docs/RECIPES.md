@@ -52,6 +52,7 @@ cleanroom categories
 cleanroom rules
 cleanroom init-config
 cleanroom clean
+cleanroom clean --preset dev --preflight
 ```
 
 `cleanroom clean` is a dry-run. Add `--apply` only after reviewing the preview.
@@ -136,6 +137,8 @@ cleanroom permissions --json
 `system-data --json` emits grouped System Data buckets with sizes, safety categories, and next-step commands.
 
 `plan --json` emits ranked cleanup recommendations with estimated reclaim size, preview commands, and explicit apply commands.
+
+`clean --preflight --json` emits selected cleanup categories, safety levels, recovery limits, and warnings without scanning or deleting files. Use it to build GUI confirmations or review risky opt-in flags before `--apply`.
 
 `large --json [PATH]` emits large files above `--min-mb` for review. It is intentionally review-only and does not delete anything.
 
@@ -223,6 +226,7 @@ cleanroom permissions --json
 
 ```sh
 cleanroom clean --preset dev
+cleanroom clean --preset dev --preflight
 cleanroom clean --preset dev --apply
 cleanroom clean --preset dev --apply --trash
 ```

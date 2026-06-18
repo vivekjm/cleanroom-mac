@@ -733,6 +733,21 @@ rm -f "$json_file"
 
 dry_run_output="$("$BIN" clean --preset dev 2>&1)"
 grep 'Dry-run mode' <<<"$dry_run_output" >/dev/null
+preflight_output="$("$BIN" clean --preset dev --preflight)"
+grep 'cleanroom clean preflight' <<<"$preflight_output" >/dev/null
+grep 'app-caches' <<<"$preflight_output" >/dev/null
+grep 'node-modules' <<<"$preflight_output" >/dev/null
+preflight_json="$(mktemp)"
+"$BIN" clean --preset deep --include-ai-models --include-containers --include-user-trash --apply --trash --yes --preflight --json > "$preflight_json"
+python3 -m json.tool "$preflight_json" >/dev/null
+grep '"apply":true' "$preflight_json" >/dev/null
+grep '"trash":true' "$preflight_json" >/dev/null
+grep '"id":"containers"' "$preflight_json" >/dev/null
+grep '"id":"user-trash"' "$preflight_json" >/dev/null
+grep '"safety":"irreversible"' "$preflight_json" >/dev/null
+grep 'Container cleanup can remove local containers' "$preflight_json" >/dev/null
+grep 'User Trash cleanup is irreversible' "$preflight_json" >/dev/null
+rm -f "$preflight_json"
 
 deep_output="$("$BIN" clean --include-ai-workspaces --include-ai-models --include-containers 2>&1)"
 grep 'Dry-run mode' <<<"$deep_output" >/dev/null

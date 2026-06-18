@@ -1,4 +1,4 @@
-.TH CLEANROOM 1 "June 2026" "cleanroom 0.58.0" "User Commands"
+.TH CLEANROOM 1 "June 2026" "cleanroom 0.59.0" "User Commands"
 .SH NAME
 cleanroom \- safe-by-default macOS storage cleaner
 .SH SYNOPSIS
@@ -144,7 +144,7 @@ cleanroom \- safe-by-default macOS storage cleaner
 .RI "report [--output path] [--redact]"
 .br
 .B cleanroom
-.RI "clean [options]"
+.RI "clean [options] [--preflight] [--json]"
 .br
 .B cleanroom
 .RI "history [--limit n]"
@@ -348,7 +348,10 @@ Generate a Markdown cleanup report. Use
 before sharing publicly to mask home, user, and temporary paths.
 .TP
 .B clean
-Preview or apply cleanup.
+Preview or apply cleanup. Use
+.B --preflight
+to summarize selected cleanup categories, warnings, and recovery limits without
+scanning or deleting files.
 .TP
 .B history
 List recent apply logs.
@@ -489,6 +492,8 @@ cleanroom report --output cleanroom-report.md
 cleanroom report --redact --output cleanroom-report.md
 cleanroom doctor --json
 cleanroom clean --preset dev
+cleanroom clean --preset dev --preflight
+cleanroom clean --preset dev --preflight --json
 cleanroom clean --preset dev --apply --trash
 cleanroom clean --include-user-trash --apply
 cleanroom history
