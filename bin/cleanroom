@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.52.0"
+VERSION="0.53.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -66,6 +66,7 @@ Usage:
   cleanroom nodes [PATH] [--days N] [--limit N] [--json]
   cleanroom venvs [PATH] [--days N] [--limit N] [--json]
   cleanroom apps [PATH] [--limit N] [--json]
+  cleanroom uninstallers [PATH] [--limit N] [--json]
   cleanroom appdata [--limit N] [--json]
   cleanroom libraries [--json]
   cleanroom cloud [--json]
@@ -121,6 +122,7 @@ Actions:
   nodes                List stale node_modules folders for review.
   venvs                List stale Python virtualenv folders for review.
   apps                 List largest app bundles for review without uninstalling.
+  uninstallers         List vendor uninstallers and remover tools for review.
   appdata              Rank large app support, container, and group container folders.
   libraries            Inventory protected media and creative libraries.
   cloud                Inventory protected cloud-sync storage locations.
@@ -159,7 +161,7 @@ Options:
   --yes                Do not prompt before --apply cleanup.
   --verbose            Print every path touched.
   --json               Emit JSON for overview, map, snapshot, diff, state, permissions, review, scan, system-data, plan, large, duplicates,
-                       documents, desktop, screenshots, archives, downloads, installers, nodes, venvs, apps, appdata, libraries, cloud, personal, communications,
+                       documents, desktop, screenshots, archives, downloads, installers, nodes, venvs, apps, uninstallers, appdata, libraries, cloud, personal, communications,
                        browsers, leftovers, startup,
                        trash, backups, xcode, caches, diagnostics, packages, receipts, homebrew, toolchains,
                        containers, android, snapshots, doctor, protect, guard, or rules.
@@ -257,6 +259,8 @@ Examples:
   cleanroom venvs --json ~/Documents
   cleanroom apps
   cleanroom apps --json /Applications
+  cleanroom uninstallers
+  cleanroom uninstallers --json
   cleanroom appdata
   cleanroom appdata --json
   cleanroom libraries
@@ -1339,6 +1343,7 @@ map_rows() {
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "media" "Media Libraries" "$HOME/Pictures; $HOME/Music; $HOME/Movies" "protected" "cleanroom libraries" "Photos, music, videos, and creative projects."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "communications" "Mail and Messages" "$HOME/Library/Mail; $HOME/Library/Mail Downloads; $HOME/Library/Containers/com.apple.mail/Data/Library/Mail Downloads; $HOME/Library/Messages" "protected" "cleanroom communications" "Mail, chats, and communication attachments are protected."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "developer" "Developer Data" "$HOME/Library/Developer; $HOME/Library/Android; $HOME/.android" "mixed" "cleanroom system-data" "Xcode, simulators, Android SDKs, and emulator data."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "uninstallers" "Vendor Uninstallers" "/Applications; $HOME/Applications; /Applications/Utilities; Application Support" "review" "cleanroom uninstallers --limit 50" "Vendor uninstallers, remover apps, and scripts. Review before manual leftover cleanup."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "packages" "Package Stores" "$HOME/.npm; $HOME/.yarn; $HOME/Library/pnpm; $HOME/.gradle; $HOME/.cocoapods; $HOME/.cargo" "rebuildable" "cleanroom packages" "Package-manager caches and stores."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "receipts" "Package Receipts" "/var/db/receipts; /Library/Receipts; $HOME/Library/Receipts" "review" "cleanroom receipts --limit 50" "macOS package installer records. Useful for uninstall investigations; not cleanup targets."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "toolchains" "Toolchains" "$HOME/go; $HOME/.cache/uv; $HOME/.m2; $HOME/.bundle; $HOME/Library/Caches/pip; $HOME/Library/Caches/org.swift.swiftpm" "rebuildable" "cleanroom toolchains" "Language and build-tool caches."
@@ -2387,6 +2392,111 @@ apps() {
   while IFS=$'\t' read -r kb name path; do
     [[ -z "${path:-}" ]] && continue
     printf '%8s  %s\n  %s\n' "$(human_kb "$kb")" "$name" "$path"
+  done <<<"$rows"
+}
+
+uninstaller_roots() {
+  if [[ "${#PATH_ARGS[@]}" -gt 0 ]]; then
+    local path
+    for path in "${PATH_ARGS[@]}"; do
+      printf '%s\t%s\n' "custom" "$(expand_path "$path")"
+    done
+  else
+    printf '%s\t%s\n' "applications" "/Applications"
+    printf '%s\t%s\n' "user-applications" "$HOME/Applications"
+    printf '%s\t%s\n' "utilities" "/Applications/Utilities"
+    printf '%s\t%s\n' "app-support" "$HOME/Library/Application Support"
+    printf '%s\t%s\n' "local-app-support" "/Library/Application Support"
+  fi
+}
+
+uninstaller_kind() {
+  local path="$1" base
+  base="$(basename "$path")"
+  if [[ -d "$path" && "$base" == *.app ]]; then
+    printf 'app'
+  elif [[ -f "$path" && "$base" == *.pkg ]]; then
+    printf 'pkg'
+  elif [[ -f "$path" && "$base" == *.command ]]; then
+    printf 'command'
+  elif [[ -f "$path" && "$base" == *.tool ]]; then
+    printf 'tool'
+  elif [[ -f "$path" && "$base" == *.sh ]]; then
+    printf 'script'
+  else
+    printf 'file'
+  fi
+}
+
+uninstaller_open_command() {
+  local path="$1" kind="$2"
+  case "$kind" in
+    app|pkg) printf 'open %s' "$(shell_quote "$path")" ;;
+    *) printf 'open -R %s' "$(shell_quote "$path")" ;;
+  esac
+}
+
+uninstaller_rows() {
+  local root_id root path kb epoch kind name
+  while IFS=$'\t' read -r root_id root; do
+    [[ -d "$root" ]] || continue
+    while IFS= read -r -d '' path; do
+      name="$(basename "$path")"
+      kind="$(uninstaller_kind "$path")"
+      kb="$(size_kb "$path")"
+      epoch="$(path_mtime_epoch "$path")"
+      printf '%012d\t%012d\t%s\t%s\t%s\t%s\n' "$kb" "$epoch" "$kind" "$root_id" "$name" "$path"
+    done < <(find "$root" -maxdepth 6 \( -type d -name '*.app' -o -type f \) \( -iname '*uninstall*' -o -iname '*uninstaller*' -o -iname '*remove*' \) -print0 2>/dev/null)
+  done < <(uninstaller_roots) | sort -t $'\t' -k1,1rn -k2,2rn | head -n "$LIMIT"
+}
+
+uninstallers() {
+  local rows
+  rows="$(uninstaller_rows)"
+
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '['
+    local first=1 kb epoch kind root_id name path kb_num epoch_num launch guidance
+    while IFS=$'\t' read -r kb epoch kind root_id name path; do
+      [[ -z "${path:-}" ]] && continue
+      kb_num="$(printf '%s\n' "$kb" | sed 's/^0*//; s/^$/0/')"
+      epoch_num="$(printf '%s\n' "${epoch:-0}" | sed 's/^0*//; s/^$/0/')"
+      launch="$(uninstaller_open_command "$path" "$kind")"
+      guidance="Use vendor uninstallers before cleaning leftovers. cleanroom only inventories these tools."
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '{"name":"%s","kind":"%s","root":"%s","path":"%s","size_kb":%s,"size":"%s","modified_epoch":%s,"modified":"%s","launch_command":"%s","guidance":"%s"}' \
+        "$(printf '%s' "$name" | json_escape)" \
+        "$(printf '%s' "$kind" | json_escape)" \
+        "$(printf '%s' "$root_id" | json_escape)" \
+        "$(printf '%s' "$path" | json_escape)" \
+        "$kb_num" \
+        "$(human_kb "${kb:-0}" | json_escape)" \
+        "${epoch_num:-0}" \
+        "$(file_mtime_iso "${epoch_num:-0}" | json_escape)" \
+        "$(printf '%s' "$launch" | json_escape)" \
+        "$(printf '%s' "$guidance" | json_escape)"
+    done <<<"$rows"
+    printf ']\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}cleanroom vendor uninstallers${RESET}"
+  printf 'Review-only inventory. cleanroom does not run, unload, disable, or remove uninstallers.\n'
+  printf 'Use official/vendor uninstallers before cleaning app leftovers manually.\n'
+  printf 'Limit: %s\n\n' "$LIMIT"
+  if [[ -z "$rows" ]]; then
+    printf 'No matching uninstallers found in readable search folders.\n'
+    return 0
+  fi
+  printf '%-10s %-9s %-12s %-18s %s\n' "size" "kind" "modified" "root" "name"
+  local kb epoch kind root_id name path epoch_num
+  while IFS=$'\t' read -r kb epoch kind root_id name path; do
+    [[ -z "${path:-}" ]] && continue
+    epoch_num="$(printf '%s\n' "${epoch:-0}" | sed 's/^0*//; s/^$/0/')"
+    printf '%-10s %-9s %-12s %-18s %s\n' "$(human_kb "$kb")" "$kind" "$(file_mtime_iso "${epoch_num:-0}")" "$root_id" "$name"
+    printf '  path: %s\n' "$path"
+    printf '  launch: %s\n' "$(uninstaller_open_command "$path" "$kind")"
   done <<<"$rows"
 }
 
@@ -4059,6 +4169,7 @@ overview() {
   printf 'cleanroom downloads --days 30 --limit 50\n'
   printf 'cleanroom venvs --days 30 --limit 50\n'
   printf 'cleanroom appdata --limit 30\n'
+  printf 'cleanroom uninstallers --limit 50\n'
   printf 'cleanroom libraries\n'
   printf 'cleanroom trash\n'
   printf 'cleanroom startup\n'
@@ -4780,7 +4891,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  overview|map|snapshot|diff|state|permissions|review|scan|system-data|plan|large|duplicates|documents|desktop|screenshots|archives|downloads|installers|nodes|venvs|virtualenvs|apps|appdata|libraries|cloud|personal|communications|comms|browsers|leftovers|backups|xcode|android|startup|trash|caches|diagnostics|packages|receipts|homebrew|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
+  overview|map|snapshot|diff|state|permissions|review|scan|system-data|plan|large|duplicates|documents|desktop|screenshots|archives|downloads|installers|nodes|venvs|virtualenvs|apps|uninstallers|appdata|libraries|cloud|personal|communications|comms|browsers|leftovers|backups|xcode|android|startup|trash|caches|diagnostics|packages|receipts|homebrew|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -4864,7 +4975,7 @@ while [[ "$#" -gt 0 ]]; do
     -h|--help) usage; exit 0 ;;
     -v|--version) echo "$VERSION"; exit 0 ;;
     *)
-      if [[ "$ACTION" == "guard" || "$ACTION" == "diff" || "$ACTION" == "large" || "$ACTION" == "duplicates" || "$ACTION" == "documents" || "$ACTION" == "screenshots" || "$ACTION" == "archives" || "$ACTION" == "nodes" || "$ACTION" == "venvs" || "$ACTION" == "virtualenvs" || "$ACTION" == "apps" || "$ACTION" == "leftovers" ]]; then
+      if [[ "$ACTION" == "guard" || "$ACTION" == "diff" || "$ACTION" == "large" || "$ACTION" == "duplicates" || "$ACTION" == "documents" || "$ACTION" == "screenshots" || "$ACTION" == "archives" || "$ACTION" == "nodes" || "$ACTION" == "venvs" || "$ACTION" == "virtualenvs" || "$ACTION" == "apps" || "$ACTION" == "uninstallers" || "$ACTION" == "leftovers" ]]; then
         PATH_ARGS+=("$1")
       else
         die "Unknown option: $1"
@@ -4896,6 +5007,7 @@ case "$ACTION" in
   nodes) nodes ;;
   venvs|virtualenvs) venvs ;;
   apps) apps ;;
+  uninstallers) uninstallers ;;
   appdata) appdata ;;
   libraries) libraries ;;
   cloud) cloud ;;

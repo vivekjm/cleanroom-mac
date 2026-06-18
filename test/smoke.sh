@@ -82,6 +82,7 @@ mkdir -p \
   "$TEST_HOME/.Trash" \
   "$TEST_HOME/.Trash/cleanroom-test-run" \
   "$TEST_HOME/Applications/FakeBig.app/Contents/MacOS" \
+  "$TEST_HOME/Applications/Cleanroom Test Uninstaller.app/Contents/MacOS" \
   "$TEST_HOME/Desktop" \
   "$TEST_HOME/Downloads" \
   "$TEST_HOME/Documents/duplicates" \
@@ -205,6 +206,7 @@ touch -t 202001010000 "$TEST_HOME/Downloads/old-package.pkg"
 dd if=/dev/zero of="$TEST_HOME/Documents/duplicates/copy-a.bin" bs=1024 count=2048 >/dev/null 2>&1
 cp "$TEST_HOME/Documents/duplicates/copy-a.bin" "$TEST_HOME/Documents/duplicates/copy-b.bin"
 dd if=/dev/zero of="$TEST_HOME/Applications/FakeBig.app/Contents/MacOS/fake" bs=1024 count=2048 >/dev/null 2>&1
+printf 'uninstaller\n' >"$TEST_HOME/Applications/Cleanroom Test Uninstaller.app/Contents/MacOS/uninstall"
 export HOME="$TEST_HOME"
 
 bash -n "$BIN"
@@ -305,6 +307,7 @@ grep 'desktop-inventory' "$rules_json" >/dev/null
 grep 'screenshots-inventory' "$rules_json" >/dev/null
 grep 'archives-inventory' "$rules_json" >/dev/null
 grep 'android-inventory' "$rules_json" >/dev/null
+grep 'uninstallers-inventory' "$rules_json" >/dev/null
 grep 'appdata-inventory' "$rules_json" >/dev/null
 grep 'cloud-inventory' "$rules_json" >/dev/null
 grep 'personal-inventory' "$rules_json" >/dev/null
@@ -413,6 +416,14 @@ apps_json="$(mktemp)"
 python3 -m json.tool "$apps_json" >/dev/null
 grep 'FakeBig' "$apps_json" >/dev/null
 rm -f "$apps_json"
+"$BIN" uninstallers "$HOME/Applications" --limit 10 | grep 'Cleanroom Test Uninstaller' >/dev/null
+uninstallers_json="$(mktemp)"
+"$BIN" uninstallers --json "$HOME/Applications" --limit 10 > "$uninstallers_json"
+python3 -m json.tool "$uninstallers_json" >/dev/null
+grep '"name":"Cleanroom Test Uninstaller.app"' "$uninstallers_json" >/dev/null
+grep '"kind":"app"' "$uninstallers_json" >/dev/null
+grep 'open ' "$uninstallers_json" >/dev/null
+rm -f "$uninstallers_json"
 "$BIN" appdata --limit 20 | grep 'CleanroomTestAdobe' >/dev/null
 appdata_json="$(mktemp)"
 "$BIN" appdata --json --limit 20 > "$appdata_json"

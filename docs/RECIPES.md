@@ -21,6 +21,7 @@ cleanroom installers
 cleanroom nodes
 cleanroom venvs
 cleanroom apps
+cleanroom uninstallers
 cleanroom appdata
 cleanroom libraries
 cleanroom cloud
@@ -75,6 +76,7 @@ cleanroom installers --json
 cleanroom nodes --json ~/Documents
 cleanroom venvs --json ~/Documents
 cleanroom apps --json
+cleanroom uninstallers --json
 cleanroom appdata --json
 cleanroom libraries --json
 cleanroom cloud --json
@@ -147,6 +149,8 @@ cleanroom permissions --json
 `venvs --json [PATH]` emits stale Python virtualenv folders with age, size, `pyvenv.cfg` marker path, and the matching preview/apply commands.
 
 `apps --json [PATH]` emits app bundle sizes for `/Applications`, `~/Applications`, or a provided path. It is intentionally review-only and does not uninstall anything.
+
+`uninstallers --json [PATH]` emits likely vendor uninstallers, remover apps, packages, and scripts with path, size, modified date, and launch/reveal command. It is intentionally review-only and does not run or remove these tools.
 
 `appdata --json` emits large top-level app support/container folders with size and guard status. It is intentionally review-only and does not remove app state.
 

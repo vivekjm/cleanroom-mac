@@ -25,6 +25,7 @@ _cleanroom() {
     'nodes:List stale node_modules folders'
     'venvs:List stale Python virtualenv folders'
     'apps:List large app bundles for review'
+    'uninstallers:List vendor uninstallers and remover tools'
     'appdata:Rank large app support and container folders'
     'libraries:Inventory protected media and creative libraries'
     'cloud:Inventory protected cloud-sync storage'

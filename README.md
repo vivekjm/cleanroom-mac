@@ -265,6 +265,14 @@ cleanroom apps --json /Applications
 cleanroom apps ~/Applications --limit 20
 ```
 
+Find vendor uninstallers and remover tools:
+
+```sh
+cleanroom uninstallers
+cleanroom uninstallers ~/Applications --limit 20
+cleanroom uninstallers --json
+```
+
 Review large app data folders:
 
 ```sh
@@ -679,6 +687,8 @@ Config files use simple `key=value` lines and are never executed as shell.
 `venvs` lists stale Python virtualenv folders before you decide whether to run `cleanroom clean --include-venv-stale --apply`. It only treats folders with `pyvenv.cfg` as virtualenv cleanup candidates.
 
 `apps` lists `.app` bundle sizes from `/Applications` and `~/Applications`, or a path you provide. It never uninstalls apps.
+
+`uninstallers` lists likely vendor uninstallers, remover apps, packages, and scripts from common application and Application Support locations, or a path you provide. It never runs or removes them; use these official tools before manual leftover cleanup.
 
 `appdata` ranks top-level Application Support, Containers, Group Containers, HTTPStorages, WebKit, and saved-state folders. It is review-only and includes the central guard status so protected profiles and personal data stand out before you investigate with `leftovers APPNAME`.
 
