@@ -328,6 +328,21 @@ case "${1:-}" in
 esac
 SH
 chmod +x "$TEST_HOME/bin/brew"
+cat >"$TEST_HOME/bin/npm" <<'SH'
+#!/usr/bin/env bash
+if [[ "${1:-}" == "cache" && "${2:-}" == "verify" ]]; then
+  printf 'Cache verified and compressed (~/.npm/_cacache)\n'
+  exit 0
+fi
+if [[ "${1:-}" == "cache" && "${2:-}" == "clean" && "${3:-}" == "--force" ]]; then
+  printf 'npm WARN using --force Recommended protections disabled.\n'
+  printf 'npm cache cleaned\n'
+  printf 'applied\n' >"$HOME/npm-cache-clean-applied"
+  exit 0
+fi
+exit 2
+SH
+chmod +x "$TEST_HOME/bin/npm"
 export HOME="$TEST_HOME"
 export PATH="$TEST_HOME/bin:$PATH"
 
@@ -905,6 +920,18 @@ grep 'pnpm-store' "$packages_json" >/dev/null
 grep 'homebrew-cache' "$packages_json" >/dev/null
 grep 'cleanroom clean --apply --trash --include-package-stores' "$packages_json" >/dev/null
 rm -f "$packages_json"
+"$BIN" npm-cache | grep 'Cache verified' >/dev/null
+npm_cache_json="$(mktemp)"
+"$BIN" npm-cache --json > "$npm_cache_json"
+python3 -m json.tool "$npm_cache_json" >/dev/null
+grep '"command":"npm cache verify"' "$npm_cache_json" >/dev/null
+grep 'Cache verified' "$npm_cache_json" >/dev/null
+rm -f "$npm_cache_json"
+npm_cache_log="$(mktemp)"
+rm -f "$npm_cache_log" "$TEST_HOME/npm-cache-clean-applied"
+"$BIN" npm-cache --apply --yes --log "$npm_cache_log" | grep 'npm cache cleaned' >/dev/null
+test -f "$TEST_HOME/npm-cache-clean-applied"
+grep 'npm-cache' "$npm_cache_log" >/dev/null
 "$BIN" receipts --limit 20 | grep 'com.cleanroom.test.pkg' >/dev/null
 receipts_json="$(mktemp)"
 "$BIN" receipts --json --limit 20 > "$receipts_json"

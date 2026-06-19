@@ -1,4 +1,4 @@
-.TH CLEANROOM 1 "June 2026" "cleanroom 0.74.0" "User Commands"
+.TH CLEANROOM 1 "June 2026" "cleanroom 0.75.0" "User Commands"
 .SH NAME
 cleanroom \- safe-by-default macOS storage cleaner
 .SH SYNOPSIS
@@ -151,6 +151,9 @@ cleanroom \- safe-by-default macOS storage cleaner
 .br
 .B cleanroom
 .RI "packages [--json]"
+.br
+.B cleanroom
+.RI "npm-cache [--json] [--apply --yes]"
 .br
 .B cleanroom
 .RI "receipts [--limit n] [--json]"
@@ -389,6 +392,9 @@ Inventory user logs, diagnostic reports, and CrashReporter data.
 .B packages
 Inventory package-manager caches and stores with preview/apply commands.
 .TP
+.B npm-cache
+Run npm's cache verifier, or clean npm cache with --apply.
+.TP
 .B receipts
 Inventory macOS package installer receipts. Receipts are install records, not
 uninstall targets; use vendor uninstallers first, then review matching
@@ -610,6 +616,8 @@ cleanroom trash --json
 cleanroom caches --json
 cleanroom diagnostics --json
 cleanroom packages --json
+cleanroom npm-cache
+cleanroom npm-cache --apply --yes
 cleanroom receipts --json
 cleanroom homebrew --json
 cleanroom homebrew-cleanup

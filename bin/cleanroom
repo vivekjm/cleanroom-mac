@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.74.0"
+VERSION="0.75.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -109,6 +109,7 @@ Usage:
   cleanroom caches [--json]
   cleanroom diagnostics [--json]
   cleanroom packages [--json]
+  cleanroom npm-cache [--json] [--apply --yes]
   cleanroom receipts [--limit N] [--json]
   cleanroom homebrew [--json]
   cleanroom homebrew-cleanup [--json] [--apply --yes]
@@ -179,6 +180,7 @@ Actions:
   caches               Inventory safe and opt-in cache buckets.
   diagnostics          Inventory user logs and diagnostic reports.
   packages             Inventory package-manager caches and stores.
+  npm-cache            Run npm's cache verifier, or clean npm cache with --apply.
   receipts             Inventory macOS package installer receipts.
   homebrew             Inventory Homebrew cache, Cellar, Caskroom, and logs.
   homebrew-cleanup     Run Homebrew's own cleanup dry-run, or apply with --apply.
@@ -205,7 +207,7 @@ Options:
   --json               Emit JSON for overview, map, snapshot, diff, state, permissions, review, scan, system-data, plan, large, brokenlinks, quarantine, metadata, quicklook, fontcaches, webcaches, savedstate, projectcaches, updaters, browsercaches, duplicates,
                        documents, desktop, screenshots, archives, downloads, installers, nodes, venvs, apps, uninstallers, appreview, appdata, libraries, cloud, cloudfiles, personal, communications,
                        browsers, leftovers, startup, loginitems,
-                       trash, backups, xcode, caches, diagnostics, packages, receipts, homebrew, homebrew-cleanup, toolchains,
+                       trash, backups, xcode, caches, diagnostics, packages, npm-cache, receipts, homebrew, homebrew-cleanup, toolchains,
                        containers, android, snapshots, clean --preflight, doctor, protect, guard, or rules.
   --output PATH        Output path for report.
   --redact             Redact home, user, and temporary paths in Markdown reports.
@@ -5557,6 +5559,79 @@ packages() {
   done <<<"$rows"
 }
 
+npm_cache() {
+  local command_label output status
+  if ! command -v npm >/dev/null 2>&1; then
+    if [[ "$JSON" -eq 1 ]]; then
+      printf '{"available":false,"apply":%s,"command":"","exit_code":127,"output":"%s"}\n' \
+        "$(if [[ "$APPLY" -eq 1 ]]; then echo true; else echo false; fi)" \
+        "$(printf '%s' "npm command not found" | json_escape)"
+      return 0
+    fi
+    die "npm command not found"
+  fi
+
+  if [[ "$APPLY" -eq 1 ]]; then
+    command_label="npm cache clean --force"
+  else
+    command_label="npm cache verify"
+  fi
+
+  if [[ "$APPLY" -eq 1 && "$ASSUME_YES" -ne 1 ]]; then
+    if [[ "$JSON" -eq 1 ]]; then
+      printf '{"available":true,"apply":true,"command":"%s","exit_code":2,"output":"%s"}\n' \
+        "$(printf '%s' "$command_label" | json_escape)" \
+        "$(printf '%s' "confirmation required; pass --yes to use --json with --apply" | json_escape)"
+      return 2
+    fi
+    warn "Apply mode enabled for npm cache cleanup."
+    warn "npm cache clean --force removes the npm cache and packages may need to download again."
+    printf 'Continue? Type "clean" to proceed: '
+    local answer
+    IFS= read -r answer
+    [[ "$answer" == "clean" ]] || die "Aborted."
+  fi
+
+  if [[ "$APPLY" -eq 1 ]]; then
+    if output="$(npm cache clean --force 2>&1)"; then
+      status=0
+      record_apply "npm-cache" "ok" "0" "$command_label" ""
+    else
+      status=$?
+      record_apply "npm-cache" "failed" "0" "$command_label" ""
+    fi
+  else
+    if output="$(npm cache verify 2>&1)"; then
+      status=0
+    else
+      status=$?
+    fi
+  fi
+
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '{"available":true,"apply":%s,"command":"%s","exit_code":%s,"output":"%s"}\n' \
+      "$(if [[ "$APPLY" -eq 1 ]]; then echo true; else echo false; fi)" \
+      "$(printf '%s' "$command_label" | json_escape)" \
+      "$status" \
+      "$(printf '%s' "$output" | json_escape)"
+    return "$status"
+  fi
+
+  printf '%s\n' "${BOLD}cleanroom npm cache${RESET}"
+  if [[ "$APPLY" -eq 1 ]]; then
+    printf 'Running: %s\n\n' "$command_label"
+  else
+    warn "Dry-run mode. Pass --apply --yes to run npm cache clean --force."
+    printf 'Running: %s\n\n' "$command_label"
+  fi
+  if [[ -n "$output" ]]; then
+    printf '%s\n' "$output"
+  else
+    printf 'npm reported no cache output.\n'
+  fi
+  return "$status"
+}
+
 receipt_roots() {
   printf '%s\t%s\n' "system-receipts" "/var/db/receipts"
   printf '%s\t%s\n' "local-receipts" "/Library/Receipts"
@@ -6970,7 +7045,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  overview|map|snapshot|diff|state|permissions|review|scan|system-data|plan|large|brokenlinks|quarantine|metadata|quicklook|fontcaches|font-caches|webcaches|web-caches|savedstate|saved-state|projectcaches|project-caches|updaters|updater-caches|browsercaches|browser-caches|duplicates|documents|desktop|screenshots|archives|downloads|installers|nodes|venvs|virtualenvs|apps|uninstallers|appreview|appdata|libraries|cloud|cloudfiles|cloud-files|personal|communications|comms|browsers|leftovers|backups|xcode|android|startup|loginitems|trash|caches|diagnostics|packages|receipts|homebrew|homebrew-cleanup|brewcleanup|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
+  overview|map|snapshot|diff|state|permissions|review|scan|system-data|plan|large|brokenlinks|quarantine|metadata|quicklook|fontcaches|font-caches|webcaches|web-caches|savedstate|saved-state|projectcaches|project-caches|updaters|updater-caches|browsercaches|browser-caches|duplicates|documents|desktop|screenshots|archives|downloads|installers|nodes|venvs|virtualenvs|apps|uninstallers|appreview|appdata|libraries|cloud|cloudfiles|cloud-files|personal|communications|comms|browsers|leftovers|backups|xcode|android|startup|loginitems|trash|caches|diagnostics|packages|npm-cache|npmcache|receipts|homebrew|homebrew-cleanup|brewcleanup|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -7129,6 +7204,7 @@ case "$ACTION" in
   caches) caches ;;
   diagnostics) diagnostics ;;
   packages) packages ;;
+  npm-cache|npmcache) npm_cache ;;
   receipts) receipts ;;
   homebrew) homebrew ;;
   homebrew-cleanup|brewcleanup) homebrew_cleanup ;;

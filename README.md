@@ -942,6 +942,8 @@ Config files use simple `key=value` lines and are never executed as shell.
 
 `packages` inventories npm, Yarn, pnpm, Gradle, CocoaPods, Cargo, and Homebrew stores with preview/apply commands for matching cleanup categories.
 
+`npm-cache` runs npm's native cache workflow. It defaults to `npm cache verify`; add `--apply --yes` to run `npm cache clean --force`. Use this when you want npm's own cache maintenance before or instead of removing known npm cache folders through `cleanroom clean`.
+
 `receipts` inventories macOS package installer receipt records from `/var/db/receipts`, `/Library/Receipts`, and `~/Library/Receipts`. It is useful when investigating software installed by `.pkg` installers, because package IDs often hint at vendor leftovers to inspect next. Cleanroom never removes receipt records.
 
 `homebrew` inventories Homebrew cache, logs, Cellar, Caskroom, and service/runtime folders. It is review-only and points to `cleanroom homebrew-cleanup` for Homebrew-native dry-run detail.

@@ -234,6 +234,8 @@ cleanroom permissions --json
 
 `packages --json` emits package-manager store sizes and matching preview/apply commands.
 
+`npm-cache --json` emits the command, exit code, apply mode, and output from npm's native cache verifier. Use `--apply --yes` to run `npm cache clean --force`.
+
 `receipts --json` emits readable macOS package installer receipt files with package IDs, receipt kind, path, size, modified date, and a matching `cleanroom leftovers <package-id>` review command. Receipts are install records and are never cleanup targets.
 
 `homebrew --json` emits Homebrew cache, log, Cellar, Caskroom, and service/runtime bucket sizes plus installed formula/cask counts when `brew` is available.

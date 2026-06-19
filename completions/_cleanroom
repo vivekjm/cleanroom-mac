@@ -62,6 +62,8 @@ _cleanroom() {
     'caches:Inventory cache buckets'
     'diagnostics:Inventory logs and diagnostic reports'
     'packages:Inventory package-manager stores'
+    'npm-cache:Run npm cache verify or explicit clean'
+    'npmcache:Alias for npm-cache'
     'receipts:Inventory macOS package installer receipts'
     'homebrew:Inventory Homebrew cache, Cellar, Caskroom, and logs'
     'homebrew-cleanup:Run Homebrew cleanup dry-run or apply'
