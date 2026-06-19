@@ -343,6 +343,21 @@ fi
 exit 2
 SH
 chmod +x "$TEST_HOME/bin/npm"
+cat >"$TEST_HOME/bin/pnpm" <<'SH'
+#!/usr/bin/env bash
+if [[ "${1:-}" == "store" && "${2:-}" == "status" ]]; then
+  printf 'Packages in the store are untouched\n'
+  exit 0
+fi
+if [[ "${1:-}" == "store" && "${2:-}" == "prune" ]]; then
+  printf 'Removed all cached metadata files\n'
+  printf 'Removed 3 packages\n'
+  printf 'applied\n' >"$HOME/pnpm-store-prune-applied"
+  exit 0
+fi
+exit 2
+SH
+chmod +x "$TEST_HOME/bin/pnpm"
 export HOME="$TEST_HOME"
 export PATH="$TEST_HOME/bin:$PATH"
 
@@ -918,7 +933,7 @@ packages_json="$(mktemp)"
 python3 -m json.tool "$packages_json" >/dev/null
 grep 'pnpm-store' "$packages_json" >/dev/null
 grep 'homebrew-cache' "$packages_json" >/dev/null
-grep 'cleanroom clean --apply --trash --include-package-stores' "$packages_json" >/dev/null
+grep 'cleanroom pnpm-store --apply --yes' "$packages_json" >/dev/null
 rm -f "$packages_json"
 "$BIN" npm-cache | grep 'Cache verified' >/dev/null
 npm_cache_json="$(mktemp)"
@@ -932,6 +947,18 @@ rm -f "$npm_cache_log" "$TEST_HOME/npm-cache-clean-applied"
 "$BIN" npm-cache --apply --yes --log "$npm_cache_log" | grep 'npm cache cleaned' >/dev/null
 test -f "$TEST_HOME/npm-cache-clean-applied"
 grep 'npm-cache' "$npm_cache_log" >/dev/null
+"$BIN" pnpm-store | grep 'Packages in the store are untouched' >/dev/null
+pnpm_store_json="$(mktemp)"
+"$BIN" pnpm-store --json > "$pnpm_store_json"
+python3 -m json.tool "$pnpm_store_json" >/dev/null
+grep '"command":"pnpm store status"' "$pnpm_store_json" >/dev/null
+grep 'Packages in the store are untouched' "$pnpm_store_json" >/dev/null
+rm -f "$pnpm_store_json"
+pnpm_store_log="$(mktemp)"
+rm -f "$pnpm_store_log" "$TEST_HOME/pnpm-store-prune-applied"
+"$BIN" pnpm-store --apply --yes --log "$pnpm_store_log" | grep 'Removed 3 packages' >/dev/null
+test -f "$TEST_HOME/pnpm-store-prune-applied"
+grep 'pnpm-store' "$pnpm_store_log" >/dev/null
 "$BIN" receipts --limit 20 | grep 'com.cleanroom.test.pkg' >/dev/null
 receipts_json="$(mktemp)"
 "$BIN" receipts --json --limit 20 > "$receipts_json"

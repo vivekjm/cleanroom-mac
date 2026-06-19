@@ -333,7 +333,7 @@ Groups nav items with an all-caps 10px header label.
 │ ██████  ○ Backups            │  ● Ready     [Copy Apply]  [Clear]  [∨]      │
 │ ██████  ○ System Data        │  $ cleanroom overview                        │
 │ ██████                       │  → /Library/Caches: 2.3 GB                  │
-│ ██████  v0.75.0              │                                              │
+│ ██████  v0.76.0              │                                              │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
