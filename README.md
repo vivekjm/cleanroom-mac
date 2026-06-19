@@ -234,6 +234,13 @@ cleanroom webcaches
 cleanroom webcaches --json
 ```
 
+Review saved app window/session state:
+
+```sh
+cleanroom savedstate
+cleanroom savedstate --json
+```
+
 Find exact duplicate files for manual review:
 
 ```sh
@@ -641,6 +648,14 @@ cleanroom clean --include-web-caches
 cleanroom clean --apply --trash --include-web-caches
 ```
 
+Clean saved app window/session state:
+
+```sh
+cleanroom savedstate
+cleanroom clean --include-saved-state
+cleanroom clean --apply --trash --include-saved-state
+```
+
 Empty current user Trash:
 
 ```sh
@@ -742,6 +757,8 @@ Config files use simple `key=value` lines and are never executed as shell.
 
 `--include-web-caches` removes Safari and WebKit cache folders only. It does not remove browsing history, cookies, saved passwords, bookmarks, website data, Keychains, or browser profiles.
 
+`--include-saved-state` removes saved app window/session restoration state. Apps may reopen without previous windows, but documents, app profiles, and account data stay protected.
+
 `--trash` applies to paths that `cleanroom` removes directly. System commands delegated to macOS or developer tools, such as Time Machine snapshot thinning or simulator reset, may still be irreversible.
 
 `restore` only restores entries that were moved by `--trash` and still exist in the cleanroom Trash folder. It skips destinations that already exist.
@@ -797,6 +814,8 @@ Config files use simple `key=value` lines and are never executed as shell.
 `fontcaches` inventories rebuildable user font cache databases that can contribute to System Data or font rendering weirdness. Cleanup is opt-in with `cleanroom clean --include-font-caches`; actual font files stay protected.
 
 `webcaches` inventories Safari and WebKit cache folders that can grow in System Data. Cleanup is opt-in with `cleanroom clean --include-web-caches`; browser history, cookies, bookmarks, website data, passwords, and profiles stay protected.
+
+`savedstate` inventories saved application window/session state under `~/Library/Saved Application State`. Cleanup is opt-in with `cleanroom clean --include-saved-state`; documents and app profiles stay protected.
 
 `duplicates` hashes files above `--min-mb`, groups exact matches, estimates possible reclaim, and never deletes anything.
 

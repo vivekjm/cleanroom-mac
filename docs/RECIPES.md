@@ -21,6 +21,7 @@ cleanroom metadata
 cleanroom quicklook
 cleanroom fontcaches
 cleanroom webcaches
+cleanroom savedstate
 cleanroom duplicates
 cleanroom downloads
 cleanroom installers
@@ -82,6 +83,7 @@ cleanroom metadata --json ~/Documents ~/Downloads
 cleanroom quicklook --json
 cleanroom fontcaches --json
 cleanroom webcaches --json
+cleanroom savedstate --json
 cleanroom duplicates --json ~/Documents
 cleanroom documents --json ~/Documents
 cleanroom desktop --json
@@ -165,6 +167,8 @@ cleanroom permissions --json
 `fontcaches --json` emits rebuildable user font cache database buckets with path, size, existence, and matching cleanup commands. Actual font files are never targeted.
 
 `webcaches --json` emits Safari and WebKit cache buckets with path, size, existence, and matching cleanup commands. Browser history, cookies, bookmarks, passwords, website data, and profiles are never targeted.
+
+`savedstate --json` emits saved application window/session state with path, size, existence, and matching cleanup commands. Documents and app profiles are never targeted.
 
 `duplicates --json [PATH]` emits exact duplicate groups with SHA-256 hashes, paths, and estimated possible reclaim. It is intentionally review-only and does not delete anything.
 
@@ -391,6 +395,17 @@ cleanroom clean --apply --trash --include-web-caches
 ```
 
 Use this when Safari or embedded web views have accumulated cache data. Cleanroom removes cache folders only; it does not remove Safari history, cookies, bookmarks, saved passwords, website data, Keychains, or browser profiles.
+
+## Saved Application State
+
+```sh
+cleanroom savedstate
+cleanroom savedstate --json
+cleanroom clean --include-saved-state
+cleanroom clean --apply --trash --include-saved-state
+```
+
+Use this when apps keep restoring stale windows or when System Data includes saved app state. Cleanroom removes saved window/session state only; documents, app profiles, account data, and preferences stay protected.
 
 ## Applications Storage
 

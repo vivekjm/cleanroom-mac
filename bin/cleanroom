@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.64.0"
+VERSION="0.65.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -39,6 +39,7 @@ INCLUDE_METADATA=0
 INCLUDE_QUICKLOOK=0
 INCLUDE_FONT_CACHES=0
 INCLUDE_WEB_CACHES=0
+INCLUDE_SAVED_STATE=0
 
 RED="$(printf '\033[31m')"
 GREEN="$(printf '\033[32m')"
@@ -68,6 +69,7 @@ Usage:
   cleanroom quicklook [--json]
   cleanroom fontcaches [--json]
   cleanroom webcaches [--json]
+  cleanroom savedstate [--json]
   cleanroom duplicates [PATH] [--min-mb N] [--limit N] [--json]
   cleanroom documents [PATH] [--limit N] [--json]
   cleanroom desktop [--limit N] [--json]
@@ -133,6 +135,7 @@ Actions:
   quicklook            Inventory Quick Look thumbnail and preview caches.
   fontcaches           Inventory rebuildable user font cache databases.
   webcaches            Inventory Safari and WebKit browser cache folders.
+  savedstate           Inventory saved app window/session state.
   duplicates           Find exact duplicate files for review without deleting anything.
   documents            Rank top-level user folders/files for review without deleting anything.
   desktop              Rank top-level Desktop folders/files for review without deleting anything.
@@ -184,7 +187,7 @@ Options:
   --trash              Move deleted files to ~/.Trash/cleanroom-* instead of rm -rf.
   --yes                Do not prompt before --apply cleanup.
   --verbose            Print every path touched.
-  --json               Emit JSON for overview, map, snapshot, diff, state, permissions, review, scan, system-data, plan, large, brokenlinks, quarantine, metadata, quicklook, fontcaches, webcaches, duplicates,
+  --json               Emit JSON for overview, map, snapshot, diff, state, permissions, review, scan, system-data, plan, large, brokenlinks, quarantine, metadata, quicklook, fontcaches, webcaches, savedstate, duplicates,
                        documents, desktop, screenshots, archives, downloads, installers, nodes, venvs, apps, uninstallers, appreview, appdata, libraries, cloud, cloudfiles, personal, communications,
                        browsers, leftovers, startup, loginitems,
                        trash, backups, xcode, caches, diagnostics, packages, receipts, homebrew, toolchains,
@@ -225,6 +228,8 @@ Options:
                        Remove rebuildable user font cache databases. Does not remove fonts.
   --include-web-caches Remove Safari and WebKit cache folders only. Does not remove website data,
                        history, cookies, passwords, bookmarks, or profiles.
+  --include-saved-state
+                       Remove rebuildable saved app window/session state.
   --include-ai-workspaces
                        Remove generated AI-agent workspace state: recordings, scratch, brain,
                        implicit data, and local conversation caches where known.
@@ -280,6 +285,8 @@ Examples:
   cleanroom fontcaches --json
   cleanroom webcaches
   cleanroom webcaches --json
+  cleanroom savedstate
+  cleanroom savedstate --json
   cleanroom duplicates ~/Documents --min-mb 100
   cleanroom duplicates --json ~/Downloads
   cleanroom documents
@@ -503,6 +510,7 @@ load_config() {
       include_quicklook) truthy "$value" && INCLUDE_QUICKLOOK=1 ;;
       include_font_caches) truthy "$value" && INCLUDE_FONT_CACHES=1 ;;
       include_web_caches) truthy "$value" && INCLUDE_WEB_CACHES=1 ;;
+      include_saved_state) truthy "$value" && INCLUDE_SAVED_STATE=1 ;;
       trash) truthy "$value" && TRASH=1 ;;
       log_file) LOG_FILE="$(expand_path "$value")" ;;
       exclude) add_exclude "$value" ;;
@@ -767,6 +775,7 @@ preflight_rows() {
   [[ "$INCLUDE_QUICKLOOK" -eq 1 ]] && printf '%s\t%s\t%s\t%s\n' "quicklook" "Quick Look caches" "rebuildable" "Trash mode can recover direct cache removals when --trash is used."
   [[ "$INCLUDE_FONT_CACHES" -eq 1 ]] && printf '%s\t%s\t%s\t%s\n' "font-caches" "Font cache databases" "rebuildable" "Actual font files stay protected; macOS recreates font caches as needed."
   [[ "$INCLUDE_WEB_CACHES" -eq 1 ]] && printf '%s\t%s\t%s\t%s\n' "web-caches" "Safari/WebKit caches" "rebuildable" "Safari history, cookies, bookmarks, passwords, and profiles stay protected."
+  [[ "$INCLUDE_SAVED_STATE" -eq 1 ]] && printf '%s\t%s\t%s\t%s\n' "saved-state" "Saved Application State" "rebuildable" "Apps may forget restored windows; app documents and profiles stay protected."
   [[ "$INCLUDE_NODE_STALE" -eq 1 ]] && printf '%s\t%s\t%s\t%s\n' "node-modules" "Stale node_modules" "rebuildable" "Dependencies may need to be installed again."
   [[ "$INCLUDE_VENV_STALE" -eq 1 ]] && printf '%s\t%s\t%s\t%s\n' "python-virtualenvs" "Stale Python virtualenvs" "rebuildable" "Virtualenvs may need to be recreated."
   [[ "$INCLUDE_DEV_HEAVY" -eq 1 ]] && printf '%s\t%s\t%s\t%s\n' "dev-heavy" "Heavy SDK and simulator data" "high-impact" "Some SDKs, symbols, or simulator app state may need reinstalling or resetting."
@@ -1536,6 +1545,81 @@ clean_web_caches() {
   done < <(webcache_specs)
 }
 
+savedstate_specs() {
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "saved-application-state" "Saved Application State" "~/Library/Saved Application State" "rebuildable" "cleanroom savedstate" "cleanroom clean --apply --trash --include-saved-state" "Saved app window/session restoration state. Apps may reopen without their previous windows; documents and app profiles are not removed."
+}
+
+savedstate_rows() {
+  local id title path_template category preview apply description path kb
+  while IFS=$'\t' read -r id title path_template category preview apply description; do
+    [[ -z "${id:-}" ]] && continue
+    path="$(expand_path "$path_template")"
+    kb="$(size_kb "$path")"
+    printf '%012d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$kb" "$id" "$title" "$path" "$category" "$preview" "$apply" "$description"
+  done < <(savedstate_specs) | sort -rn
+}
+
+savedstate_total_kb() {
+  local total=0 kb id title path category preview apply description kb_num
+  while IFS=$'\t' read -r kb id title path category preview apply description; do
+    [[ -z "${id:-}" ]] && continue
+    kb_num="$(printf '%s\n' "${kb:-0}" | sed 's/^0*//; s/^$/0/')"
+    total=$((total + kb_num))
+  done < <(savedstate_rows)
+  printf '%s\n' "$total"
+}
+
+savedstate() {
+  local rows
+  rows="$(savedstate_rows)"
+
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '['
+    local first=1 kb id title path category preview apply description kb_num
+    while IFS=$'\t' read -r kb id title path category preview apply description; do
+      [[ -z "${id:-}" ]] && continue
+      kb_num="$(printf '%s\n' "${kb:-0}" | sed 's/^0*//; s/^$/0/')"
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '{"id":"%s","title":"%s","path":"%s","exists":%s,"category":"%s","size_kb":%s,"size":"%s","preview_command":"%s","apply_command":"%s","description":"%s"}' \
+        "$(printf '%s' "$id" | json_escape)" \
+        "$(printf '%s' "$title" | json_escape)" \
+        "$(printf '%s' "$path" | json_escape)" \
+        "$(if [[ -e "$path" ]]; then echo true; else echo false; fi)" \
+        "$(printf '%s' "$category" | json_escape)" \
+        "$kb_num" \
+        "$(human_kb "${kb:-0}" | json_escape)" \
+        "$(printf '%s' "$preview" | json_escape)" \
+        "$(printf '%s' "$apply" | json_escape)" \
+        "$(printf '%s' "$description" | json_escape)"
+    done <<<"$rows"
+    printf ']\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}cleanroom saved application state${RESET}"
+  printf 'Review-only inventory. Cleanup is opt-in with --include-saved-state and does not remove documents or app profile data.\n\n'
+  printf '%-10s %-26s %s\n' "size" "bucket" "path"
+  local kb id title path category preview apply description
+  while IFS=$'\t' read -r kb id title path category preview apply description; do
+    [[ -z "${id:-}" ]] && continue
+    printf '%-10s %-26s %s\n' "$(human_kb "$kb")" "$title" "$path"
+    printf '  %s\n' "$description"
+  done <<<"$rows"
+  printf '\nPreview cleanup with: cleanroom clean --include-saved-state\n'
+  printf 'Apply cleanup with: cleanroom clean --apply --trash --include-saved-state\n'
+}
+
+clean_saved_state() {
+  [[ "$INCLUDE_SAVED_STATE" -eq 1 ]] || return 0
+  log "${BOLD}Saved Application State${RESET}"
+  local id title path_template category preview apply description
+  while IFS=$'\t' read -r id title path_template category preview apply description; do
+    [[ -z "${id:-}" ]] && continue
+    run_rm "$path_template"
+  done < <(savedstate_specs)
+}
+
 clean_dev_heavy() {
   [[ "$INCLUDE_DEV_HEAVY" -eq 1 ]] || return 0
   log "${BOLD}Heavy developer artifacts${RESET}"
@@ -1729,7 +1813,7 @@ system_data_rows() {
   printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "personal-data" "Personal App Data" "~/Library/Mail; ~/Library/Messages; ~/Library/Application Support/AddressBook; ~/Library/Calendars; ~/Library/Group Containers/group.com.apple.notes; ~/Library/Group Containers/group.com.apple.reminders; ~/Library/Group Containers/group.com.apple.VoiceMemos.shared" "protected" "cleanroom personal" "manual review" "Mail, Messages, Contacts, Calendars, Notes, Reminders, and Voice Memos are protected personal data."
   printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "group-containers" "Group Containers" "~/Library/Group Containers" "review" "cleanroom leftovers APPNAME" "manual review" "Shared app containers can hold account data and should be reviewed by app or vendor."
   printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "http-storages" "HTTPStorages" "~/Library/HTTPStorages" "review" "cleanroom leftovers APPNAME" "manual review" "Per-app HTTP storage and cookies. Review carefully; cleanroom does not remove this wholesale."
-  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "saved-state" "Saved Application State" "~/Library/Saved Application State" "review" "cleanroom leftovers APPNAME" "manual review" "Window/session state for apps. Usually small, but useful when investigating leftovers."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "saved-state" "Saved Application State" "~/Library/Saved Application State" "rebuildable" "cleanroom savedstate" "cleanroom clean --apply --trash --include-saved-state" "Window/session restoration state for apps. Apps can recreate it; documents and app profiles stay protected."
 }
 
 system_data() {
@@ -4668,6 +4752,7 @@ cache_rows() {
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "quicklook-caches" "quicklook" "Quick Look thumbnail and preview cache paths" "cleanroom quicklook" "cleanroom clean --apply --trash --include-quicklook" "Quick Look thumbnails and preview cache data. macOS rebuilds it as needed."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "font-caches" "font-caches" "Apple Type Services and Font Registry user cache paths" "cleanroom fontcaches" "cleanroom clean --apply --trash --include-font-caches" "Rebuildable user font cache databases. Actual fonts stay protected."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "web-caches" "web-caches" "Safari and WebKit cache paths" "cleanroom webcaches" "cleanroom clean --apply --trash --include-web-caches" "Safari/WebKit cache folders only; history, cookies, bookmarks, passwords, website data, and profiles stay protected."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "saved-state" "saved-state" "~/Library/Saved Application State" "cleanroom savedstate" "cleanroom clean --apply --trash --include-saved-state" "Saved app window/session restoration state. Documents and app profiles stay protected."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "safe-app-caches" "app-caches" "known nested app cache folders" "cleanroom clean --include-app-caches" "cleanroom clean --apply --trash --include-app-caches" "Nested cache folders for apps such as Chrome, Brave, Edge, Arc, VS Code, Cursor, Slack, Comet, and Trae. Profiles, passwords, cookies, bookmarks, and settings stay protected."
 }
 
@@ -5377,7 +5462,7 @@ snapshots() {
 }
 
 plan_rows() {
-  local safe package toolchain app installers metadata_total quicklook_total fontcache_total webcache_total node venv dev diagnostics ai_workspaces ai_models containers user_trash
+  local safe package toolchain app installers metadata_total quicklook_total fontcache_total webcache_total savedstate_total node venv dev diagnostics ai_workspaces ai_models containers user_trash
   safe="$(sum_existing_kb \
     "~/Library/Caches" "~/.cache" "~/.npm/_cacache" "~/.npm/_logs" "~/.npm/_npx" \
     "~/.yarn/cache" "~/.yarn/berry" "~/.gradle/caches" "~/.gradle/daemon" \
@@ -5392,6 +5477,7 @@ plan_rows() {
   quicklook_total="$(quicklook_total_kb)"
   fontcache_total="$(fontcache_total_kb)"
   webcache_total="$(webcache_total_kb)"
+  savedstate_total="$(savedstate_total_kb)"
   node="$(stale_node_kb)"
   venv="$(stale_venv_kb)"
   dev="$(sum_existing_kb \
@@ -5412,6 +5498,7 @@ plan_rows() {
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$quicklook_total" "quicklook" "Quick Look caches" "cleanroom quicklook" "cleanroom clean --apply --trash --include-quicklook" "Rebuildable Quick Look thumbnail and preview caches."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$fontcache_total" "font-caches" "Font cache databases" "cleanroom fontcaches" "cleanroom clean --apply --trash --include-font-caches" "Rebuildable Apple Type Services and font registry caches. Actual font files stay protected."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$webcache_total" "web-caches" "Safari/WebKit caches" "cleanroom webcaches" "cleanroom clean --apply --trash --include-web-caches" "Rebuildable Safari and WebKit cache folders. Browser history, cookies, bookmarks, passwords, website data, and profiles stay protected."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$savedstate_total" "saved-state" "Saved Application State" "cleanroom savedstate" "cleanroom clean --apply --trash --include-saved-state" "Rebuildable app window/session restoration state. Documents and app profiles stay protected."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$package" "package-stores" "Package-manager stores" "cleanroom clean --include-package-stores" "cleanroom clean --apply --trash --include-package-stores" "Rebuildable package stores such as pnpm, CocoaPods, Cargo, and Gradle-related stores."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$toolchain" "toolchains" "Language toolchain caches" "cleanroom toolchains" "cleanroom clean --apply --trash --include-toolchains" "Rebuildable caches for Go, Python, SwiftPM, Maven, Composer, RubyGems, Bundler, uv, and Poetry."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$node" "node-stale" "Stale node_modules" "cleanroom clean --include-node-stale --days $DAYS" "cleanroom clean --apply --trash --include-node-stale --days $DAYS" "node_modules older than $DAYS days under Desktop, Documents, and Downloads."
@@ -5884,6 +5971,7 @@ include_metadata=false
 include_quicklook=false
 include_font_caches=false
 include_web_caches=false
+include_saved_state=false
 
 # Apply safety
 trash=false
@@ -5919,6 +6007,7 @@ interactive() {
   ask_yes_no "Include Quick Look thumbnail caches?" && INCLUDE_QUICKLOOK=1
   ask_yes_no "Include user font cache databases?" && INCLUDE_FONT_CACHES=1
   ask_yes_no "Include Safari and WebKit cache folders?" && INCLUDE_WEB_CACHES=1
+  ask_yes_no "Include saved app window/session state?" && INCLUDE_SAVED_STATE=1
   ask_yes_no "Include stale node_modules older than ${DAYS} days?" && INCLUDE_NODE_STALE=1
   ask_yes_no "Include stale Python virtualenvs older than ${DAYS} days?" && INCLUDE_VENV_STALE=1
   ask_yes_no "Include heavy SDK/simulator cleanup?" && INCLUDE_DEV_HEAVY=1
@@ -5981,6 +6070,10 @@ Default safe cleanup:
   Safari and WebKit cache folders only. History, cookies, passwords, bookmarks,
   website data, Keychains, and browser profiles are never removed.
 
+--include-saved-state:
+  Saved app window/session restoration state. Apps may reopen without their
+  previous windows, but documents and app profiles are never removed.
+
 --include-dev-heavy:
   Xcode device support, unavailable simulators, simulator app data, Android NDK,
   and Android system images.
@@ -6039,6 +6132,7 @@ clean() {
   clean_quicklook
   clean_font_caches
   clean_web_caches
+  clean_saved_state
   clean_node_stale
   clean_venv_stale
   clean_snapshots
@@ -6085,7 +6179,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  overview|map|snapshot|diff|state|permissions|review|scan|system-data|plan|large|brokenlinks|quarantine|metadata|quicklook|fontcaches|font-caches|webcaches|web-caches|duplicates|documents|desktop|screenshots|archives|downloads|installers|nodes|venvs|virtualenvs|apps|uninstallers|appreview|appdata|libraries|cloud|cloudfiles|cloud-files|personal|communications|comms|browsers|leftovers|backups|xcode|android|startup|loginitems|trash|caches|diagnostics|packages|receipts|homebrew|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
+  overview|map|snapshot|diff|state|permissions|review|scan|system-data|plan|large|brokenlinks|quarantine|metadata|quicklook|fontcaches|font-caches|webcaches|web-caches|savedstate|saved-state|duplicates|documents|desktop|screenshots|archives|downloads|installers|nodes|venvs|virtualenvs|apps|uninstallers|appreview|appdata|libraries|cloud|cloudfiles|cloud-files|personal|communications|comms|browsers|leftovers|backups|xcode|android|startup|loginitems|trash|caches|diagnostics|packages|receipts|homebrew|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -6170,6 +6264,7 @@ while [[ "$#" -gt 0 ]]; do
     --include-quicklook) INCLUDE_QUICKLOOK=1 ;;
     --include-font-caches|--include-fontcaches) INCLUDE_FONT_CACHES=1 ;;
     --include-web-caches|--include-webcaches) INCLUDE_WEB_CACHES=1 ;;
+    --include-saved-state|--include-savedstate) INCLUDE_SAVED_STATE=1 ;;
     --include-gemini) INCLUDE_GEMINI=1; INCLUDE_AI_WORKSPACES=1 ;;
     --include-lmstudio) INCLUDE_LMSTUDIO=1; INCLUDE_AI_MODELS=1 ;;
     -h|--help) usage; exit 0 ;;
@@ -6203,6 +6298,7 @@ case "$ACTION" in
   quicklook) quicklook ;;
   fontcaches|font-caches) fontcaches ;;
   webcaches|web-caches) webcaches ;;
+  savedstate|saved-state) savedstate ;;
   duplicates) duplicates ;;
   documents) documents ;;
   desktop) desktop ;;

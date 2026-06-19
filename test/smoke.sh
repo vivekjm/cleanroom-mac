@@ -37,6 +37,7 @@ mkdir -p \
   "$TEST_HOME/Library/Containers/com.apple.Safari/Data/Library/WebKit/NetworkCache" \
   "$TEST_HOME/Library/Containers/com.apple.Safari/Data/Library/Safari" \
   "$TEST_HOME/Library/Logs/Homebrew" \
+  "$TEST_HOME/Library/Saved Application State/com.example.Test.savedState" \
   "$TEST_HOME/Library/Receipts" \
   "$TEST_HOME/.bundle/cache" \
   "$TEST_HOME/Library/DiagnosticReports" \
@@ -133,6 +134,7 @@ printf 'quicklook agent container\n' >"$TEST_HOME/Library/Containers/com.apple.q
 printf 'safari container cache\n' >"$TEST_HOME/Library/Containers/com.apple.Safari/Data/Library/Caches/cache.db"
 printf 'safari webkit cache\n' >"$TEST_HOME/Library/Containers/com.apple.Safari/Data/Library/WebKit/NetworkCache/cache.db"
 printf 'safari container history\n' >"$TEST_HOME/Library/Containers/com.apple.Safari/Data/Library/Safari/History.db"
+printf 'saved state\n' >"$TEST_HOME/Library/Saved Application State/com.example.Test.savedState/window.plist"
 printf 'brew log\n' >"$TEST_HOME/Library/Logs/Homebrew/build.log"
 printf 'receipt plist\n' >"$TEST_HOME/Library/Receipts/com.cleanroom.test.pkg.plist"
 printf 'receipt bom\n' >"$TEST_HOME/Library/Receipts/com.cleanroom.test.pkg.bom"
@@ -345,6 +347,7 @@ grep 'personal-data' "$system_data_json" >/dev/null
 grep 'quicklook' "$system_data_json" >/dev/null
 grep 'font-caches' "$system_data_json" >/dev/null
 grep 'web-caches' "$system_data_json" >/dev/null
+grep 'saved-state' "$system_data_json" >/dev/null
 grep '"category":"protected"' "$system_data_json" >/dev/null
 grep 'cleanroom containers' "$system_data_json" >/dev/null
 rm -f "$system_data_json"
@@ -370,6 +373,7 @@ grep 'metadata-clutter' "$rules_json" >/dev/null
 grep 'quicklook-caches' "$rules_json" >/dev/null
 grep 'font-caches' "$rules_json" >/dev/null
 grep 'web-caches' "$rules_json" >/dev/null
+grep 'saved-state' "$rules_json" >/dev/null
 grep 'screenshots-inventory' "$rules_json" >/dev/null
 grep 'archives-inventory' "$rules_json" >/dev/null
 grep 'android-inventory' "$rules_json" >/dev/null
@@ -407,6 +411,7 @@ grep 'cleanroom metadata --apply --trash' "$plan_json" >/dev/null
 grep 'cleanroom clean --apply --trash --include-quicklook' "$plan_json" >/dev/null
 grep 'cleanroom clean --apply --trash --include-font-caches' "$plan_json" >/dev/null
 grep 'cleanroom clean --apply --trash --include-web-caches' "$plan_json" >/dev/null
+grep 'cleanroom clean --apply --trash --include-saved-state' "$plan_json" >/dev/null
 rm -f "$plan_json"
 "$BIN" large "$HOME/Downloads" --min-mb 1 --limit 5 | grep 'big-test.bin' >/dev/null
 large_json="$(mktemp)"
@@ -503,6 +508,21 @@ grep $'\ttrash\tok\t' "$webcaches_log" >/dev/null
 "$BIN" restore --log "$webcaches_log" --apply --yes >/dev/null
 test -e "$TEST_HOME/Library/Caches/com.apple.Safari"
 test -e "$TEST_HOME/Library/Containers/com.apple.Safari/Data/Library/Caches"
+"$BIN" savedstate | grep 'Saved Application State' >/dev/null
+savedstate_json="$(mktemp)"
+"$BIN" savedstate --json > "$savedstate_json"
+python3 -m json.tool "$savedstate_json" >/dev/null
+grep '"id":"saved-application-state"' "$savedstate_json" >/dev/null
+grep '"exists":true' "$savedstate_json" >/dev/null
+grep 'cleanroom clean --apply --trash --include-saved-state' "$savedstate_json" >/dev/null
+rm -f "$savedstate_json"
+savedstate_log="$TEST_HOME/savedstate-apply.log"
+"$BIN" clean --include-saved-state --apply --trash --yes --log "$savedstate_log" >/dev/null
+test ! -e "$TEST_HOME/Library/Saved Application State"
+test -f "$savedstate_log"
+grep $'\ttrash\tok\t' "$savedstate_log" >/dev/null
+"$BIN" restore --log "$savedstate_log" --apply --yes >/dev/null
+test -e "$TEST_HOME/Library/Saved Application State/com.example.Test.savedState/window.plist"
 "$BIN" duplicates "$HOME/Documents" --min-mb 1 --limit 5 | grep 'copy-a.bin' >/dev/null
 "$BIN" duplicates "$HOME/Documents" --min-mb 1 --limit 5 | grep 'copy-b.bin' >/dev/null
 duplicates_json="$(mktemp)"
@@ -778,6 +798,7 @@ grep 'safe-app-caches' "$caches_json" >/dev/null
 grep 'quicklook-caches' "$caches_json" >/dev/null
 grep 'font-caches' "$caches_json" >/dev/null
 grep 'web-caches' "$caches_json" >/dev/null
+grep 'saved-state' "$caches_json" >/dev/null
 grep 'cleanroom clean --apply --trash --include-app-caches' "$caches_json" >/dev/null
 rm -f "$caches_json"
 "$BIN" diagnostics | grep 'diagnostic-reports' >/dev/null
@@ -843,6 +864,7 @@ grep '^include_metadata=false' "$config_file" >/dev/null
 grep '^include_quicklook=false' "$config_file" >/dev/null
 grep '^include_font_caches=false' "$config_file" >/dev/null
 grep '^include_web_caches=false' "$config_file" >/dev/null
+grep '^include_saved_state=false' "$config_file" >/dev/null
 "$BIN" doctor --config "$config_file" | grep "$config_file" >/dev/null
 
 report_stdout="$("$BIN" report)"
@@ -885,8 +907,10 @@ fontcaches_preflight="$("$BIN" clean --include-font-caches --preflight)"
 grep 'font-caches' <<<"$fontcaches_preflight" >/dev/null
 webcaches_preflight="$("$BIN" clean --include-web-caches --preflight)"
 grep 'web-caches' <<<"$webcaches_preflight" >/dev/null
+savedstate_preflight="$("$BIN" clean --include-saved-state --preflight)"
+grep 'saved-state' <<<"$savedstate_preflight" >/dev/null
 preflight_json="$(mktemp)"
-"$BIN" clean --preset deep --include-ai-models --include-containers --include-user-trash --include-metadata --include-quicklook --include-font-caches --include-web-caches --apply --trash --yes --preflight --json > "$preflight_json"
+"$BIN" clean --preset deep --include-ai-models --include-containers --include-user-trash --include-metadata --include-quicklook --include-font-caches --include-web-caches --include-saved-state --apply --trash --yes --preflight --json > "$preflight_json"
 python3 -m json.tool "$preflight_json" >/dev/null
 grep '"apply":true' "$preflight_json" >/dev/null
 grep '"trash":true' "$preflight_json" >/dev/null
@@ -895,6 +919,7 @@ grep '"id":"metadata"' "$preflight_json" >/dev/null
 grep '"id":"quicklook"' "$preflight_json" >/dev/null
 grep '"id":"font-caches"' "$preflight_json" >/dev/null
 grep '"id":"web-caches"' "$preflight_json" >/dev/null
+grep '"id":"saved-state"' "$preflight_json" >/dev/null
 grep '"id":"user-trash"' "$preflight_json" >/dev/null
 grep '"safety":"irreversible"' "$preflight_json" >/dev/null
 grep 'Container cleanup can remove local containers' "$preflight_json" >/dev/null
