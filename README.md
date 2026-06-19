@@ -227,6 +227,13 @@ cleanroom fontcaches
 cleanroom fontcaches --json
 ```
 
+Review Safari and WebKit browser cache folders:
+
+```sh
+cleanroom webcaches
+cleanroom webcaches --json
+```
+
 Find exact duplicate files for manual review:
 
 ```sh
@@ -626,6 +633,14 @@ cleanroom clean --include-font-caches
 cleanroom clean --apply --trash --include-font-caches
 ```
 
+Clean Safari and WebKit cache folders:
+
+```sh
+cleanroom webcaches
+cleanroom clean --include-web-caches
+cleanroom clean --apply --trash --include-web-caches
+```
+
 Empty current user Trash:
 
 ```sh
@@ -725,6 +740,8 @@ Config files use simple `key=value` lines and are never executed as shell.
 
 `--include-font-caches` removes rebuildable Apple Type Services and Font Registry user cache databases. It does not remove actual fonts from user, system, or shared font folders.
 
+`--include-web-caches` removes Safari and WebKit cache folders only. It does not remove browsing history, cookies, saved passwords, bookmarks, website data, Keychains, or browser profiles.
+
 `--trash` applies to paths that `cleanroom` removes directly. System commands delegated to macOS or developer tools, such as Time Machine snapshot thinning or simulator reset, may still be irreversible.
 
 `restore` only restores entries that were moved by `--trash` and still exist in the cleanroom Trash folder. It skips destinations that already exist.
@@ -778,6 +795,8 @@ Config files use simple `key=value` lines and are never executed as shell.
 `quicklook` inventories rebuildable Quick Look thumbnail and preview caches that can contribute to System Data. Cleanup is opt-in with `cleanroom clean --include-quicklook`.
 
 `fontcaches` inventories rebuildable user font cache databases that can contribute to System Data or font rendering weirdness. Cleanup is opt-in with `cleanroom clean --include-font-caches`; actual font files stay protected.
+
+`webcaches` inventories Safari and WebKit cache folders that can grow in System Data. Cleanup is opt-in with `cleanroom clean --include-web-caches`; browser history, cookies, bookmarks, website data, passwords, and profiles stay protected.
 
 `duplicates` hashes files above `--min-mb`, groups exact matches, estimates possible reclaim, and never deletes anything.
 

@@ -20,6 +20,7 @@ cleanroom quarantine
 cleanroom metadata
 cleanroom quicklook
 cleanroom fontcaches
+cleanroom webcaches
 cleanroom duplicates
 cleanroom downloads
 cleanroom installers
@@ -80,6 +81,7 @@ cleanroom quarantine --json ~/Downloads
 cleanroom metadata --json ~/Documents ~/Downloads
 cleanroom quicklook --json
 cleanroom fontcaches --json
+cleanroom webcaches --json
 cleanroom duplicates --json ~/Documents
 cleanroom documents --json ~/Documents
 cleanroom desktop --json
@@ -161,6 +163,8 @@ cleanroom permissions --json
 `quicklook --json` emits rebuildable Quick Look thumbnail and preview cache buckets with path, size, existence, and matching cleanup commands.
 
 `fontcaches --json` emits rebuildable user font cache database buckets with path, size, existence, and matching cleanup commands. Actual font files are never targeted.
+
+`webcaches --json` emits Safari and WebKit cache buckets with path, size, existence, and matching cleanup commands. Browser history, cookies, bookmarks, passwords, website data, and profiles are never targeted.
 
 `duplicates --json [PATH]` emits exact duplicate groups with SHA-256 hashes, paths, and estimated possible reclaim. It is intentionally review-only and does not delete anything.
 
@@ -376,6 +380,17 @@ cleanroom clean --apply --trash --include-font-caches
 ```
 
 Use this when font menus, previews, or rendering feel stale after installing or removing fonts. Cleanroom removes rebuildable user font cache databases only; it does not remove fonts from user, shared, or system font folders.
+
+## Safari / WebKit Caches
+
+```sh
+cleanroom webcaches
+cleanroom webcaches --json
+cleanroom clean --include-web-caches
+cleanroom clean --apply --trash --include-web-caches
+```
+
+Use this when Safari or embedded web views have accumulated cache data. Cleanroom removes cache folders only; it does not remove Safari history, cookies, bookmarks, saved passwords, website data, Keychains, or browser profiles.
 
 ## Applications Storage
 

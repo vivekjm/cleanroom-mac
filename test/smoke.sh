@@ -28,8 +28,14 @@ mkdir -p \
   "$TEST_HOME/Library/Caches/com.apple.FontRegistry" \
   "$TEST_HOME/Library/Caches/com.apple.FontWorker" \
   "$TEST_HOME/Library/Caches/com.apple.FontServices" \
+  "$TEST_HOME/Library/Caches/com.apple.Safari" \
+  "$TEST_HOME/Library/Caches/com.apple.WebKit.Networking" \
+  "$TEST_HOME/Library/Caches/com.apple.WebKit.WebContent" \
   "$TEST_HOME/Library/Containers/com.apple.QuickLook.thumbnailcache/Data/Library/Caches" \
   "$TEST_HOME/Library/Containers/com.apple.quicklook.ThumbnailsAgent/Data/Library/Caches" \
+  "$TEST_HOME/Library/Containers/com.apple.Safari/Data/Library/Caches" \
+  "$TEST_HOME/Library/Containers/com.apple.Safari/Data/Library/WebKit/NetworkCache" \
+  "$TEST_HOME/Library/Containers/com.apple.Safari/Data/Library/Safari" \
   "$TEST_HOME/Library/Logs/Homebrew" \
   "$TEST_HOME/Library/Receipts" \
   "$TEST_HOME/.bundle/cache" \
@@ -61,6 +67,7 @@ mkdir -p \
   "$TEST_HOME/Library/Caches/com.cleanroomtestadobe.acc" \
   "$TEST_HOME/Library/Preferences" \
   "$TEST_HOME/Library/Keychains" \
+  "$TEST_HOME/Library/Safari" \
   "$TEST_HOME/Library/Mail" \
   "$TEST_HOME/Library/Mail Downloads" \
   "$TEST_HOME/Library/Containers/com.apple.mail/Data/Library/Mail Downloads" \
@@ -118,8 +125,14 @@ printf 'ats font cache\n' >"$TEST_HOME/Library/Caches/com.apple.ATS/User/annex.d
 printf 'font registry\n' >"$TEST_HOME/Library/Caches/com.apple.FontRegistry/registry.db"
 printf 'font worker\n' >"$TEST_HOME/Library/Caches/com.apple.FontWorker/cache.db"
 printf 'font services\n' >"$TEST_HOME/Library/Caches/com.apple.FontServices/cache.db"
+printf 'safari cache\n' >"$TEST_HOME/Library/Caches/com.apple.Safari/cache.db"
+printf 'webkit networking cache\n' >"$TEST_HOME/Library/Caches/com.apple.WebKit.Networking/cache.db"
+printf 'webkit webcontent cache\n' >"$TEST_HOME/Library/Caches/com.apple.WebKit.WebContent/cache.db"
 printf 'quicklook container\n' >"$TEST_HOME/Library/Containers/com.apple.QuickLook.thumbnailcache/Data/Library/Caches/thumb.db"
 printf 'quicklook agent container\n' >"$TEST_HOME/Library/Containers/com.apple.quicklook.ThumbnailsAgent/Data/Library/Caches/thumb.db"
+printf 'safari container cache\n' >"$TEST_HOME/Library/Containers/com.apple.Safari/Data/Library/Caches/cache.db"
+printf 'safari webkit cache\n' >"$TEST_HOME/Library/Containers/com.apple.Safari/Data/Library/WebKit/NetworkCache/cache.db"
+printf 'safari container history\n' >"$TEST_HOME/Library/Containers/com.apple.Safari/Data/Library/Safari/History.db"
 printf 'brew log\n' >"$TEST_HOME/Library/Logs/Homebrew/build.log"
 printf 'receipt plist\n' >"$TEST_HOME/Library/Receipts/com.cleanroom.test.pkg.plist"
 printf 'receipt bom\n' >"$TEST_HOME/Library/Receipts/com.cleanroom.test.pkg.bom"
@@ -159,6 +172,8 @@ dd if=/dev/zero of="$TEST_HOME/Library/Application Support/CleanroomTestAdobe/Cr
 printf 'adobe cache\n' >"$TEST_HOME/Library/Caches/com.cleanroomtestadobe.acc/cache.bin"
 printf 'adobe prefs\n' >"$TEST_HOME/Library/Preferences/com.cleanroomtestadobe.acc.plist"
 printf 'keychain\n' >"$TEST_HOME/Library/Keychains/login.keychain-db"
+printf 'safari history\n' >"$TEST_HOME/Library/Safari/History.db"
+printf 'safari bookmarks\n' >"$TEST_HOME/Library/Safari/Bookmarks.plist"
 printf 'mail\n' >"$TEST_HOME/Library/Mail/envelope-index"
 printf 'mail attachment\n' >"$TEST_HOME/Library/Mail Downloads/attachment.pdf"
 printf 'container mail attachment\n' >"$TEST_HOME/Library/Containers/com.apple.mail/Data/Library/Mail Downloads/container-attachment.pdf"
@@ -329,6 +344,7 @@ grep 'cloud-sync' "$system_data_json" >/dev/null
 grep 'personal-data' "$system_data_json" >/dev/null
 grep 'quicklook' "$system_data_json" >/dev/null
 grep 'font-caches' "$system_data_json" >/dev/null
+grep 'web-caches' "$system_data_json" >/dev/null
 grep '"category":"protected"' "$system_data_json" >/dev/null
 grep 'cleanroom containers' "$system_data_json" >/dev/null
 rm -f "$system_data_json"
@@ -353,6 +369,7 @@ grep 'quarantine-inventory' "$rules_json" >/dev/null
 grep 'metadata-clutter' "$rules_json" >/dev/null
 grep 'quicklook-caches' "$rules_json" >/dev/null
 grep 'font-caches' "$rules_json" >/dev/null
+grep 'web-caches' "$rules_json" >/dev/null
 grep 'screenshots-inventory' "$rules_json" >/dev/null
 grep 'archives-inventory' "$rules_json" >/dev/null
 grep 'android-inventory' "$rules_json" >/dev/null
@@ -389,6 +406,7 @@ grep 'cleanroom clean --apply --trash --include-diagnostics --days 30' "$plan_js
 grep 'cleanroom metadata --apply --trash' "$plan_json" >/dev/null
 grep 'cleanroom clean --apply --trash --include-quicklook' "$plan_json" >/dev/null
 grep 'cleanroom clean --apply --trash --include-font-caches' "$plan_json" >/dev/null
+grep 'cleanroom clean --apply --trash --include-web-caches' "$plan_json" >/dev/null
 rm -f "$plan_json"
 "$BIN" large "$HOME/Downloads" --min-mb 1 --limit 5 | grep 'big-test.bin' >/dev/null
 large_json="$(mktemp)"
@@ -465,6 +483,26 @@ test -f "$fontcaches_log"
 grep $'\ttrash\tok\t' "$fontcaches_log" >/dev/null
 "$BIN" restore --log "$fontcaches_log" --apply --yes >/dev/null
 test -e "$TEST_HOME/Library/Caches/com.apple.ATS"
+"$BIN" webcaches | grep 'Safari User Cache' >/dev/null
+webcaches_json="$(mktemp)"
+"$BIN" webcaches --json > "$webcaches_json"
+python3 -m json.tool "$webcaches_json" >/dev/null
+grep '"id":"safari-user-cache"' "$webcaches_json" >/dev/null
+grep '"exists":true' "$webcaches_json" >/dev/null
+grep 'cleanroom clean --apply --trash --include-web-caches' "$webcaches_json" >/dev/null
+rm -f "$webcaches_json"
+webcaches_log="$TEST_HOME/webcaches-apply.log"
+"$BIN" clean --include-web-caches --apply --trash --yes --log "$webcaches_log" >/dev/null
+test ! -e "$TEST_HOME/Library/Caches/com.apple.Safari"
+test ! -e "$TEST_HOME/Library/Containers/com.apple.Safari/Data/Library/Caches"
+test -e "$TEST_HOME/Library/Safari/History.db"
+test -e "$TEST_HOME/Library/Safari/Bookmarks.plist"
+test -e "$TEST_HOME/Library/Containers/com.apple.Safari/Data/Library/Safari/History.db"
+test -f "$webcaches_log"
+grep $'\ttrash\tok\t' "$webcaches_log" >/dev/null
+"$BIN" restore --log "$webcaches_log" --apply --yes >/dev/null
+test -e "$TEST_HOME/Library/Caches/com.apple.Safari"
+test -e "$TEST_HOME/Library/Containers/com.apple.Safari/Data/Library/Caches"
 "$BIN" duplicates "$HOME/Documents" --min-mb 1 --limit 5 | grep 'copy-a.bin' >/dev/null
 "$BIN" duplicates "$HOME/Documents" --min-mb 1 --limit 5 | grep 'copy-b.bin' >/dev/null
 duplicates_json="$(mktemp)"
@@ -739,6 +777,7 @@ python3 -m json.tool "$caches_json" >/dev/null
 grep 'safe-app-caches' "$caches_json" >/dev/null
 grep 'quicklook-caches' "$caches_json" >/dev/null
 grep 'font-caches' "$caches_json" >/dev/null
+grep 'web-caches' "$caches_json" >/dev/null
 grep 'cleanroom clean --apply --trash --include-app-caches' "$caches_json" >/dev/null
 rm -f "$caches_json"
 "$BIN" diagnostics | grep 'diagnostic-reports' >/dev/null
@@ -803,6 +842,7 @@ grep '^preset=dev' "$config_file" >/dev/null
 grep '^include_metadata=false' "$config_file" >/dev/null
 grep '^include_quicklook=false' "$config_file" >/dev/null
 grep '^include_font_caches=false' "$config_file" >/dev/null
+grep '^include_web_caches=false' "$config_file" >/dev/null
 "$BIN" doctor --config "$config_file" | grep "$config_file" >/dev/null
 
 report_stdout="$("$BIN" report)"
@@ -843,8 +883,10 @@ quicklook_preflight="$("$BIN" clean --include-quicklook --preflight)"
 grep 'quicklook' <<<"$quicklook_preflight" >/dev/null
 fontcaches_preflight="$("$BIN" clean --include-font-caches --preflight)"
 grep 'font-caches' <<<"$fontcaches_preflight" >/dev/null
+webcaches_preflight="$("$BIN" clean --include-web-caches --preflight)"
+grep 'web-caches' <<<"$webcaches_preflight" >/dev/null
 preflight_json="$(mktemp)"
-"$BIN" clean --preset deep --include-ai-models --include-containers --include-user-trash --include-metadata --include-quicklook --include-font-caches --apply --trash --yes --preflight --json > "$preflight_json"
+"$BIN" clean --preset deep --include-ai-models --include-containers --include-user-trash --include-metadata --include-quicklook --include-font-caches --include-web-caches --apply --trash --yes --preflight --json > "$preflight_json"
 python3 -m json.tool "$preflight_json" >/dev/null
 grep '"apply":true' "$preflight_json" >/dev/null
 grep '"trash":true' "$preflight_json" >/dev/null
@@ -852,6 +894,7 @@ grep '"id":"containers"' "$preflight_json" >/dev/null
 grep '"id":"metadata"' "$preflight_json" >/dev/null
 grep '"id":"quicklook"' "$preflight_json" >/dev/null
 grep '"id":"font-caches"' "$preflight_json" >/dev/null
+grep '"id":"web-caches"' "$preflight_json" >/dev/null
 grep '"id":"user-trash"' "$preflight_json" >/dev/null
 grep '"safety":"irreversible"' "$preflight_json" >/dev/null
 grep 'Container cleanup can remove local containers' "$preflight_json" >/dev/null

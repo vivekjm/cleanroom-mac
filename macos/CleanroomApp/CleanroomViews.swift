@@ -268,6 +268,7 @@ struct SidebarView: View {
                             NavRow("xmark.bin.fill",          "Caches",      .run(title: "Caches",      args: "caches"), state)
                             NavRow("eye.fill",                "Quick Look",  .run(title: "Quick Look",  args: "quicklook"), state)
                             NavRow("textformat",              "Font Caches", .run(title: "Font Caches", args: "fontcaches"), state)
+                            NavRow("safari.fill",             "Web Caches",  .run(title: "Web Caches",  args: "webcaches"), state)
                             NavRow("shippingbox.fill",        "Node Modules",.run(title: "Node Modules",args: "nodes --limit 30 --days 30"), state)
                             NavRow("terminal.fill",           "Virtualenvs", .run(title: "Virtualenvs", args: "venvs --limit 30 --days 30"), state)
                             NavRow("apps.iphone",             "Apps",        .run(title: "Apps",        args: "apps --limit 30"), state)
@@ -298,7 +299,7 @@ struct SidebarView: View {
 
                 Rectangle().fill(DS.C.dividerOnDark).frame(height: 1)
                 HStack {
-                    Text(state.cliPath.isEmpty ? "CLI not found" : "v0.63.0")
+                    Text(state.cliPath.isEmpty ? "CLI not found" : "v0.64.0")
                         .font(DS.T.tag)
                         .foregroundColor(DS.C.textOnDark.opacity(0.35))
                     Spacer()

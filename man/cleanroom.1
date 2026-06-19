@@ -1,4 +1,4 @@
-.TH CLEANROOM 1 "June 2026" "cleanroom 0.63.0" "User Commands"
+.TH CLEANROOM 1 "June 2026" "cleanroom 0.64.0" "User Commands"
 .SH NAME
 cleanroom \- safe-by-default macOS storage cleaner
 .SH SYNOPSIS
@@ -49,6 +49,9 @@ cleanroom \- safe-by-default macOS storage cleaner
 .br
 .B cleanroom
 .RI "fontcaches [--json]"
+.br
+.B cleanroom
+.RI "webcaches [--json]"
 .br
 .B cleanroom
 .RI "duplicates [path] [--min-mb n] [--limit n] [--json]"
@@ -247,6 +250,10 @@ Inventory rebuildable Quick Look thumbnail and preview caches.
 .TP
 .B fontcaches
 Inventory rebuildable user font cache databases without touching actual fonts.
+.TP
+.B webcaches
+Inventory Safari and WebKit cache folders without touching history, cookies,
+passwords, bookmarks, website data, or profiles.
 .TP
 .B duplicates
 Find exact duplicate files for review without deleting anything.
@@ -472,6 +479,9 @@ Remove rebuildable Quick Look thumbnail and preview caches.
 .B --include-font-caches
 Remove rebuildable user font cache databases. Actual font files stay protected.
 .TP
+.B --include-web-caches
+Remove Safari and WebKit cache folders only. Browser profile data stays protected.
+.TP
 .B --include-venv-stale
 Remove stale Python virtualenv folders older than
 .BR --days
@@ -513,6 +523,7 @@ cleanroom metadata --json
 cleanroom metadata --apply --trash
 cleanroom quicklook --json
 cleanroom fontcaches --json
+cleanroom webcaches --json
 cleanroom leftovers adobe --limit 50
 cleanroom leftovers adobe --apply --trash
 cleanroom backups --json
