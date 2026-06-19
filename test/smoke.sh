@@ -31,6 +31,8 @@ mkdir -p \
   "$TEST_HOME/Library/Caches/com.apple.Safari" \
   "$TEST_HOME/Library/Caches/com.apple.WebKit.Networking" \
   "$TEST_HOME/Library/Caches/com.apple.WebKit.WebContent" \
+  "$TEST_HOME/Library/Caches/Firefox" \
+  "$TEST_HOME/Library/Caches/org.mozilla.firefox" \
   "$TEST_HOME/Library/Caches/Sparkle" \
   "$TEST_HOME/Library/Caches/com.github.Squirrel.ShipIt" \
   "$TEST_HOME/Library/Application Support/com.github.Squirrel.ShipIt" \
@@ -65,6 +67,8 @@ mkdir -p \
   "$TEST_HOME/Library/Application Support/MobileSync/Backup/FakeDeviceBackup" \
   "$TEST_HOME/Library/Application Support/Google/Chrome/Default" \
   "$TEST_HOME/Library/Application Support/Google/Chrome/Default/Cache" \
+  "$TEST_HOME/Library/Application Support/Google/Chrome/Default/Code Cache" \
+  "$TEST_HOME/Library/Application Support/BraveSoftware/Brave-Browser/Default/GPUCache" \
   "$TEST_HOME/Library/Application Support/AddressBook" \
   "$TEST_HOME/Library/Application Support/CallHistoryDB" \
   "$TEST_HOME/Library/Application Support/CleanroomTestAdobe/Creative Cloud" \
@@ -140,6 +144,8 @@ printf 'font services\n' >"$TEST_HOME/Library/Caches/com.apple.FontServices/cach
 printf 'safari cache\n' >"$TEST_HOME/Library/Caches/com.apple.Safari/cache.db"
 printf 'webkit networking cache\n' >"$TEST_HOME/Library/Caches/com.apple.WebKit.Networking/cache.db"
 printf 'webkit webcontent cache\n' >"$TEST_HOME/Library/Caches/com.apple.WebKit.WebContent/cache.db"
+printf 'firefox cache\n' >"$TEST_HOME/Library/Caches/Firefox/cache2.db"
+printf 'firefox org cache\n' >"$TEST_HOME/Library/Caches/org.mozilla.firefox/cache2.db"
 printf 'quicklook container\n' >"$TEST_HOME/Library/Containers/com.apple.QuickLook.thumbnailcache/Data/Library/Caches/thumb.db"
 printf 'quicklook agent container\n' >"$TEST_HOME/Library/Containers/com.apple.quicklook.ThumbnailsAgent/Data/Library/Caches/thumb.db"
 printf 'safari container cache\n' >"$TEST_HOME/Library/Containers/com.apple.Safari/Data/Library/Caches/cache.db"
@@ -181,6 +187,8 @@ printf 'docker raw\n' >"$TEST_HOME/Library/Containers/com.docker.docker/Data/vms
 printf 'podman desktop\n' >"$TEST_HOME/Library/Containers/io.podman_desktop.PodmanDesktop/Data/state.db"
 printf 'login data\n' >"$TEST_HOME/Library/Application Support/Google/Chrome/Default/Login Data"
 printf 'browser cache\n' >"$TEST_HOME/Library/Application Support/Google/Chrome/Default/Cache/example.cache"
+printf 'browser code cache\n' >"$TEST_HOME/Library/Application Support/Google/Chrome/Default/Code Cache/code.cache"
+printf 'brave gpu cache\n' >"$TEST_HOME/Library/Application Support/BraveSoftware/Brave-Browser/Default/GPUCache/gpu.cache"
 printf 'contacts\n' >"$TEST_HOME/Library/Application Support/AddressBook/AddressBook-v22.abcddb"
 printf 'call history\n' >"$TEST_HOME/Library/Application Support/CallHistoryDB/CallHistory.storedata"
 printf 'adobe support\n' >"$TEST_HOME/Library/Application Support/CleanroomTestAdobe/Creative Cloud/state.db"
@@ -399,6 +407,7 @@ grep 'web-caches' "$rules_json" >/dev/null
 grep 'saved-state' "$rules_json" >/dev/null
 grep 'project-caches' "$rules_json" >/dev/null
 grep 'updater-caches' "$rules_json" >/dev/null
+grep 'browser-caches' "$rules_json" >/dev/null
 grep 'screenshots-inventory' "$rules_json" >/dev/null
 grep 'archives-inventory' "$rules_json" >/dev/null
 grep 'android-inventory' "$rules_json" >/dev/null
@@ -439,6 +448,7 @@ grep 'cleanroom clean --apply --trash --include-web-caches' "$plan_json" >/dev/n
 grep 'cleanroom clean --apply --trash --include-saved-state' "$plan_json" >/dev/null
 grep 'cleanroom clean --apply --trash --include-project-caches' "$plan_json" >/dev/null
 grep 'cleanroom clean --apply --trash --include-updater-caches' "$plan_json" >/dev/null
+grep 'cleanroom clean --apply --trash --include-browser-caches' "$plan_json" >/dev/null
 rm -f "$plan_json"
 "$BIN" large "$HOME/Downloads" --min-mb 1 --limit 5 | grep 'big-test.bin' >/dev/null
 large_json="$(mktemp)"
@@ -591,6 +601,26 @@ grep $'\ttrash\tok\t' "$updaters_log" >/dev/null
 "$BIN" restore --log "$updaters_log" --apply --yes >/dev/null
 test -e "$TEST_HOME/Library/Caches/Sparkle/update.zip"
 test -e "$TEST_HOME/Library/Application Support/com.github.Squirrel.ShipIt/staged-update"
+"$BIN" browsercaches | grep 'Google Chrome' >/dev/null
+"$BIN" browsercaches | grep 'Firefox' >/dev/null
+browsercaches_json="$(mktemp)"
+"$BIN" browsercaches --json > "$browsercaches_json"
+python3 -m json.tool "$browsercaches_json" >/dev/null
+grep '"browser":"Google Chrome"' "$browsercaches_json" >/dev/null
+grep '"kind":"firefox-cache"' "$browsercaches_json" >/dev/null
+grep 'cleanroom clean --apply --trash --include-browser-caches' "$browsercaches_json" >/dev/null
+rm -f "$browsercaches_json"
+browsercaches_log="$TEST_HOME/browsercaches-apply.log"
+"$BIN" clean --include-browser-caches --apply --trash --yes --log "$browsercaches_log" >/dev/null
+test ! -e "$TEST_HOME/Library/Application Support/Google/Chrome/Default/Cache"
+test ! -e "$TEST_HOME/Library/Application Support/Google/Chrome/Default/Code Cache"
+test ! -e "$TEST_HOME/Library/Caches/Firefox"
+test -e "$TEST_HOME/Library/Application Support/Google/Chrome/Default/Login Data"
+test -f "$browsercaches_log"
+grep $'\ttrash\tok\t' "$browsercaches_log" >/dev/null
+"$BIN" restore --log "$browsercaches_log" --apply --yes >/dev/null
+test -e "$TEST_HOME/Library/Application Support/Google/Chrome/Default/Cache/example.cache"
+test -e "$TEST_HOME/Library/Caches/Firefox/cache2.db"
 "$BIN" duplicates "$HOME/Documents" --min-mb 1 --limit 5 | grep 'copy-a.bin' >/dev/null
 "$BIN" duplicates "$HOME/Documents" --min-mb 1 --limit 5 | grep 'copy-b.bin' >/dev/null
 duplicates_json="$(mktemp)"
@@ -741,7 +771,8 @@ browsers_json="$(mktemp)"
 python3 -m json.tool "$browsers_json" >/dev/null
 grep 'Google Chrome' "$browsers_json" >/dev/null
 grep '"protected":true' "$browsers_json" >/dev/null
-grep 'cleanroom clean --apply --trash --include-app-caches' "$browsers_json" >/dev/null
+grep 'cleanroom clean --apply --trash --include-browser-caches' "$browsers_json" >/dev/null
+grep 'cleanroom clean --apply --trash --include-web-caches' "$browsers_json" >/dev/null
 rm -f "$browsers_json"
 "$BIN" leftovers cleanroomtestadobe --limit 10 | grep 'com.cleanroomtestadobe.acc' >/dev/null
 leftovers_json="$(mktemp)"
@@ -936,6 +967,7 @@ grep '^include_web_caches=false' "$config_file" >/dev/null
 grep '^include_saved_state=false' "$config_file" >/dev/null
 grep '^include_project_caches=false' "$config_file" >/dev/null
 grep '^include_updater_caches=false' "$config_file" >/dev/null
+grep '^include_browser_caches=false' "$config_file" >/dev/null
 "$BIN" doctor --config "$config_file" | grep "$config_file" >/dev/null
 
 report_stdout="$("$BIN" report)"
@@ -984,8 +1016,10 @@ projectcaches_preflight="$("$BIN" clean --include-project-caches --preflight)"
 grep 'project-caches' <<<"$projectcaches_preflight" >/dev/null
 updaters_preflight="$("$BIN" clean --include-updater-caches --preflight)"
 grep 'updater-caches' <<<"$updaters_preflight" >/dev/null
+browsercaches_preflight="$("$BIN" clean --include-browser-caches --preflight)"
+grep 'browser-caches' <<<"$browsercaches_preflight" >/dev/null
 preflight_json="$(mktemp)"
-"$BIN" clean --preset deep --include-ai-models --include-containers --include-user-trash --include-metadata --include-quicklook --include-font-caches --include-web-caches --include-saved-state --include-project-caches --include-updater-caches --apply --trash --yes --preflight --json > "$preflight_json"
+"$BIN" clean --preset deep --include-ai-models --include-containers --include-user-trash --include-metadata --include-quicklook --include-font-caches --include-web-caches --include-saved-state --include-project-caches --include-updater-caches --include-browser-caches --apply --trash --yes --preflight --json > "$preflight_json"
 python3 -m json.tool "$preflight_json" >/dev/null
 grep '"apply":true' "$preflight_json" >/dev/null
 grep '"trash":true' "$preflight_json" >/dev/null
@@ -997,6 +1031,7 @@ grep '"id":"web-caches"' "$preflight_json" >/dev/null
 grep '"id":"saved-state"' "$preflight_json" >/dev/null
 grep '"id":"project-caches"' "$preflight_json" >/dev/null
 grep '"id":"updater-caches"' "$preflight_json" >/dev/null
+grep '"id":"browser-caches"' "$preflight_json" >/dev/null
 grep '"id":"user-trash"' "$preflight_json" >/dev/null
 grep '"safety":"irreversible"' "$preflight_json" >/dev/null
 grep 'Container cleanup can remove local containers' "$preflight_json" >/dev/null

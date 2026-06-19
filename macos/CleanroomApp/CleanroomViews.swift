@@ -272,6 +272,7 @@ struct SidebarView: View {
                             NavRow("rectangle.stack.fill",    "Saved State", .run(title: "Saved State", args: "savedstate"), state)
                             NavRow("chevron.left.forwardslash.chevron.right", "Project Caches", .run(title: "Project Caches", args: "projectcaches --limit 40"), state)
                             NavRow("arrow.clockwise.circle.fill", "Updater Caches", .run(title: "Updater Caches", args: "updaters"), state)
+                            NavRow("globe", "Browser Caches", .run(title: "Browser Caches", args: "browsercaches"), state)
                             NavRow("shippingbox.fill",        "Node Modules",.run(title: "Node Modules",args: "nodes --limit 30 --days 30"), state)
                             NavRow("terminal.fill",           "Virtualenvs", .run(title: "Virtualenvs", args: "venvs --limit 30 --days 30"), state)
                             NavRow("apps.iphone",             "Apps",        .run(title: "Apps",        args: "apps --limit 30"), state)
@@ -302,7 +303,7 @@ struct SidebarView: View {
 
                 Rectangle().fill(DS.C.dividerOnDark).frame(height: 1)
                 HStack {
-                    Text(state.cliPath.isEmpty ? "CLI not found" : "v0.67.0")
+                    Text(state.cliPath.isEmpty ? "CLI not found" : "v0.68.0")
                         .font(DS.T.tag)
                         .foregroundColor(DS.C.textOnDark.opacity(0.35))
                     Spacer()

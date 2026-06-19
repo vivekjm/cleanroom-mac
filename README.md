@@ -257,6 +257,13 @@ cleanroom updaters
 cleanroom updaters --json
 ```
 
+Review Chromium and Firefox browser cache folders:
+
+```sh
+cleanroom browsercaches
+cleanroom browsercaches --json
+```
+
 Find exact duplicate files for manual review:
 
 ```sh
@@ -688,6 +695,14 @@ cleanroom clean --include-updater-caches
 cleanroom clean --apply --trash --include-updater-caches
 ```
 
+Clean Chromium and Firefox browser cache folders:
+
+```sh
+cleanroom browsercaches
+cleanroom clean --include-browser-caches
+cleanroom clean --apply --trash --include-browser-caches
+```
+
 Empty current user Trash:
 
 ```sh
@@ -795,6 +810,8 @@ Config files use simple `key=value` lines and are never executed as shell.
 
 `--include-updater-caches` removes rebuildable Sparkle and Squirrel app updater cache/staging data. Apps, app profiles, browser profiles, passwords, cookies, bookmarks, and settings are not targeted.
 
+`--include-browser-caches` removes Chromium and Firefox browser cache folders only. Browser profiles, password databases, cookies, bookmarks, sessions, extensions, and settings are not targeted.
+
 `--trash` applies to paths that `cleanroom` removes directly. System commands delegated to macOS or developer tools, such as Time Machine snapshot thinning or simulator reset, may still be irreversible.
 
 `restore` only restores entries that were moved by `--trash` and still exist in the cleanroom Trash folder. It skips destinations that already exist.
@@ -856,6 +873,8 @@ Config files use simple `key=value` lines and are never executed as shell.
 `projectcaches` inventories known rebuildable project cache artifacts under Desktop, Documents, Downloads, or a provided folder. Cleanup is opt-in with `cleanroom clean --include-project-caches`; source, `.git`, `node_modules`, and virtualenv folders stay protected.
 
 `updaters` inventories rebuildable Sparkle and Squirrel app updater cache/staging folders. Cleanup is opt-in with `cleanroom clean --include-updater-caches`; apps, profiles, browser data, and passwords stay protected.
+
+`browsercaches` inventories Chromium and Firefox cache folders. Cleanup is opt-in with `cleanroom clean --include-browser-caches`; profiles, password databases, cookies, bookmarks, sessions, extensions, and settings stay protected.
 
 `duplicates` hashes files above `--min-mb`, groups exact matches, estimates possible reclaim, and never deletes anything.
 

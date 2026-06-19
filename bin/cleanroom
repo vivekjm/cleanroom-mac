@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.67.0"
+VERSION="0.68.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -42,6 +42,7 @@ INCLUDE_WEB_CACHES=0
 INCLUDE_SAVED_STATE=0
 INCLUDE_PROJECT_CACHES=0
 INCLUDE_UPDATER_CACHES=0
+INCLUDE_BROWSER_CACHES=0
 
 RED="$(printf '\033[31m')"
 GREEN="$(printf '\033[32m')"
@@ -74,6 +75,7 @@ Usage:
   cleanroom savedstate [--json]
   cleanroom projectcaches [PATH] [--limit N] [--json]
   cleanroom updaters [--json]
+  cleanroom browsercaches [--json]
   cleanroom duplicates [PATH] [--min-mb N] [--limit N] [--json]
   cleanroom documents [PATH] [--limit N] [--json]
   cleanroom desktop [--limit N] [--json]
@@ -142,6 +144,7 @@ Actions:
   savedstate           Inventory saved app window/session state.
   projectcaches        Inventory Python/dev project cache folders and files.
   updaters             Inventory app updater cache and staging folders.
+  browsercaches        Inventory Chromium and Firefox browser cache folders.
   duplicates           Find exact duplicate files for review without deleting anything.
   documents            Rank top-level user folders/files for review without deleting anything.
   desktop              Rank top-level Desktop folders/files for review without deleting anything.
@@ -193,7 +196,7 @@ Options:
   --trash              Move deleted files to ~/.Trash/cleanroom-* instead of rm -rf.
   --yes                Do not prompt before --apply cleanup.
   --verbose            Print every path touched.
-  --json               Emit JSON for overview, map, snapshot, diff, state, permissions, review, scan, system-data, plan, large, brokenlinks, quarantine, metadata, quicklook, fontcaches, webcaches, savedstate, projectcaches, updaters, duplicates,
+  --json               Emit JSON for overview, map, snapshot, diff, state, permissions, review, scan, system-data, plan, large, brokenlinks, quarantine, metadata, quicklook, fontcaches, webcaches, savedstate, projectcaches, updaters, browsercaches, duplicates,
                        documents, desktop, screenshots, archives, downloads, installers, nodes, venvs, apps, uninstallers, appreview, appdata, libraries, cloud, cloudfiles, personal, communications,
                        browsers, leftovers, startup, loginitems,
                        trash, backups, xcode, caches, diagnostics, packages, receipts, homebrew, toolchains,
@@ -242,6 +245,9 @@ Options:
                        and .coverage under Desktop/Documents/Downloads.
   --include-updater-caches
                        Remove rebuildable Sparkle and Squirrel app updater cache/staging data.
+  --include-browser-caches
+                       Remove Chromium and Firefox cache folders only. Does not remove
+                       profiles, passwords, cookies, bookmarks, sessions, or settings.
   --include-ai-workspaces
                        Remove generated AI-agent workspace state: recordings, scratch, brain,
                        implicit data, and local conversation caches where known.
@@ -304,6 +310,8 @@ Examples:
   cleanroom projectcaches --json
   cleanroom updaters
   cleanroom updaters --json
+  cleanroom browsercaches
+  cleanroom browsercaches --json
   cleanroom duplicates ~/Documents --min-mb 100
   cleanroom duplicates --json ~/Downloads
   cleanroom documents
@@ -530,6 +538,7 @@ load_config() {
       include_saved_state) truthy "$value" && INCLUDE_SAVED_STATE=1 ;;
       include_project_caches) truthy "$value" && INCLUDE_PROJECT_CACHES=1 ;;
       include_updater_caches) truthy "$value" && INCLUDE_UPDATER_CACHES=1 ;;
+      include_browser_caches) truthy "$value" && INCLUDE_BROWSER_CACHES=1 ;;
       trash) truthy "$value" && TRASH=1 ;;
       log_file) LOG_FILE="$(expand_path "$value")" ;;
       exclude) add_exclude "$value" ;;
@@ -797,6 +806,7 @@ preflight_rows() {
   [[ "$INCLUDE_SAVED_STATE" -eq 1 ]] && printf '%s\t%s\t%s\t%s\n' "saved-state" "Saved Application State" "rebuildable" "Apps may forget restored windows; app documents and profiles stay protected."
   [[ "$INCLUDE_PROJECT_CACHES" -eq 1 ]] && printf '%s\t%s\t%s\t%s\n' "project-caches" "Project cache artifacts" "rebuildable" "Only known cache folders/files are targeted; source and dependency folders stay protected."
   [[ "$INCLUDE_UPDATER_CACHES" -eq 1 ]] && printf '%s\t%s\t%s\t%s\n' "updater-caches" "App updater caches" "rebuildable" "Only Sparkle/Squirrel updater cache and staging data is targeted; apps and profiles stay protected."
+  [[ "$INCLUDE_BROWSER_CACHES" -eq 1 ]] && printf '%s\t%s\t%s\t%s\n' "browser-caches" "Chromium/Firefox browser caches" "rebuildable" "Profiles, passwords, cookies, bookmarks, sessions, extensions, and settings stay protected."
   [[ "$INCLUDE_NODE_STALE" -eq 1 ]] && printf '%s\t%s\t%s\t%s\n' "node-modules" "Stale node_modules" "rebuildable" "Dependencies may need to be installed again."
   [[ "$INCLUDE_VENV_STALE" -eq 1 ]] && printf '%s\t%s\t%s\t%s\n' "python-virtualenvs" "Stale Python virtualenvs" "rebuildable" "Virtualenvs may need to be recreated."
   [[ "$INCLUDE_DEV_HEAVY" -eq 1 ]] && printf '%s\t%s\t%s\t%s\n' "dev-heavy" "Heavy SDK and simulator data" "high-impact" "Some SDKs, symbols, or simulator app state may need reinstalling or resetting."
@@ -1842,6 +1852,115 @@ clean_updater_caches() {
     [[ -z "${id:-}" ]] && continue
     run_rm "$path_template"
   done < <(updatercache_specs)
+}
+
+browsercache_profile_roots() {
+  printf '%s\t%s\n' "Google Chrome" "~/Library/Application Support/Google/Chrome"
+  printf '%s\t%s\n' "Brave" "~/Library/Application Support/BraveSoftware/Brave-Browser"
+  printf '%s\t%s\n' "Microsoft Edge" "~/Library/Application Support/Microsoft Edge"
+  printf '%s\t%s\n' "Arc" "~/Library/Application Support/Arc"
+}
+
+browsercache_fixed_roots() {
+  printf '%s\t%s\t%s\n' "Firefox" "firefox-cache" "~/Library/Caches/Firefox"
+  printf '%s\t%s\t%s\n' "Firefox" "firefox-org-cache" "~/Library/Caches/org.mozilla.firefox"
+}
+
+browsercache_rows() {
+  local browser root_template root path name kb
+  while IFS=$'\t' read -r browser root_template; do
+    [[ -z "${browser:-}" ]] && continue
+    root="$(expand_path "$root_template")"
+    [[ -d "$root" ]] || continue
+    find "$root" -type d \( \
+      -name 'Cache' -o -name 'Code Cache' -o -name 'GPUCache' -o -name 'DawnCache' \
+      -o -name 'ShaderCache' -o -name 'GrShaderCache' -o -name 'CachedData' \
+    \) -prune -print0 2>/dev/null |
+      while IFS= read -r -d '' path; do
+        name="$(basename "$path")"
+        kb="$(size_kb "$path")"
+        printf '%012d\t%s\t%s\t%s\t%s\n' "$kb" "$browser" "chromium-cache" "$name" "$path"
+      done
+  done < <(browsercache_profile_roots)
+
+  local id
+  while IFS=$'\t' read -r browser id root_template; do
+    [[ -z "${browser:-}" ]] && continue
+    path="$(expand_path "$root_template")"
+    [[ -e "$path" ]] || continue
+    kb="$(size_kb "$path")"
+    printf '%012d\t%s\t%s\t%s\t%s\n' "$kb" "$browser" "$id" "$(basename "$path")" "$path"
+  done < <(browsercache_fixed_roots)
+}
+
+browsercache_rows_sorted() {
+  browsercache_rows | sort -t $'\t' -k1,1rn -k2,2
+}
+
+browsercache_total_kb() {
+  local total=0 kb browser kind name path kb_num
+  while IFS=$'\t' read -r kb browser kind name path; do
+    [[ -z "${path:-}" ]] && continue
+    kb_num="$(printf '%s\n' "${kb:-0}" | sed 's/^0*//; s/^$/0/')"
+    total=$((total + kb_num))
+  done < <(browsercache_rows_sorted)
+  printf '%s\n' "$total"
+}
+
+browsercaches() {
+  local rows
+  rows="$(browsercache_rows_sorted)"
+
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '['
+    local first=1 kb browser kind name path kb_num
+    while IFS=$'\t' read -r kb browser kind name path; do
+      [[ -z "${path:-}" ]] && continue
+      kb_num="$(printf '%s\n' "${kb:-0}" | sed 's/^0*//; s/^$/0/')"
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '{"browser":"%s","kind":"%s","name":"%s","path":"%s","size_kb":%s,"size":"%s","preview_command":"%s","apply_command":"%s","description":"%s"}' \
+        "$(printf '%s' "$browser" | json_escape)" \
+        "$(printf '%s' "$kind" | json_escape)" \
+        "$(printf '%s' "$name" | json_escape)" \
+        "$(printf '%s' "$path" | json_escape)" \
+        "$kb_num" \
+        "$(human_kb "${kb:-0}" | json_escape)" \
+        "$(printf 'cleanroom browsercaches' | json_escape)" \
+        "$(printf 'cleanroom clean --apply --trash --include-browser-caches' | json_escape)" \
+        "$(printf 'Rebuildable browser cache folder. Profiles, passwords, cookies, bookmarks, sessions, extensions, and settings are not removed.' | json_escape)"
+    done <<<"$rows"
+    printf ']\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}cleanroom browser caches${RESET}"
+  printf 'Review-only inventory. Cleanup is opt-in with --include-browser-caches and targets only Chromium/Firefox cache folders.\n'
+  printf 'Profiles, passwords, cookies, bookmarks, sessions, extensions, and settings stay protected.\n\n'
+
+  if [[ -z "$rows" ]]; then
+    printf 'No Chromium/Firefox browser cache folders found.\n'
+    return 0
+  fi
+
+  printf '%-10s %-18s %-16s %s\n' "size" "browser" "cache" "path"
+  local kb browser kind name path
+  while IFS=$'\t' read -r kb browser kind name path; do
+    [[ -z "${path:-}" ]] && continue
+    printf '%-10s %-18s %-16s %s\n' "$(human_kb "$kb")" "$browser" "$name" "$path"
+  done <<<"$rows"
+  printf '\nPreview cleanup with: cleanroom clean --include-browser-caches\n'
+  printf 'Apply cleanup with: cleanroom clean --apply --trash --include-browser-caches\n'
+}
+
+clean_browser_caches() {
+  [[ "$INCLUDE_BROWSER_CACHES" -eq 1 ]] || return 0
+  log "${BOLD}Chromium and Firefox browser cache folders${RESET}"
+  local kb browser kind name path
+  while IFS=$'\t' read -r kb browser kind name path; do
+    [[ -z "${path:-}" ]] && continue
+    run_rm "$path"
+  done < <(browsercache_rows_sorted)
 }
 
 clean_dev_heavy() {
@@ -3641,15 +3760,15 @@ browser_cache_kb() {
 
 browser_preview_command() {
   case "$1" in
-    firefox|safari) printf 'cleanroom clean' ;;
-    *) printf 'cleanroom clean --include-app-caches' ;;
+    safari) printf 'cleanroom webcaches' ;;
+    *) printf 'cleanroom browsercaches' ;;
   esac
 }
 
 browser_apply_command() {
   case "$1" in
-    firefox|safari) printf 'cleanroom clean --apply --trash' ;;
-    *) printf 'cleanroom clean --apply --trash --include-app-caches' ;;
+    safari) printf 'cleanroom clean --apply --trash --include-web-caches' ;;
+    *) printf 'cleanroom clean --apply --trash --include-browser-caches' ;;
   esac
 }
 
@@ -4979,6 +5098,7 @@ cache_rows() {
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "saved-state" "saved-state" "~/Library/Saved Application State" "cleanroom savedstate" "cleanroom clean --apply --trash --include-saved-state" "Saved app window/session restoration state. Documents and app profiles stay protected."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "project-caches" "project-caches" "__pycache__, .pytest_cache, .mypy_cache, .ruff_cache, .tox, .nox, htmlcov, .coverage" "cleanroom projectcaches" "cleanroom clean --apply --trash --include-project-caches" "Known rebuildable project cache artifacts under Desktop, Documents, and Downloads. Source and dependency folders stay protected."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "updater-caches" "updater-caches" "Sparkle and Squirrel updater cache paths" "cleanroom updaters" "cleanroom clean --apply --trash --include-updater-caches" "Sparkle/Squirrel updater cache and staging folders only. Apps, app profiles, and passwords stay protected."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "browser-caches" "browser-caches" "Chromium and Firefox cache folders" "cleanroom browsercaches" "cleanroom clean --apply --trash --include-browser-caches" "Chromium and Firefox cache folders only. Profiles, passwords, cookies, bookmarks, sessions, extensions, and settings stay protected."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "safe-app-caches" "app-caches" "known nested app cache folders" "cleanroom clean --include-app-caches" "cleanroom clean --apply --trash --include-app-caches" "Nested cache folders for apps such as Chrome, Brave, Edge, Arc, VS Code, Cursor, Slack, Comet, and Trae. Profiles, passwords, cookies, bookmarks, and settings stay protected."
 }
 
@@ -5014,6 +5134,8 @@ caches() {
         kb="$(app_cache_kb)"
       elif [[ "$id" == "updater-caches" ]]; then
         kb="$(updatercache_total_kb)"
+      elif [[ "$id" == "browser-caches" ]]; then
+        kb="$(browsercache_total_kb)"
       else
         kb="$(paths_field_kb "$paths")"
       fi
@@ -5043,6 +5165,8 @@ caches() {
       kb="$(app_cache_kb)"
     elif [[ "$id" == "updater-caches" ]]; then
       kb="$(updatercache_total_kb)"
+    elif [[ "$id" == "browser-caches" ]]; then
+      kb="$(browsercache_total_kb)"
     else
       kb="$(paths_field_kb "$paths")"
     fi
@@ -5649,6 +5773,7 @@ overview() {
   printf 'cleanroom cloudfiles --min-mb 250 --limit 50\n'
   printf 'cleanroom personal\n'
   printf 'cleanroom communications\n'
+  printf 'cleanroom browsercaches\n'
   printf 'cleanroom diagnostics\n'
   printf 'cleanroom protect\n'
 }
@@ -5693,7 +5818,7 @@ snapshots() {
 }
 
 plan_rows() {
-  local safe package toolchain app installers metadata_total quicklook_total fontcache_total webcache_total savedstate_total projectcache_total updatercache_total node venv dev diagnostics ai_workspaces ai_models containers user_trash
+  local safe package toolchain app browsercache_total installers metadata_total quicklook_total fontcache_total webcache_total savedstate_total projectcache_total updatercache_total node venv dev diagnostics ai_workspaces ai_models containers user_trash
   safe="$(sum_existing_kb \
     "~/Library/Caches" "~/.cache" "~/.npm/_cacache" "~/.npm/_logs" "~/.npm/_npx" \
     "~/.yarn/cache" "~/.yarn/berry" "~/.gradle/caches" "~/.gradle/daemon" \
@@ -5703,6 +5828,7 @@ plan_rows() {
   package="$(sum_existing_kb "~/Library/pnpm/store" "~/.pnpm-store" "~/.cocoapods/repos" "~/.cargo/registry/cache")"
   toolchain="$(toolchain_total_kb)"
   app="$(app_cache_kb)"
+  browsercache_total="$(browsercache_total_kb)"
   installers="$(installer_total_kb)"
   metadata_total="$(metadata_total_kb)"
   quicklook_total="$(quicklook_total_kb)"
@@ -5726,6 +5852,7 @@ plan_rows() {
 
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$safe" "safe" "Default safe cleanup" "cleanroom clean" "cleanroom clean --apply --trash" "Rebuildable caches and old logs. Recommended first step."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$app" "app-caches" "Safe app cache folders" "cleanroom clean --include-app-caches" "cleanroom clean --apply --trash --include-app-caches" "Nested cache folders only; browser profiles and passwords stay protected."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$browsercache_total" "browser-caches" "Chromium/Firefox browser caches" "cleanroom browsercaches" "cleanroom clean --apply --trash --include-browser-caches" "Rebuildable browser cache folders only. Profiles, passwords, cookies, bookmarks, sessions, extensions, and settings stay protected."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$installers" "old-installers" "Old downloaded installers" "cleanroom clean --include-installers --days $DAYS" "cleanroom clean --apply --trash --include-installers --days $DAYS" "Downloaded .dmg, .pkg, .mpkg, .xip, .ipsw, and .iso files older than $DAYS days in ~/Downloads."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$metadata_total" "metadata" "Filesystem metadata clutter" "cleanroom metadata" "cleanroom metadata --apply --trash" ".DS_Store, AppleDouble, Thumbs.db, Desktop.ini, and similar clutter under Desktop, Documents, and Downloads."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$quicklook_total" "quicklook" "Quick Look caches" "cleanroom quicklook" "cleanroom clean --apply --trash --include-quicklook" "Rebuildable Quick Look thumbnail and preview caches."
@@ -6209,6 +6336,7 @@ include_web_caches=false
 include_saved_state=false
 include_project_caches=false
 include_updater_caches=false
+include_browser_caches=false
 
 # Apply safety
 trash=false
@@ -6247,6 +6375,7 @@ interactive() {
   ask_yes_no "Include saved app window/session state?" && INCLUDE_SAVED_STATE=1
   ask_yes_no "Include project cache artifacts?" && INCLUDE_PROJECT_CACHES=1
   ask_yes_no "Include Sparkle/Squirrel app updater caches?" && INCLUDE_UPDATER_CACHES=1
+  ask_yes_no "Include Chromium/Firefox browser cache folders?" && INCLUDE_BROWSER_CACHES=1
   ask_yes_no "Include stale node_modules older than ${DAYS} days?" && INCLUDE_NODE_STALE=1
   ask_yes_no "Include stale Python virtualenvs older than ${DAYS} days?" && INCLUDE_VENV_STALE=1
   ask_yes_no "Include heavy SDK/simulator cleanup?" && INCLUDE_DEV_HEAVY=1
@@ -6323,6 +6452,10 @@ Default safe cleanup:
   Rebuildable Sparkle and Squirrel updater cache/staging data. Apps, app profiles,
   browser profiles, passwords, cookies, bookmarks, and settings are not targeted.
 
+--include-browser-caches:
+  Rebuildable Chromium and Firefox cache folders only. Browser profiles, password
+  databases, cookies, bookmarks, sessions, extensions, and settings are not targeted.
+
 --include-dev-heavy:
   Xcode device support, unavailable simulators, simulator app data, Android NDK,
   and Android system images.
@@ -6384,6 +6517,7 @@ clean() {
   clean_saved_state
   clean_project_caches
   clean_updater_caches
+  clean_browser_caches
   clean_node_stale
   clean_venv_stale
   clean_snapshots
@@ -6430,7 +6564,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  overview|map|snapshot|diff|state|permissions|review|scan|system-data|plan|large|brokenlinks|quarantine|metadata|quicklook|fontcaches|font-caches|webcaches|web-caches|savedstate|saved-state|projectcaches|project-caches|updaters|updater-caches|duplicates|documents|desktop|screenshots|archives|downloads|installers|nodes|venvs|virtualenvs|apps|uninstallers|appreview|appdata|libraries|cloud|cloudfiles|cloud-files|personal|communications|comms|browsers|leftovers|backups|xcode|android|startup|loginitems|trash|caches|diagnostics|packages|receipts|homebrew|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
+  overview|map|snapshot|diff|state|permissions|review|scan|system-data|plan|large|brokenlinks|quarantine|metadata|quicklook|fontcaches|font-caches|webcaches|web-caches|savedstate|saved-state|projectcaches|project-caches|updaters|updater-caches|browsercaches|browser-caches|duplicates|documents|desktop|screenshots|archives|downloads|installers|nodes|venvs|virtualenvs|apps|uninstallers|appreview|appdata|libraries|cloud|cloudfiles|cloud-files|personal|communications|comms|browsers|leftovers|backups|xcode|android|startup|loginitems|trash|caches|diagnostics|packages|receipts|homebrew|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -6518,6 +6652,7 @@ while [[ "$#" -gt 0 ]]; do
     --include-saved-state|--include-savedstate) INCLUDE_SAVED_STATE=1 ;;
     --include-project-caches|--include-projectcaches) INCLUDE_PROJECT_CACHES=1 ;;
     --include-updater-caches|--include-updatercaches|--include-updaters) INCLUDE_UPDATER_CACHES=1 ;;
+    --include-browser-caches|--include-browsercaches) INCLUDE_BROWSER_CACHES=1 ;;
     --include-gemini) INCLUDE_GEMINI=1; INCLUDE_AI_WORKSPACES=1 ;;
     --include-lmstudio) INCLUDE_LMSTUDIO=1; INCLUDE_AI_MODELS=1 ;;
     -h|--help) usage; exit 0 ;;
@@ -6554,6 +6689,7 @@ case "$ACTION" in
   savedstate|saved-state) savedstate ;;
   projectcaches|project-caches) projectcaches ;;
   updaters|updater-caches) updaters ;;
+  browsercaches|browser-caches) browsercaches ;;
   duplicates) duplicates ;;
   documents) documents ;;
   desktop) desktop ;;

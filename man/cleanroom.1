@@ -1,4 +1,4 @@
-.TH CLEANROOM 1 "June 2026" "cleanroom 0.67.0" "User Commands"
+.TH CLEANROOM 1 "June 2026" "cleanroom 0.68.0" "User Commands"
 .SH NAME
 cleanroom \- safe-by-default macOS storage cleaner
 .SH SYNOPSIS
@@ -61,6 +61,9 @@ cleanroom \- safe-by-default macOS storage cleaner
 .br
 .B cleanroom
 .RI "updaters [--json]"
+.br
+.B cleanroom
+.RI "browsercaches [--json]"
 .br
 .B cleanroom
 .RI "duplicates [path] [--min-mb n] [--limit n] [--json]"
@@ -275,6 +278,10 @@ pytest, mypy, ruff, tox, nox, and coverage caches.
 .B updaters
 Inventory Sparkle and Squirrel app updater cache and staging folders without
 touching apps, app profiles, browser profiles, or passwords.
+.TP
+.B browsercaches
+Inventory Chromium and Firefox browser cache folders without touching profiles,
+password databases, cookies, bookmarks, sessions, extensions, or settings.
 .TP
 .B duplicates
 Find exact duplicate files for review without deleting anything.
@@ -513,6 +520,10 @@ Downloads. Source, .git, node_modules, and virtualenv folders are pruned.
 .B --include-updater-caches
 Remove rebuildable Sparkle/Squirrel app updater cache and staging data.
 .TP
+.B --include-browser-caches
+Remove Chromium and Firefox browser cache folders only. Browser profiles and
+credential data stay protected.
+.TP
 .B --include-venv-stale
 Remove stale Python virtualenv folders older than
 .BR --days
@@ -558,6 +569,7 @@ cleanroom webcaches --json
 cleanroom savedstate --json
 cleanroom projectcaches --json
 cleanroom updaters --json
+cleanroom browsercaches --json
 cleanroom leftovers adobe --limit 50
 cleanroom leftovers adobe --apply --trash
 cleanroom backups --json
