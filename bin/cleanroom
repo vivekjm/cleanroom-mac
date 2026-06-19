@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.71.0"
+VERSION="0.72.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -37,6 +37,7 @@ INCLUDE_USER_TRASH=0
 INCLUDE_INSTALLERS=0
 INCLUDE_DOWNLOAD_ARTIFACTS=0
 INCLUDE_SCREENSHOTS=0
+INCLUDE_CLEANROOM_STATE=0
 INCLUDE_METADATA=0
 INCLUDE_QUICKLOOK=0
 INCLUDE_FONT_CACHES=0
@@ -238,6 +239,9 @@ Options:
                        Remove old installers, disk images, and archives from ~/Downloads.
   --include-screenshots
                        Remove old screenshot and screen recording files older than --days.
+  --include-cleanroom-state
+                       Remove cleanroom-created logs, snapshots, and recoverable Trash
+                       folders older than --days. Never enabled by presets.
   --include-metadata   Remove filesystem metadata clutter from Desktop, Documents, and Downloads.
   --include-quicklook  Remove rebuildable Quick Look thumbnail and preview caches.
   --include-font-caches
@@ -543,6 +547,7 @@ load_config() {
       include_installers) truthy "$value" && INCLUDE_INSTALLERS=1 ;;
       include_download_artifacts) truthy "$value" && INCLUDE_DOWNLOAD_ARTIFACTS=1 ;;
       include_screenshots) truthy "$value" && INCLUDE_SCREENSHOTS=1 ;;
+      include_cleanroom_state) truthy "$value" && INCLUDE_CLEANROOM_STATE=1 ;;
       include_metadata) truthy "$value" && INCLUDE_METADATA=1 ;;
       include_quicklook) truthy "$value" && INCLUDE_QUICKLOOK=1 ;;
       include_font_caches) truthy "$value" && INCLUDE_FONT_CACHES=1 ;;
@@ -814,6 +819,7 @@ preflight_rows() {
   [[ "$INCLUDE_INSTALLERS" -eq 1 ]] && printf '%s\t%s\t%s\t%s\n' "installers" "Old downloaded installers" "opt-in" "Trash mode can recover direct removals when --trash is used."
   [[ "$INCLUDE_DOWNLOAD_ARTIFACTS" -eq 1 ]] && printf '%s\t%s\t%s\t%s\n' "download-artifacts" "Old downloadable artifacts" "opt-in" "Only installer, disk image, and archive-style files directly under ~/Downloads older than ${DAYS} days are targeted."
   [[ "$INCLUDE_SCREENSHOTS" -eq 1 ]] && printf '%s\t%s\t%s\t%s\n' "screenshots" "Old screenshots and screen recordings" "privacy-sensitive" "Only known screenshot and screen recording filenames older than ${DAYS} days under Desktop, Downloads, and Documents are targeted."
+  [[ "$INCLUDE_CLEANROOM_STATE" -eq 1 ]] && printf '%s\t%s\t%s\t%s\n' "cleanroom-state" "Old cleanroom-created state" "maintenance" "Only cleanroom run logs, snapshots, and cleanroom Trash folders older than ${DAYS} days are targeted."
   [[ "$INCLUDE_METADATA" -eq 1 ]] && printf '%s\t%s\t%s\t%s\n' "metadata" "Filesystem metadata clutter" "low-risk" "Trash mode can recover direct removals when --trash is used."
   [[ "$INCLUDE_QUICKLOOK" -eq 1 ]] && printf '%s\t%s\t%s\t%s\n' "quicklook" "Quick Look caches" "rebuildable" "Trash mode can recover direct cache removals when --trash is used."
   [[ "$INCLUDE_FONT_CACHES" -eq 1 ]] && printf '%s\t%s\t%s\t%s\n' "font-caches" "Font cache databases" "rebuildable" "Actual font files stay protected; macOS recreates font caches as needed."
@@ -912,6 +918,7 @@ confirm_apply() {
   warn "Protected data like browser passwords and Keychains is not deleted."
   [[ "$INCLUDE_AI_MODELS" -eq 1 ]] && warn "AI model cleanup removes downloaded model files."
   [[ "$INCLUDE_CONTAINERS" -eq 1 ]] && warn "Container cleanup can remove local container VM disks and volumes."
+  [[ "$INCLUDE_CLEANROOM_STATE" -eq 1 ]] && warn "Cleanroom state cleanup can remove old restore folders from ~/.Trash."
   [[ "$INCLUDE_USER_TRASH" -eq 1 ]] && warn "User Trash cleanup permanently empties ~/.Trash."
   printf 'Continue? Type "clean" to proceed: '
   local answer
@@ -1182,6 +1189,7 @@ delete_user_trash_child() {
     warn "Could not empty Trash item: $path"
     record_apply "empty-trash" "failed" "$kb" "$path" ""
   fi
+  return 0
 }
 
 run_rm() {
@@ -5172,6 +5180,45 @@ cleanroom_trash_total_kb() {
   printf '%s\n' "$total"
 }
 
+cleanroom_state_cleanup_rows() {
+  local cutoff path kind kb epoch age_days
+  cutoff=$(( $(date +%s) - DAYS * 86400 ))
+
+  if [[ -d "$(log_dir)" ]]; then
+    while IFS= read -r -d '' path; do
+      epoch="$(path_mtime_epoch "$path")"
+      [[ "${epoch:-0}" -le "$cutoff" ]] || continue
+      kb="$(size_kb "$path")"
+      age_days=$((($(date +%s) - epoch) / 86400))
+      printf '%012d\t%s\t%s\t%s\t%s\n' "$kb" "$epoch" "$age_days" "run-log" "$path"
+    done < <(find "$(log_dir)" -type f -name '*.log' -mtime +"$DAYS" -print0 2>/dev/null)
+  fi
+
+  if [[ -d "$(snapshot_dir)" ]]; then
+    while IFS= read -r -d '' path; do
+      epoch="$(path_mtime_epoch "$path")"
+      [[ "${epoch:-0}" -le "$cutoff" ]] || continue
+      kb="$(size_kb "$path")"
+      age_days=$((($(date +%s) - epoch) / 86400))
+      printf '%012d\t%s\t%s\t%s\t%s\n' "$kb" "$epoch" "$age_days" "snapshot" "$path"
+    done < <(find "$(snapshot_dir)" -type f -name 'snapshot-*.json' -mtime +"$DAYS" -print0 2>/dev/null)
+  fi
+
+  if [[ -d "$HOME/.Trash" ]]; then
+    while IFS= read -r -d '' path; do
+      epoch="$(path_mtime_epoch "$path")"
+      [[ "${epoch:-0}" -le "$cutoff" ]] || continue
+      kb="$(size_kb "$path")"
+      age_days=$((($(date +%s) - epoch) / 86400))
+      printf '%012d\t%s\t%s\t%s\t%s\n' "$kb" "$epoch" "$age_days" "recoverable-trash" "$path"
+    done < <(find "$HOME/.Trash" -mindepth 1 -maxdepth 1 -type d -name 'cleanroom-*' -mtime +"$DAYS" -print0 2>/dev/null)
+  fi
+}
+
+cleanroom_state_cleanup_total_kb() {
+  cleanroom_state_cleanup_rows | tab_rows_total_kb
+}
+
 state_rows() {
   local runs snapshots trash_pattern trash_kb
   runs="$(log_dir)"
@@ -5217,6 +5264,32 @@ state() {
     printf '%-10s %-8s %-20s %-28s %s\n' "$(human_kb "${kb:-0}")" "${count:-0}" "$id" "$command" "$path"
     printf '  %s\n' "$description"
   done <<<"$rows"
+  printf '\nPreview cleanup with: cleanroom clean --include-cleanroom-state --days %s\n' "$DAYS"
+  printf 'Apply cleanup with: cleanroom clean --apply --include-cleanroom-state --days %s\n' "$DAYS"
+}
+
+clean_cleanroom_state() {
+  [[ "$INCLUDE_CLEANROOM_STATE" -eq 1 ]] || return 0
+  log "${BOLD}Old cleanroom-created state older than ${DAYS} days${RESET}"
+  local rows kb epoch age_days kind path
+  rows="$(cleanroom_state_cleanup_rows)"
+  if [[ -z "$rows" ]]; then
+    printf 'No old cleanroom-created state found.\n'
+    return 0
+  fi
+  while IFS=$'\t' read -r kb epoch age_days kind path; do
+    [[ -z "${path:-}" ]] && continue
+    if [[ "$kind" == "recoverable-trash" ]]; then
+      if [[ "$APPLY" -eq 1 ]]; then
+        delete_user_trash_child "$path"
+      else
+        printf 'would empty  %8s  %s\n' "$(human_kb "$kb")" "$path"
+      fi
+    else
+      run_rm "$path"
+    fi
+  done <<<"$rows"
+  return 0
 }
 
 trash() {
@@ -6023,7 +6096,7 @@ snapshots() {
 }
 
 plan_rows() {
-  local safe package toolchain app browsercache_total installers download_artifacts screenshots_total metadata_total quicklook_total fontcache_total webcache_total savedstate_total projectcache_total updatercache_total devicebackup_total node venv dev diagnostics ai_workspaces ai_models containers user_trash
+  local safe package toolchain app browsercache_total installers download_artifacts screenshots_total cleanroom_state_total metadata_total quicklook_total fontcache_total webcache_total savedstate_total projectcache_total updatercache_total devicebackup_total node venv dev diagnostics ai_workspaces ai_models containers user_trash
   safe="$(sum_existing_kb \
     "~/Library/Caches" "~/.cache" "~/.npm/_cacache" "~/.npm/_logs" "~/.npm/_npx" \
     "~/.yarn/cache" "~/.yarn/berry" "~/.gradle/caches" "~/.gradle/daemon" \
@@ -6037,6 +6110,7 @@ plan_rows() {
   installers="$(installer_total_kb)"
   download_artifacts="$(download_artifact_total_kb)"
   screenshots_total="$(screenshot_total_kb)"
+  cleanroom_state_total="$(cleanroom_state_cleanup_total_kb)"
   metadata_total="$(metadata_total_kb)"
   quicklook_total="$(quicklook_total_kb)"
   fontcache_total="$(fontcache_total_kb)"
@@ -6064,6 +6138,7 @@ plan_rows() {
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$installers" "old-installers" "Old downloaded installers" "cleanroom clean --include-installers --days $DAYS" "cleanroom clean --apply --trash --include-installers --days $DAYS" "Downloaded .dmg, .pkg, .mpkg, .xip, .ipsw, and .iso files older than $DAYS days in ~/Downloads."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$download_artifacts" "download-artifacts" "Old downloadable artifacts" "cleanroom downloads --days $DAYS" "cleanroom clean --apply --trash --include-download-artifacts --days $DAYS" "Old installers, disk images, and archive files directly under ~/Downloads. Arbitrary documents and folders stay untouched."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$screenshots_total" "screenshots" "Old screenshots and screen recordings" "cleanroom screenshots --days $DAYS" "cleanroom clean --apply --trash --include-screenshots --days $DAYS" "Known screenshot and screen recording files older than $DAYS days under Desktop, Downloads, and Documents."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$cleanroom_state_total" "cleanroom-state" "Old cleanroom-created state" "cleanroom state" "cleanroom clean --apply --include-cleanroom-state --days $DAYS" "Old cleanroom run logs, storage snapshots, and recoverable Trash folders created by previous --trash runs."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$metadata_total" "metadata" "Filesystem metadata clutter" "cleanroom metadata" "cleanroom metadata --apply --trash" ".DS_Store, AppleDouble, Thumbs.db, Desktop.ini, and similar clutter under Desktop, Documents, and Downloads."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$quicklook_total" "quicklook" "Quick Look caches" "cleanroom quicklook" "cleanroom clean --apply --trash --include-quicklook" "Rebuildable Quick Look thumbnail and preview caches."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$fontcache_total" "font-caches" "Font cache databases" "cleanroom fontcaches" "cleanroom clean --apply --trash --include-font-caches" "Rebuildable Apple Type Services and font registry caches. Actual font files stay protected."
@@ -6542,6 +6617,7 @@ include_containers=false
 include_installers=false
 include_download_artifacts=false
 include_screenshots=false
+include_cleanroom_state=false
 include_metadata=false
 include_quicklook=false
 include_font_caches=false
@@ -6584,6 +6660,7 @@ interactive() {
   ask_yes_no "Include old downloaded installers older than ${DAYS} days?" && INCLUDE_INSTALLERS=1
   ask_yes_no "Include old downloadable artifacts in Downloads older than ${DAYS} days?" && INCLUDE_DOWNLOAD_ARTIFACTS=1
   ask_yes_no "Include old screenshots and screen recordings older than ${DAYS} days?" && INCLUDE_SCREENSHOTS=1
+  ask_yes_no "Include old cleanroom-created state older than ${DAYS} days?" && INCLUDE_CLEANROOM_STATE=1
   ask_yes_no "Include filesystem metadata clutter?" && INCLUDE_METADATA=1
   ask_yes_no "Include Quick Look thumbnail caches?" && INCLUDE_QUICKLOOK=1
   ask_yes_no "Include user font cache databases?" && INCLUDE_FONT_CACHES=1
@@ -6646,6 +6723,11 @@ Default safe cleanup:
   Old screenshot and screen recording files under Desktop, Downloads, and
   Documents. Only known screenshot/recording filenames older than --days are
   targeted; arbitrary images and videos are not removed.
+
+--include-cleanroom-state:
+  Old cleanroom-created audit logs, storage snapshots, and recoverable
+  ~/.Trash/cleanroom-* folders older than --days. This only targets state
+  created by cleanroom and is never included in presets.
 
 --include-metadata:
   Filesystem metadata clutter such as .DS_Store, AppleDouble ._* files,
@@ -6744,6 +6826,7 @@ clean() {
   clean_installers
   clean_download_artifacts
   clean_screenshots
+  clean_cleanroom_state
   clean_metadata
   clean_quicklook
   clean_font_caches
@@ -6873,6 +6956,7 @@ while [[ "$#" -gt 0 ]]; do
     --include-installers) INCLUDE_INSTALLERS=1 ;;
     --include-download-artifacts|--include-downloads-artifacts|--include-downloadartifacts) INCLUDE_DOWNLOAD_ARTIFACTS=1 ;;
     --include-screenshots|--include-screen-recordings|--include-screenrecordings) INCLUDE_SCREENSHOTS=1 ;;
+    --include-cleanroom-state|--include-cleanroomstate) INCLUDE_CLEANROOM_STATE=1 ;;
     --include-package-stores) INCLUDE_PACKAGE_STORES=1 ;;
     --include-toolchains) INCLUDE_TOOLCHAINS=1 ;;
     --include-diagnostics) INCLUDE_DIAGNOSTICS=1 ;;

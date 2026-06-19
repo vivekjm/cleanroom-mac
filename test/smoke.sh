@@ -356,6 +356,7 @@ grep '"id":"downloads"' "$diff_json" >/dev/null
 grep '"delta_kb":' "$diff_json" >/dev/null
 rm -f "$diff_json"
 "$BIN" state | grep 'cleanroom state' >/dev/null
+"$BIN" state | grep 'include-cleanroom-state' >/dev/null
 state_json="$(mktemp)"
 "$BIN" state --json > "$state_json"
 python3 -m json.tool "$state_json" >/dev/null
@@ -459,6 +460,7 @@ grep 'cleanroom clean --apply --trash --include-browser-caches' "$plan_json" >/d
 grep 'cleanroom clean --include-device-backups --days 30 --apply --trash' "$plan_json" >/dev/null
 grep 'cleanroom clean --apply --trash --include-download-artifacts --days 30' "$plan_json" >/dev/null
 grep 'cleanroom clean --apply --trash --include-screenshots --days 30' "$plan_json" >/dev/null
+grep 'cleanroom clean --apply --include-cleanroom-state --days 30' "$plan_json" >/dev/null
 rm -f "$plan_json"
 "$BIN" large "$HOME/Downloads" --min-mb 1 --limit 5 | grep 'big-test.bin' >/dev/null
 large_json="$(mktemp)"
@@ -993,6 +995,7 @@ grep '^include_browser_caches=false' "$config_file" >/dev/null
 grep '^include_device_backups=false' "$config_file" >/dev/null
 grep '^include_download_artifacts=false' "$config_file" >/dev/null
 grep '^include_screenshots=false' "$config_file" >/dev/null
+grep '^include_cleanroom_state=false' "$config_file" >/dev/null
 "$BIN" doctor --config "$config_file" | grep "$config_file" >/dev/null
 
 report_stdout="$("$BIN" report)"
@@ -1049,8 +1052,10 @@ downloadartifacts_preflight="$("$BIN" clean --include-download-artifacts --prefl
 grep 'download-artifacts' <<<"$downloadartifacts_preflight" >/dev/null
 screenshots_preflight="$("$BIN" clean --include-screenshots --preflight)"
 grep 'screenshots' <<<"$screenshots_preflight" >/dev/null
+cleanroomstate_preflight="$("$BIN" clean --include-cleanroom-state --preflight)"
+grep 'cleanroom-state' <<<"$cleanroomstate_preflight" >/dev/null
 preflight_json="$(mktemp)"
-"$BIN" clean --preset deep --include-ai-models --include-containers --include-user-trash --include-metadata --include-download-artifacts --include-screenshots --include-quicklook --include-font-caches --include-web-caches --include-saved-state --include-project-caches --include-updater-caches --include-browser-caches --include-device-backups --apply --trash --yes --preflight --json > "$preflight_json"
+"$BIN" clean --preset deep --include-ai-models --include-containers --include-user-trash --include-metadata --include-download-artifacts --include-screenshots --include-cleanroom-state --include-quicklook --include-font-caches --include-web-caches --include-saved-state --include-project-caches --include-updater-caches --include-browser-caches --include-device-backups --apply --trash --yes --preflight --json > "$preflight_json"
 python3 -m json.tool "$preflight_json" >/dev/null
 grep '"apply":true' "$preflight_json" >/dev/null
 grep '"trash":true' "$preflight_json" >/dev/null
@@ -1058,6 +1063,7 @@ grep '"id":"containers"' "$preflight_json" >/dev/null
 grep '"id":"metadata"' "$preflight_json" >/dev/null
 grep '"id":"download-artifacts"' "$preflight_json" >/dev/null
 grep '"id":"screenshots"' "$preflight_json" >/dev/null
+grep '"id":"cleanroom-state"' "$preflight_json" >/dev/null
 grep '"id":"quicklook"' "$preflight_json" >/dev/null
 grep '"id":"font-caches"' "$preflight_json" >/dev/null
 grep '"id":"web-caches"' "$preflight_json" >/dev/null
@@ -1134,6 +1140,31 @@ test ! -e "$HOME/Downloads/Screen Recording 2026-06-01 at 10.00.00 PM.mov"
 test -e "$HOME/Desktop/Screenshot 2026-06-01 at 10.00.00 PM.png"
 test -e "$HOME/Downloads/Screen Recording 2026-06-01 at 10.00.00 PM.mov"
 rm -f "$screenshots_log"
+mkdir -p "$HOME/.local/state/cleanroom/runs" "$HOME/.local/state/cleanroom/snapshots" "$HOME/.Trash/cleanroom-old-state" "$HOME/.Trash/cleanroom-fresh-state"
+printf 'old log\n' >"$HOME/.local/state/cleanroom/runs/old-run.log"
+printf 'fresh log\n' >"$HOME/.local/state/cleanroom/runs/fresh-run.log"
+printf '{"old":true}\n' >"$HOME/.local/state/cleanroom/snapshots/snapshot-old.json"
+printf '{"fresh":true}\n' >"$HOME/.local/state/cleanroom/snapshots/snapshot-fresh.json"
+printf 'old recoverable\n' >"$HOME/.Trash/cleanroom-old-state/item.txt"
+printf 'fresh recoverable\n' >"$HOME/.Trash/cleanroom-fresh-state/item.txt"
+touch -t 202001010000 "$HOME/.local/state/cleanroom/runs/old-run.log" "$HOME/.local/state/cleanroom/snapshots/snapshot-old.json" "$HOME/.Trash/cleanroom-old-state" "$HOME/.Trash/cleanroom-old-state/item.txt"
+cleanroom_state_preview="$("$BIN" clean --include-cleanroom-state --days 30)"
+grep 'old-run.log' <<<"$cleanroom_state_preview" >/dev/null
+grep 'snapshot-old.json' <<<"$cleanroom_state_preview" >/dev/null
+grep 'cleanroom-old-state' <<<"$cleanroom_state_preview" >/dev/null
+cleanroom_state_log="$(mktemp)"
+rm -f "$cleanroom_state_log"
+"$BIN" clean --include-cleanroom-state --days 30 --apply --yes --log "$cleanroom_state_log" >/dev/null 2>&1
+grep 'old-run.log' "$cleanroom_state_log" >/dev/null
+grep 'snapshot-old.json' "$cleanroom_state_log" >/dev/null
+grep 'cleanroom-old-state' "$cleanroom_state_log" >/dev/null
+test ! -e "$HOME/.local/state/cleanroom/runs/old-run.log"
+test ! -e "$HOME/.local/state/cleanroom/snapshots/snapshot-old.json"
+test ! -e "$HOME/.Trash/cleanroom-old-state"
+test -e "$HOME/.local/state/cleanroom/runs/fresh-run.log"
+test -e "$HOME/.local/state/cleanroom/snapshots/snapshot-fresh.json"
+test -e "$HOME/.Trash/cleanroom-fresh-state/item.txt"
+rm -f "$cleanroom_state_log"
 
 venv_log="$(mktemp)"
 rm -f "$venv_log"

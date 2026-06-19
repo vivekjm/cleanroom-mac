@@ -144,7 +144,7 @@ cleanroom permissions --json
 
 `diff --json BEFORE AFTER` emits before/after storage bucket deltas from two snapshot files. Plain `diff` with no paths compares the latest two saved snapshots.
 
-`state --json` emits Cleanroom-created run-log, snapshot, and recoverable Trash-folder counts and sizes. It is intentionally read-only and helps wrappers or support flows show what Cleanroom itself has created.
+`state --json` emits Cleanroom-created run-log, snapshot, and recoverable Trash-folder counts and sizes. Use `clean --include-cleanroom-state --days N` to preview pruning old Cleanroom-created state, and add `--apply` only after confirming old recovery folders are no longer needed.
 
 `permissions --json` emits existence/readability/listability status for common macOS privacy-sensitive storage locations. Use it when results seem incomplete or show unexpected 0B sizes.
 
@@ -574,6 +574,9 @@ Every applied run writes an audit log:
 ```sh
 ls ~/.local/state/cleanroom/runs
 cleanroom history
+cleanroom state
+cleanroom clean --include-cleanroom-state --days 30
+cleanroom clean --apply --include-cleanroom-state --days 30
 ```
 
 Use `--log PATH` when you want the run log somewhere specific.

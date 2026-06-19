@@ -1,4 +1,4 @@
-.TH CLEANROOM 1 "June 2026" "cleanroom 0.71.0" "User Commands"
+.TH CLEANROOM 1 "June 2026" "cleanroom 0.72.0" "User Commands"
 .SH NAME
 cleanroom \- safe-by-default macOS storage cleaner
 .SH SYNOPSIS
@@ -224,7 +224,7 @@ the latest two saved snapshots from ~/.local/state/cleanroom/snapshots.
 .TP
 .B state
 Inventory Cleanroom-created apply logs, storage snapshots, and recoverable
-~/.Trash/cleanroom-* folders without deleting anything.
+~/.Trash/cleanroom-* folders. Cleanup is opt-in for old Cleanroom-created state.
 .TP
 .B permissions
 Audit whether common macOS privacy-sensitive storage locations exist and are
@@ -507,6 +507,12 @@ files are not targeted.
 .B --include-screenshots
 Remove old screenshot and screen recording files under Desktop, Downloads, and
 Documents during apply. Arbitrary images and videos are not targeted.
+.TP
+.B --include-cleanroom-state
+Remove old Cleanroom-created run logs, snapshots, and recoverable
+~/.Trash/cleanroom-* folders older than
+.BR --days .
+This is never enabled by presets.
 .TP
 .B --include-metadata
 Remove filesystem metadata clutter from Desktop, Documents, and Downloads.

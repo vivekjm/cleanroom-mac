@@ -151,6 +151,8 @@ cleanroom snapshot --output ~/Desktop/cleanroom-before.json
 cleanroom snapshot --json
 cleanroom diff ~/Desktop/cleanroom-before.json ~/Desktop/cleanroom-after.json
 cleanroom state
+cleanroom clean --include-cleanroom-state --days 30
+cleanroom clean --apply --include-cleanroom-state --days 30
 cleanroom permissions
 ```
 
@@ -841,6 +843,8 @@ Config files use simple `key=value` lines and are never executed as shell.
 `diff` compares two snapshot JSON files and ranks bucket deltas. With no paths, it compares the latest two snapshots from `~/.local/state/cleanroom/snapshots/`. It is read-only and useful for explaining what grew after an install or what shrank after cleanup.
 
 `state` inventories Cleanroom-created audit logs, storage snapshots, and recoverable `~/.Trash/cleanroom-*` folders. It is read-only and helps users understand the tool's own footprint.
+
+`--include-cleanroom-state` removes old Cleanroom-created audit logs, snapshots, and recoverable `~/.Trash/cleanroom-*` folders older than `--days`. It is never included in presets, because deleting old recovery folders can remove the easiest rollback path for previous `--trash` runs.
 
 `permissions` audits whether common macOS privacy-sensitive storage locations exist and are readable/listable by the current terminal or app. If existing paths show `blocked` or `limited`, grant Full Disk Access to the app running Cleanroom for more complete inventories.
 
