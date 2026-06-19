@@ -343,6 +343,24 @@ fi
 exit 2
 SH
 chmod +x "$TEST_HOME/bin/npm"
+cat >"$TEST_HOME/bin/yarn" <<'SH'
+#!/usr/bin/env bash
+if [[ "${1:-}" == "cache" && "${2:-}" == "dir" ]]; then
+  printf '%s/.cache/yarn\n' "$HOME"
+  exit 0
+fi
+if [[ "${1:-}" == "cache" && "${2:-}" == "clean" ]]; then
+  printf 'success Cleared cache.\n'
+  printf 'applied\n' >"$HOME/yarn-cache-clean-applied"
+  exit 0
+fi
+if [[ "${1:-}" == "config" && "${2:-}" == "get" && "${3:-}" == "cacheFolder" ]]; then
+  printf '%s/.yarn/berry/cache\n' "$HOME"
+  exit 0
+fi
+exit 2
+SH
+chmod +x "$TEST_HOME/bin/yarn"
 cat >"$TEST_HOME/bin/pnpm" <<'SH'
 #!/usr/bin/env bash
 if [[ "${1:-}" == "store" && "${2:-}" == "status" ]]; then
@@ -933,6 +951,7 @@ packages_json="$(mktemp)"
 python3 -m json.tool "$packages_json" >/dev/null
 grep 'pnpm-store' "$packages_json" >/dev/null
 grep 'homebrew-cache' "$packages_json" >/dev/null
+grep 'cleanroom yarn-cache --apply --yes' "$packages_json" >/dev/null
 grep 'cleanroom pnpm-store --apply --yes' "$packages_json" >/dev/null
 rm -f "$packages_json"
 "$BIN" npm-cache | grep 'Cache verified' >/dev/null
@@ -947,6 +966,18 @@ rm -f "$npm_cache_log" "$TEST_HOME/npm-cache-clean-applied"
 "$BIN" npm-cache --apply --yes --log "$npm_cache_log" | grep 'npm cache cleaned' >/dev/null
 test -f "$TEST_HOME/npm-cache-clean-applied"
 grep 'npm-cache' "$npm_cache_log" >/dev/null
+"$BIN" yarn-cache | grep '.cache/yarn' >/dev/null
+yarn_cache_json="$(mktemp)"
+"$BIN" yarn-cache --json > "$yarn_cache_json"
+python3 -m json.tool "$yarn_cache_json" >/dev/null
+grep '"command":"yarn cache dir"' "$yarn_cache_json" >/dev/null
+grep '.cache/yarn' "$yarn_cache_json" >/dev/null
+rm -f "$yarn_cache_json"
+yarn_cache_log="$(mktemp)"
+rm -f "$yarn_cache_log" "$TEST_HOME/yarn-cache-clean-applied"
+"$BIN" yarn-cache --apply --yes --log "$yarn_cache_log" | grep 'Cleared cache' >/dev/null
+test -f "$TEST_HOME/yarn-cache-clean-applied"
+grep 'yarn-cache' "$yarn_cache_log" >/dev/null
 "$BIN" pnpm-store | grep 'Packages in the store are untouched' >/dev/null
 pnpm_store_json="$(mktemp)"
 "$BIN" pnpm-store --json > "$pnpm_store_json"

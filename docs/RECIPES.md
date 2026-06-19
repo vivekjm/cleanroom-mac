@@ -236,6 +236,8 @@ cleanroom permissions --json
 
 `npm-cache --json` emits the command, exit code, apply mode, and output from npm's native cache verifier. Use `--apply --yes` to run `npm cache clean --force`.
 
+`yarn-cache --json` emits the command, exit code, apply mode, and output from Yarn's native cache-location command. Use `--apply --yes` to run `yarn cache clean`.
+
 `pnpm-store --json` emits the command, exit code, apply mode, and output from pnpm's native store status check. Use `--apply --yes` to run `pnpm store prune`.
 
 `receipts --json` emits readable macOS package installer receipt files with package IDs, receipt kind, path, size, modified date, and a matching `cleanroom leftovers <package-id>` review command. Receipts are install records and are never cleanup targets.

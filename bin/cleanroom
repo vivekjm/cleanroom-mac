@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.76.0"
+VERSION="0.77.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -110,6 +110,7 @@ Usage:
   cleanroom diagnostics [--json]
   cleanroom packages [--json]
   cleanroom npm-cache [--json] [--apply --yes]
+  cleanroom yarn-cache [--json] [--apply --yes]
   cleanroom pnpm-store [--json] [--apply --yes]
   cleanroom receipts [--limit N] [--json]
   cleanroom homebrew [--json]
@@ -182,6 +183,7 @@ Actions:
   diagnostics          Inventory user logs and diagnostic reports.
   packages             Inventory package-manager caches and stores.
   npm-cache            Run npm's cache verifier, or clean npm cache with --apply.
+  yarn-cache           Show Yarn cache location, or clean Yarn cache with --apply.
   pnpm-store           Run pnpm store status, or prune unreferenced packages with --apply.
   receipts             Inventory macOS package installer receipts.
   homebrew             Inventory Homebrew cache, Cellar, Caskroom, and logs.
@@ -209,7 +211,7 @@ Options:
   --json               Emit JSON for overview, map, snapshot, diff, state, permissions, review, scan, system-data, plan, large, brokenlinks, quarantine, metadata, quicklook, fontcaches, webcaches, savedstate, projectcaches, updaters, browsercaches, duplicates,
                        documents, desktop, screenshots, archives, downloads, installers, nodes, venvs, apps, uninstallers, appreview, appdata, libraries, cloud, cloudfiles, personal, communications,
                        browsers, leftovers, startup, loginitems,
-                       trash, backups, xcode, caches, diagnostics, packages, npm-cache, pnpm-store, receipts, homebrew, homebrew-cleanup, toolchains,
+                       trash, backups, xcode, caches, diagnostics, packages, npm-cache, yarn-cache, pnpm-store, receipts, homebrew, homebrew-cleanup, toolchains,
                        containers, android, snapshots, clean --preflight, doctor, protect, guard, or rules.
   --output PATH        Output path for report.
   --redact             Redact home, user, and temporary paths in Markdown reports.
@@ -5348,7 +5350,7 @@ trash() {
 
 package_rows() {
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "npm-cache" "npm" "~/.npm/_cacache; ~/.npm/_logs; ~/.npm/_npx" "default" "cleanroom clean" "cleanroom clean --apply --trash"
-  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "yarn-cache" "yarn" "~/.yarn/cache; ~/.yarn/berry" "default" "cleanroom clean" "cleanroom clean --apply --trash"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "yarn-cache" "yarn" "~/.yarn/cache; ~/.yarn/berry" "default" "cleanroom yarn-cache" "cleanroom yarn-cache --apply --yes"
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "pnpm-store" "pnpm" "~/Library/pnpm/store; ~/.pnpm-store" "package-stores" "cleanroom pnpm-store" "cleanroom pnpm-store --apply --yes"
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "gradle-cache" "gradle" "~/.gradle/caches; ~/.gradle/daemon; ~/.gradle/native; ~/.gradle/workers; ~/.gradle-tangibly-release/caches; ~/.gradle-tangibly-release/wrapper; ~/.gradle-tangibly-release/native" "package-stores" "cleanroom clean --include-package-stores" "cleanroom clean --apply --trash --include-package-stores"
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "cocoapods-repos" "cocoapods" "~/.cocoapods/repos" "package-stores" "cleanroom clean --include-package-stores" "cleanroom clean --apply --trash --include-package-stores"
@@ -5380,7 +5382,7 @@ cache_rows() {
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "user-caches" "default" "~/Library/Caches; ~/.cache" "cleanroom clean" "cleanroom clean --apply --trash" "Standard user cache folders. Recreated automatically by apps."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "old-logs" "default" "~/Library/Logs" "cleanroom clean" "cleanroom clean --apply --trash" "User log files. Apply removes only log files older than seven days."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "npm-cache" "default" "~/.npm/_cacache; ~/.npm/_logs; ~/.npm/_npx" "cleanroom clean" "cleanroom clean --apply --trash" "npm caches, temporary npx installs, and npm logs."
-  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "yarn-cache" "default" "~/.yarn/cache; ~/.yarn/berry" "cleanroom clean" "cleanroom clean --apply --trash" "Yarn package caches and Berry state."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "yarn-cache" "default" "~/.yarn/cache; ~/.yarn/berry" "cleanroom yarn-cache" "cleanroom yarn-cache --apply --yes" "Yarn package caches and Berry state. Native clean removes cached packages."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "gradle-cache" "default" "~/.gradle/caches; ~/.gradle/daemon; ~/.gradle/native; ~/.gradle/workers" "cleanroom clean" "cleanroom clean --apply --trash" "Gradle caches, daemons, native caches, and worker state."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "pnpm-store" "default" "~/Library/pnpm/store" "cleanroom pnpm-store" "cleanroom pnpm-store --apply --yes" "Default pnpm content-addressable package store. Native prune removes unreferenced packages."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "xcode-derived-data" "default" "~/Library/Developer/Xcode/DerivedData" "cleanroom clean" "cleanroom clean --apply --trash" "Xcode build intermediates and indexes."
@@ -5630,6 +5632,84 @@ npm_cache() {
     printf '%s\n' "$output"
   else
     printf 'npm reported no cache output.\n'
+  fi
+  return "$status"
+}
+
+yarn_cache() {
+  local command_label output status
+  if ! command -v yarn >/dev/null 2>&1; then
+    if [[ "$JSON" -eq 1 ]]; then
+      printf '{"available":false,"apply":%s,"command":"","exit_code":127,"output":"%s"}\n' \
+        "$(if [[ "$APPLY" -eq 1 ]]; then echo true; else echo false; fi)" \
+        "$(printf '%s' "yarn command not found" | json_escape)"
+      return 0
+    fi
+    die "yarn command not found"
+  fi
+
+  if [[ "$APPLY" -eq 1 ]]; then
+    command_label="yarn cache clean"
+  else
+    command_label="yarn cache dir"
+  fi
+
+  if [[ "$APPLY" -eq 1 && "$ASSUME_YES" -ne 1 ]]; then
+    if [[ "$JSON" -eq 1 ]]; then
+      printf '{"available":true,"apply":true,"command":"%s","exit_code":2,"output":"%s"}\n' \
+        "$(printf '%s' "$command_label" | json_escape)" \
+        "$(printf '%s' "confirmation required; pass --yes to use --json with --apply" | json_escape)"
+      return 2
+    fi
+    warn "Apply mode enabled for Yarn cache cleanup."
+    warn "Yarn cache clean removes cached packages and projects may need to download packages again."
+    printf 'Continue? Type "clean" to proceed: '
+    local answer
+    IFS= read -r answer
+    [[ "$answer" == "clean" ]] || die "Aborted."
+  fi
+
+  if [[ "$APPLY" -eq 1 ]]; then
+    if output="$(yarn cache clean 2>&1)"; then
+      status=0
+      record_apply "yarn-cache" "ok" "0" "$command_label" ""
+    else
+      status=$?
+      record_apply "yarn-cache" "failed" "0" "$command_label" ""
+    fi
+  else
+    if output="$(yarn cache dir 2>&1)"; then
+      status=0
+    else
+      command_label="yarn config get cacheFolder"
+      if output="$(yarn config get cacheFolder 2>&1)"; then
+        status=0
+      else
+        status=$?
+      fi
+    fi
+  fi
+
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '{"available":true,"apply":%s,"command":"%s","exit_code":%s,"output":"%s"}\n' \
+      "$(if [[ "$APPLY" -eq 1 ]]; then echo true; else echo false; fi)" \
+      "$(printf '%s' "$command_label" | json_escape)" \
+      "$status" \
+      "$(printf '%s' "$output" | json_escape)"
+    return "$status"
+  fi
+
+  printf '%s\n' "${BOLD}cleanroom Yarn cache${RESET}"
+  if [[ "$APPLY" -eq 1 ]]; then
+    printf 'Running: %s\n\n' "$command_label"
+  else
+    warn "Dry-run mode. Pass --apply --yes to run yarn cache clean."
+    printf 'Running: %s\n\n' "$command_label"
+  fi
+  if [[ -n "$output" ]]; then
+    printf '%s\n' "$output"
+  else
+    printf 'Yarn reported no cache output.\n'
   fi
   return "$status"
 }
@@ -7120,7 +7200,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  overview|map|snapshot|diff|state|permissions|review|scan|system-data|plan|large|brokenlinks|quarantine|metadata|quicklook|fontcaches|font-caches|webcaches|web-caches|savedstate|saved-state|projectcaches|project-caches|updaters|updater-caches|browsercaches|browser-caches|duplicates|documents|desktop|screenshots|archives|downloads|installers|nodes|venvs|virtualenvs|apps|uninstallers|appreview|appdata|libraries|cloud|cloudfiles|cloud-files|personal|communications|comms|browsers|leftovers|backups|xcode|android|startup|loginitems|trash|caches|diagnostics|packages|npm-cache|npmcache|pnpm-store|pnpmstore|receipts|homebrew|homebrew-cleanup|brewcleanup|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
+  overview|map|snapshot|diff|state|permissions|review|scan|system-data|plan|large|brokenlinks|quarantine|metadata|quicklook|fontcaches|font-caches|webcaches|web-caches|savedstate|saved-state|projectcaches|project-caches|updaters|updater-caches|browsercaches|browser-caches|duplicates|documents|desktop|screenshots|archives|downloads|installers|nodes|venvs|virtualenvs|apps|uninstallers|appreview|appdata|libraries|cloud|cloudfiles|cloud-files|personal|communications|comms|browsers|leftovers|backups|xcode|android|startup|loginitems|trash|caches|diagnostics|packages|npm-cache|npmcache|yarn-cache|yarncache|pnpm-store|pnpmstore|receipts|homebrew|homebrew-cleanup|brewcleanup|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -7280,6 +7360,7 @@ case "$ACTION" in
   diagnostics) diagnostics ;;
   packages) packages ;;
   npm-cache|npmcache) npm_cache ;;
+  yarn-cache|yarncache) yarn_cache ;;
   pnpm-store|pnpmstore) pnpm_store ;;
   receipts) receipts ;;
   homebrew) homebrew ;;

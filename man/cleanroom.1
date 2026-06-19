@@ -1,4 +1,4 @@
-.TH CLEANROOM 1 "June 2026" "cleanroom 0.76.0" "User Commands"
+.TH CLEANROOM 1 "June 2026" "cleanroom 0.77.0" "User Commands"
 .SH NAME
 cleanroom \- safe-by-default macOS storage cleaner
 .SH SYNOPSIS
@@ -154,6 +154,9 @@ cleanroom \- safe-by-default macOS storage cleaner
 .br
 .B cleanroom
 .RI "npm-cache [--json] [--apply --yes]"
+.br
+.B cleanroom
+.RI "yarn-cache [--json] [--apply --yes]"
 .br
 .B cleanroom
 .RI "pnpm-store [--json] [--apply --yes]"
@@ -398,6 +401,9 @@ Inventory package-manager caches and stores with preview/apply commands.
 .B npm-cache
 Run npm's cache verifier, or clean npm cache with --apply.
 .TP
+.B yarn-cache
+Show Yarn cache location, or clean Yarn cache with --apply.
+.TP
 .B pnpm-store
 Run pnpm store status, or prune unreferenced packages with --apply.
 .TP
@@ -624,6 +630,8 @@ cleanroom diagnostics --json
 cleanroom packages --json
 cleanroom npm-cache
 cleanroom npm-cache --apply --yes
+cleanroom yarn-cache
+cleanroom yarn-cache --apply --yes
 cleanroom pnpm-store
 cleanroom pnpm-store --apply --yes
 cleanroom receipts --json
