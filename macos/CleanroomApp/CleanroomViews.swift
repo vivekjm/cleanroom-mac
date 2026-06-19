@@ -738,8 +738,7 @@ struct OutputPanel: View {
                     }
                     .frame(height: DS.Layout.outputH)
                     .background(DS.C.terminalBg)
-                    // onChange(of:perform:) is deprecated in macOS 14 but valid on 12+
-                    .onChange(of: state.output) { _ in
+                    .onReceive(state.$output) { _ in
                         withAnimation(DS.Ani.snap) { proxy.scrollTo("bottom", anchor: .bottom) }
                     }
                 }
