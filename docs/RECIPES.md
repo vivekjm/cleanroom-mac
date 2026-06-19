@@ -23,6 +23,7 @@ cleanroom fontcaches
 cleanroom webcaches
 cleanroom savedstate
 cleanroom projectcaches
+cleanroom updaters
 cleanroom duplicates
 cleanroom downloads
 cleanroom installers
@@ -86,6 +87,7 @@ cleanroom fontcaches --json
 cleanroom webcaches --json
 cleanroom savedstate --json
 cleanroom projectcaches --json
+cleanroom updaters --json
 cleanroom duplicates --json ~/Documents
 cleanroom documents --json ~/Documents
 cleanroom desktop --json
@@ -420,6 +422,17 @@ cleanroom projectcaches --json
 cleanroom clean --include-project-caches
 cleanroom clean --apply --trash --include-project-caches
 ```
+
+Review and clean app updater cache/staging data:
+
+```sh
+cleanroom updaters
+cleanroom updaters --json
+cleanroom clean --include-updater-caches
+cleanroom clean --apply --trash --include-updater-caches
+```
+
+`updaters` targets rebuildable Sparkle and Squirrel updater cache/staging folders only. It does not remove apps, app profiles, browser profiles, passwords, cookies, bookmarks, or settings.
 
 Use this for Python and test/tooling cache clutter inside local projects. Cleanroom targets known rebuildable cache artifacts only and prunes `.git`, `node_modules`, and virtualenv folders.
 

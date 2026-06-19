@@ -31,6 +31,9 @@ mkdir -p \
   "$TEST_HOME/Library/Caches/com.apple.Safari" \
   "$TEST_HOME/Library/Caches/com.apple.WebKit.Networking" \
   "$TEST_HOME/Library/Caches/com.apple.WebKit.WebContent" \
+  "$TEST_HOME/Library/Caches/Sparkle" \
+  "$TEST_HOME/Library/Caches/com.github.Squirrel.ShipIt" \
+  "$TEST_HOME/Library/Application Support/com.github.Squirrel.ShipIt" \
   "$TEST_HOME/Library/Containers/com.apple.QuickLook.thumbnailcache/Data/Library/Caches" \
   "$TEST_HOME/Library/Containers/com.apple.quicklook.ThumbnailsAgent/Data/Library/Caches" \
   "$TEST_HOME/Library/Containers/com.apple.Safari/Data/Library/Caches" \
@@ -142,6 +145,9 @@ printf 'quicklook agent container\n' >"$TEST_HOME/Library/Containers/com.apple.q
 printf 'safari container cache\n' >"$TEST_HOME/Library/Containers/com.apple.Safari/Data/Library/Caches/cache.db"
 printf 'safari webkit cache\n' >"$TEST_HOME/Library/Containers/com.apple.Safari/Data/Library/WebKit/NetworkCache/cache.db"
 printf 'safari container history\n' >"$TEST_HOME/Library/Containers/com.apple.Safari/Data/Library/Safari/History.db"
+printf 'sparkle update\n' >"$TEST_HOME/Library/Caches/Sparkle/update.zip"
+printf 'squirrel cache\n' >"$TEST_HOME/Library/Caches/com.github.Squirrel.ShipIt/update.nupkg"
+printf 'squirrel staging\n' >"$TEST_HOME/Library/Application Support/com.github.Squirrel.ShipIt/staged-update"
 printf 'saved state\n' >"$TEST_HOME/Library/Saved Application State/com.example.Test.savedState/window.plist"
 printf 'brew log\n' >"$TEST_HOME/Library/Logs/Homebrew/build.log"
 printf 'receipt plist\n' >"$TEST_HOME/Library/Receipts/com.cleanroom.test.pkg.plist"
@@ -392,6 +398,7 @@ grep 'font-caches' "$rules_json" >/dev/null
 grep 'web-caches' "$rules_json" >/dev/null
 grep 'saved-state' "$rules_json" >/dev/null
 grep 'project-caches' "$rules_json" >/dev/null
+grep 'updater-caches' "$rules_json" >/dev/null
 grep 'screenshots-inventory' "$rules_json" >/dev/null
 grep 'archives-inventory' "$rules_json" >/dev/null
 grep 'android-inventory' "$rules_json" >/dev/null
@@ -431,6 +438,7 @@ grep 'cleanroom clean --apply --trash --include-font-caches' "$plan_json" >/dev/
 grep 'cleanroom clean --apply --trash --include-web-caches' "$plan_json" >/dev/null
 grep 'cleanroom clean --apply --trash --include-saved-state' "$plan_json" >/dev/null
 grep 'cleanroom clean --apply --trash --include-project-caches' "$plan_json" >/dev/null
+grep 'cleanroom clean --apply --trash --include-updater-caches' "$plan_json" >/dev/null
 rm -f "$plan_json"
 "$BIN" large "$HOME/Downloads" --min-mb 1 --limit 5 | grep 'big-test.bin' >/dev/null
 large_json="$(mktemp)"
@@ -564,6 +572,25 @@ test -f "$projectcaches_log"
 grep $'\ttrash\tok\t' "$projectcaches_log" >/dev/null
 "$BIN" restore --log "$projectcaches_log" --apply --yes >/dev/null
 test -e "$TEST_HOME/Documents/python-cache-project/pkg/__pycache__/module.cpython-312.pyc"
+"$BIN" updaters | grep 'Sparkle cache' >/dev/null
+"$BIN" updaters | grep 'Squirrel staging' >/dev/null
+updaters_json="$(mktemp)"
+"$BIN" updaters --json > "$updaters_json"
+python3 -m json.tool "$updaters_json" >/dev/null
+grep '"id":"sparkle-cache"' "$updaters_json" >/dev/null
+grep '"id":"squirrel-staging"' "$updaters_json" >/dev/null
+grep 'cleanroom clean --apply --trash --include-updater-caches' "$updaters_json" >/dev/null
+rm -f "$updaters_json"
+updaters_log="$TEST_HOME/updaters-apply.log"
+"$BIN" clean --include-updater-caches --apply --trash --yes --log "$updaters_log" >/dev/null
+test ! -e "$TEST_HOME/Library/Caches/Sparkle"
+test ! -e "$TEST_HOME/Library/Caches/com.github.Squirrel.ShipIt"
+test ! -e "$TEST_HOME/Library/Application Support/com.github.Squirrel.ShipIt"
+test -f "$updaters_log"
+grep $'\ttrash\tok\t' "$updaters_log" >/dev/null
+"$BIN" restore --log "$updaters_log" --apply --yes >/dev/null
+test -e "$TEST_HOME/Library/Caches/Sparkle/update.zip"
+test -e "$TEST_HOME/Library/Application Support/com.github.Squirrel.ShipIt/staged-update"
 "$BIN" duplicates "$HOME/Documents" --min-mb 1 --limit 5 | grep 'copy-a.bin' >/dev/null
 "$BIN" duplicates "$HOME/Documents" --min-mb 1 --limit 5 | grep 'copy-b.bin' >/dev/null
 duplicates_json="$(mktemp)"
@@ -908,6 +935,7 @@ grep '^include_font_caches=false' "$config_file" >/dev/null
 grep '^include_web_caches=false' "$config_file" >/dev/null
 grep '^include_saved_state=false' "$config_file" >/dev/null
 grep '^include_project_caches=false' "$config_file" >/dev/null
+grep '^include_updater_caches=false' "$config_file" >/dev/null
 "$BIN" doctor --config "$config_file" | grep "$config_file" >/dev/null
 
 report_stdout="$("$BIN" report)"
@@ -954,8 +982,10 @@ savedstate_preflight="$("$BIN" clean --include-saved-state --preflight)"
 grep 'saved-state' <<<"$savedstate_preflight" >/dev/null
 projectcaches_preflight="$("$BIN" clean --include-project-caches --preflight)"
 grep 'project-caches' <<<"$projectcaches_preflight" >/dev/null
+updaters_preflight="$("$BIN" clean --include-updater-caches --preflight)"
+grep 'updater-caches' <<<"$updaters_preflight" >/dev/null
 preflight_json="$(mktemp)"
-"$BIN" clean --preset deep --include-ai-models --include-containers --include-user-trash --include-metadata --include-quicklook --include-font-caches --include-web-caches --include-saved-state --include-project-caches --apply --trash --yes --preflight --json > "$preflight_json"
+"$BIN" clean --preset deep --include-ai-models --include-containers --include-user-trash --include-metadata --include-quicklook --include-font-caches --include-web-caches --include-saved-state --include-project-caches --include-updater-caches --apply --trash --yes --preflight --json > "$preflight_json"
 python3 -m json.tool "$preflight_json" >/dev/null
 grep '"apply":true' "$preflight_json" >/dev/null
 grep '"trash":true' "$preflight_json" >/dev/null
@@ -966,6 +996,7 @@ grep '"id":"font-caches"' "$preflight_json" >/dev/null
 grep '"id":"web-caches"' "$preflight_json" >/dev/null
 grep '"id":"saved-state"' "$preflight_json" >/dev/null
 grep '"id":"project-caches"' "$preflight_json" >/dev/null
+grep '"id":"updater-caches"' "$preflight_json" >/dev/null
 grep '"id":"user-trash"' "$preflight_json" >/dev/null
 grep '"safety":"irreversible"' "$preflight_json" >/dev/null
 grep 'Container cleanup can remove local containers' "$preflight_json" >/dev/null

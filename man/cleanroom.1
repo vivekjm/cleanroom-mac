@@ -1,4 +1,4 @@
-.TH CLEANROOM 1 "June 2026" "cleanroom 0.66.0" "User Commands"
+.TH CLEANROOM 1 "June 2026" "cleanroom 0.67.0" "User Commands"
 .SH NAME
 cleanroom \- safe-by-default macOS storage cleaner
 .SH SYNOPSIS
@@ -58,6 +58,9 @@ cleanroom \- safe-by-default macOS storage cleaner
 .br
 .B cleanroom
 .RI "projectcaches [path] [--limit n] [--json]"
+.br
+.B cleanroom
+.RI "updaters [--json]"
 .br
 .B cleanroom
 .RI "duplicates [path] [--min-mb n] [--limit n] [--json]"
@@ -268,6 +271,10 @@ or app profiles.
 .B projectcaches
 Inventory known rebuildable project cache artifacts such as __pycache__,
 pytest, mypy, ruff, tox, nox, and coverage caches.
+.TP
+.B updaters
+Inventory Sparkle and Squirrel app updater cache and staging folders without
+touching apps, app profiles, browser profiles, or passwords.
 .TP
 .B duplicates
 Find exact duplicate files for review without deleting anything.
@@ -503,6 +510,9 @@ Remove saved app window/session state. Documents and app profiles stay protected
 Remove known rebuildable project cache artifacts under Desktop, Documents, and
 Downloads. Source, .git, node_modules, and virtualenv folders are pruned.
 .TP
+.B --include-updater-caches
+Remove rebuildable Sparkle/Squirrel app updater cache and staging data.
+.TP
 .B --include-venv-stale
 Remove stale Python virtualenv folders older than
 .BR --days
@@ -547,6 +557,7 @@ cleanroom fontcaches --json
 cleanroom webcaches --json
 cleanroom savedstate --json
 cleanroom projectcaches --json
+cleanroom updaters --json
 cleanroom leftovers adobe --limit 50
 cleanroom leftovers adobe --apply --trash
 cleanroom backups --json
