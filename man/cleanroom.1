@@ -1,4 +1,4 @@
-.TH CLEANROOM 1 "June 2026" "cleanroom 0.70.0" "User Commands"
+.TH CLEANROOM 1 "June 2026" "cleanroom 0.71.0" "User Commands"
 .SH NAME
 cleanroom \- safe-by-default macOS storage cleaner
 .SH SYNOPSIS
@@ -293,7 +293,8 @@ Rank top-level files and folders in ~/Documents or a provided directory with gua
 Rank top-level files and folders on ~/Desktop with guard status.
 .TP
 .B screenshots
-List screenshot and screen recording files for review without deleting anything.
+List screenshot and screen recording files for review. Cleanup is opt-in and
+limited to known screenshot/recording filenames.
 .TP
 .B archives
 List archive and disk image files for review without deleting anything.
@@ -502,6 +503,10 @@ Remove old downloaded installer files from ~/Downloads during apply.
 Remove old installers, disk images, and archive files directly under
 ~/Downloads during apply. Arbitrary documents, photos, folders, and nested
 files are not targeted.
+.TP
+.B --include-screenshots
+Remove old screenshot and screen recording files under Desktop, Downloads, and
+Documents during apply. Arbitrary images and videos are not targeted.
 .TP
 .B --include-metadata
 Remove filesystem metadata clutter from Desktop, Documents, and Downloads.

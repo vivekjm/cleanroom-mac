@@ -184,7 +184,7 @@ cleanroom permissions --json
 
 `desktop --json` emits the same guarded top-level inventory for `~/Desktop`. It is intentionally review-only and useful for screenshot/export/project clutter.
 
-`screenshots --json [PATH]` emits screenshot and screen recording files with age, modified date, size, and Finder reveal command. It is intentionally review-only because screenshots can contain sensitive data.
+`screenshots --json [PATH]` emits screenshot and screen recording files with age, modified date, size, Finder reveal command, and matching preview/apply commands. Cleanup is opt-in because screenshots can contain sensitive data.
 
 `archives --json [PATH]` emits archive and disk image files with type, age, modified date, size, and Finder reveal command. It is intentionally review-only because archives can be backups, deliverables, or installer sources.
 
@@ -335,6 +335,8 @@ cleanroom duplicates ~/Documents --min-mb 100 --limit 20
 cleanroom documents ~/Documents --limit 40
 cleanroom desktop --limit 40
 cleanroom screenshots ~/Desktop --days 7 --limit 50
+cleanroom clean --include-screenshots --days 30
+cleanroom clean --apply --trash --include-screenshots --days 30
 cleanroom archives ~/Downloads --days 7 --limit 50
 cleanroom downloads --days 30 --limit 50
 cleanroom installers --days 30 --limit 50
@@ -348,6 +350,8 @@ cleanroom personal
 ```
 
 Use this when macOS Storage reports a large Documents category. Review the output manually; cleanroom will not delete arbitrary personal files, protected media libraries, cloud-sync folders, or personal app databases.
+
+`--include-screenshots` targets only known screenshot and screen recording filenames under Desktop, Downloads, and Documents older than `--days`. Use `--trash` for a recoverable applied run.
 
 ## Old Installers
 

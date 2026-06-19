@@ -414,6 +414,7 @@ grep 'updater-caches' "$rules_json" >/dev/null
 grep 'browser-caches' "$rules_json" >/dev/null
 grep 'device-backups' "$rules_json" >/dev/null
 grep 'download-artifacts' "$rules_json" >/dev/null
+grep 'old-screenshots' "$rules_json" >/dev/null
 grep 'screenshots-inventory' "$rules_json" >/dev/null
 grep 'archives-inventory' "$rules_json" >/dev/null
 grep 'android-inventory' "$rules_json" >/dev/null
@@ -457,6 +458,7 @@ grep 'cleanroom clean --apply --trash --include-updater-caches' "$plan_json" >/d
 grep 'cleanroom clean --apply --trash --include-browser-caches' "$plan_json" >/dev/null
 grep 'cleanroom clean --include-device-backups --days 30 --apply --trash' "$plan_json" >/dev/null
 grep 'cleanroom clean --apply --trash --include-download-artifacts --days 30' "$plan_json" >/dev/null
+grep 'cleanroom clean --apply --trash --include-screenshots --days 30' "$plan_json" >/dev/null
 rm -f "$plan_json"
 "$BIN" large "$HOME/Downloads" --min-mb 1 --limit 5 | grep 'big-test.bin' >/dev/null
 large_json="$(mktemp)"
@@ -661,6 +663,7 @@ python3 -m json.tool "$screenshots_json" >/dev/null
 grep '"name":"Screenshot 2026-06-01 at 10.00.00 PM.png"' "$screenshots_json" >/dev/null
 grep '"age_days"' "$screenshots_json" >/dev/null
 grep 'open -R' "$screenshots_json" >/dev/null
+grep 'cleanroom clean --apply --trash --include-screenshots --days 7' "$screenshots_json" >/dev/null
 rm -f "$screenshots_json"
 "$BIN" archives "$HOME/Downloads" --days 7 --limit 10 | grep 'old-archive.zip' >/dev/null
 archives_json="$(mktemp)"
@@ -989,6 +992,7 @@ grep '^include_updater_caches=false' "$config_file" >/dev/null
 grep '^include_browser_caches=false' "$config_file" >/dev/null
 grep '^include_device_backups=false' "$config_file" >/dev/null
 grep '^include_download_artifacts=false' "$config_file" >/dev/null
+grep '^include_screenshots=false' "$config_file" >/dev/null
 "$BIN" doctor --config "$config_file" | grep "$config_file" >/dev/null
 
 report_stdout="$("$BIN" report)"
@@ -1043,14 +1047,17 @@ devicebackups_preflight="$("$BIN" clean --include-device-backups --preflight)"
 grep 'device-backups' <<<"$devicebackups_preflight" >/dev/null
 downloadartifacts_preflight="$("$BIN" clean --include-download-artifacts --preflight)"
 grep 'download-artifacts' <<<"$downloadartifacts_preflight" >/dev/null
+screenshots_preflight="$("$BIN" clean --include-screenshots --preflight)"
+grep 'screenshots' <<<"$screenshots_preflight" >/dev/null
 preflight_json="$(mktemp)"
-"$BIN" clean --preset deep --include-ai-models --include-containers --include-user-trash --include-metadata --include-download-artifacts --include-quicklook --include-font-caches --include-web-caches --include-saved-state --include-project-caches --include-updater-caches --include-browser-caches --include-device-backups --apply --trash --yes --preflight --json > "$preflight_json"
+"$BIN" clean --preset deep --include-ai-models --include-containers --include-user-trash --include-metadata --include-download-artifacts --include-screenshots --include-quicklook --include-font-caches --include-web-caches --include-saved-state --include-project-caches --include-updater-caches --include-browser-caches --include-device-backups --apply --trash --yes --preflight --json > "$preflight_json"
 python3 -m json.tool "$preflight_json" >/dev/null
 grep '"apply":true' "$preflight_json" >/dev/null
 grep '"trash":true' "$preflight_json" >/dev/null
 grep '"id":"containers"' "$preflight_json" >/dev/null
 grep '"id":"metadata"' "$preflight_json" >/dev/null
 grep '"id":"download-artifacts"' "$preflight_json" >/dev/null
+grep '"id":"screenshots"' "$preflight_json" >/dev/null
 grep '"id":"quicklook"' "$preflight_json" >/dev/null
 grep '"id":"font-caches"' "$preflight_json" >/dev/null
 grep '"id":"web-caches"' "$preflight_json" >/dev/null
@@ -1116,6 +1123,17 @@ test -e "$HOME/Downloads/old-report.pdf"
 "$BIN" restore --log "$download_artifacts_log" --apply --yes >/dev/null
 test -e "$HOME/Downloads/old-download-artifact.tar.gz"
 rm -f "$download_artifacts_log"
+screenshots_log="$(mktemp)"
+rm -f "$screenshots_log"
+"$BIN" clean --include-screenshots --days 30 --apply --trash --yes --log "$screenshots_log" >/dev/null 2>&1
+grep 'Screenshot 2026-06-01 at 10.00.00 PM.png' "$screenshots_log" >/dev/null
+grep 'Screen Recording 2026-06-01 at 10.00.00 PM.mov' "$screenshots_log" >/dev/null
+test ! -e "$HOME/Desktop/Screenshot 2026-06-01 at 10.00.00 PM.png"
+test ! -e "$HOME/Downloads/Screen Recording 2026-06-01 at 10.00.00 PM.mov"
+"$BIN" restore --log "$screenshots_log" --apply --yes >/dev/null
+test -e "$HOME/Desktop/Screenshot 2026-06-01 at 10.00.00 PM.png"
+test -e "$HOME/Downloads/Screen Recording 2026-06-01 at 10.00.00 PM.mov"
+rm -f "$screenshots_log"
 
 venv_log="$(mktemp)"
 rm -f "$venv_log"

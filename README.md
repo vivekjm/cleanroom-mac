@@ -293,6 +293,8 @@ Review screenshot and screen recording clutter:
 cleanroom screenshots
 cleanroom screenshots ~/Desktop --days 7 --limit 50
 cleanroom screenshots --json
+cleanroom clean --include-screenshots --days 30
+cleanroom clean --apply --trash --include-screenshots --days 30
 ```
 
 Review archive and disk image clutter:
@@ -824,6 +826,8 @@ Config files use simple `key=value` lines and are never executed as shell.
 
 `--include-device-backups` moves local iPhone/iPad backups older than `--days` from MobileSync to the cleanroom Trash folder. It requires `--trash`, is never included in presets, and should only be used after confirming another backup exists.
 
+`--include-screenshots` moves known screenshot and screen recording files older than `--days` from Desktop, Downloads, and Documents. It does not target arbitrary images or videos; use `--trash` for a recoverable applied run.
+
 `--trash` applies to paths that `cleanroom` removes directly. System commands delegated to macOS or developer tools, such as Time Machine snapshot thinning or simulator reset, may still be irreversible.
 
 `restore` only restores entries that were moved by `--trash` and still exist in the cleanroom Trash folder. It skips destinations that already exist.
@@ -848,7 +852,7 @@ Config files use simple `key=value` lines and are never executed as shell.
 
 `desktop` is a convenience shortcut for the same guarded top-level inventory on `~/Desktop`, useful when screenshots, exports, archives, and loose project folders have piled up.
 
-`screenshots` lists screenshot and screen recording files in Desktop, Downloads, and Documents, or a provided folder. It is review-only because screenshots often contain private account, work, or payment information.
+`screenshots` lists screenshot and screen recording files in Desktop, Downloads, and Documents, or a provided folder. Cleanup is opt-in with `--include-screenshots` and targets only known screenshot/recording filenames older than `--days`; arbitrary images and videos are not removed.
 
 `archives` lists archive and disk image files such as `.zip`, `.rar`, `.7z`, `.tar.*`, `.dmg`, `.iso`, and `.img` in Downloads, Desktop, and Documents, or a provided folder. It is review-only because archives may be backups, deliverables, or installer sources.
 

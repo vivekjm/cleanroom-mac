@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.70.0"
+VERSION="0.71.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -36,6 +36,7 @@ INCLUDE_SNAPSHOTS=0
 INCLUDE_USER_TRASH=0
 INCLUDE_INSTALLERS=0
 INCLUDE_DOWNLOAD_ARTIFACTS=0
+INCLUDE_SCREENSHOTS=0
 INCLUDE_METADATA=0
 INCLUDE_QUICKLOOK=0
 INCLUDE_FONT_CACHES=0
@@ -235,6 +236,8 @@ Options:
   --include-installers Remove old downloaded installer files from ~/Downloads.
   --include-download-artifacts
                        Remove old installers, disk images, and archives from ~/Downloads.
+  --include-screenshots
+                       Remove old screenshot and screen recording files older than --days.
   --include-metadata   Remove filesystem metadata clutter from Desktop, Documents, and Downloads.
   --include-quicklook  Remove rebuildable Quick Look thumbnail and preview caches.
   --include-font-caches
@@ -539,6 +542,7 @@ load_config() {
       include_user_trash) truthy "$value" && INCLUDE_USER_TRASH=1 ;;
       include_installers) truthy "$value" && INCLUDE_INSTALLERS=1 ;;
       include_download_artifacts) truthy "$value" && INCLUDE_DOWNLOAD_ARTIFACTS=1 ;;
+      include_screenshots) truthy "$value" && INCLUDE_SCREENSHOTS=1 ;;
       include_metadata) truthy "$value" && INCLUDE_METADATA=1 ;;
       include_quicklook) truthy "$value" && INCLUDE_QUICKLOOK=1 ;;
       include_font_caches) truthy "$value" && INCLUDE_FONT_CACHES=1 ;;
@@ -809,6 +813,7 @@ preflight_rows() {
   [[ "$INCLUDE_DIAGNOSTICS" -eq 1 ]] && printf '%s\t%s\t%s\t%s\n' "diagnostics" "Old diagnostic reports" "low-risk" "Trash mode can recover direct removals when --trash is used."
   [[ "$INCLUDE_INSTALLERS" -eq 1 ]] && printf '%s\t%s\t%s\t%s\n' "installers" "Old downloaded installers" "opt-in" "Trash mode can recover direct removals when --trash is used."
   [[ "$INCLUDE_DOWNLOAD_ARTIFACTS" -eq 1 ]] && printf '%s\t%s\t%s\t%s\n' "download-artifacts" "Old downloadable artifacts" "opt-in" "Only installer, disk image, and archive-style files directly under ~/Downloads older than ${DAYS} days are targeted."
+  [[ "$INCLUDE_SCREENSHOTS" -eq 1 ]] && printf '%s\t%s\t%s\t%s\n' "screenshots" "Old screenshots and screen recordings" "privacy-sensitive" "Only known screenshot and screen recording filenames older than ${DAYS} days under Desktop, Downloads, and Documents are targeted."
   [[ "$INCLUDE_METADATA" -eq 1 ]] && printf '%s\t%s\t%s\t%s\n' "metadata" "Filesystem metadata clutter" "low-risk" "Trash mode can recover direct removals when --trash is used."
   [[ "$INCLUDE_QUICKLOOK" -eq 1 ]] && printf '%s\t%s\t%s\t%s\n' "quicklook" "Quick Look caches" "rebuildable" "Trash mode can recover direct cache removals when --trash is used."
   [[ "$INCLUDE_FONT_CACHES" -eq 1 ]] && printf '%s\t%s\t%s\t%s\n' "font-caches" "Font cache databases" "rebuildable" "Actual font files stay protected; macOS recreates font caches as needed."
@@ -2096,7 +2101,7 @@ clean_installers() {
       while IFS=$'\t' read -r kb epoch age_days path; do
         [[ -z "${path:-}" ]] && continue
         printf 'would remove %8s  %s\n' "$(human_kb "$kb")" "$path"
-    done
+      done
   fi
 }
 
@@ -2110,6 +2115,22 @@ clean_download_artifacts() {
     return 0
   fi
   while IFS=$'\t' read -r kb epoch age_days kind path; do
+    [[ -z "${path:-}" ]] && continue
+    run_rm "$path"
+  done <<<"$rows"
+  return 0
+}
+
+clean_screenshots() {
+  [[ "$INCLUDE_SCREENSHOTS" -eq 1 ]] || return 0
+  log "${BOLD}Old screenshots and screen recordings older than ${DAYS} days${RESET}"
+  local rows kb epoch age_days path
+  rows="$(screenshot_rows)"
+  if [[ -z "$rows" ]]; then
+    printf 'No old screenshot or screen recording files found.\n'
+    return 0
+  fi
+  while IFS=$'\t' read -r kb epoch age_days path; do
     [[ -z "${path:-}" ]] && continue
     run_rm "$path"
   done <<<"$rows"
@@ -3001,7 +3022,7 @@ screenshots() {
       kb_num="$(printf '%s\n' "$kb" | sed 's/^0*//; s/^$/0/')"
       [[ "$first" -eq 0 ]] && printf ','
       first=0
-      printf '{"path":"%s","name":"%s","size_kb":%s,"size":"%s","modified_epoch":%s,"modified":"%s","age_days":%s,"review_command":"%s"}' \
+      printf '{"path":"%s","name":"%s","size_kb":%s,"size":"%s","modified_epoch":%s,"modified":"%s","age_days":%s,"review_command":"%s","preview_command":"%s","apply_command":"%s"}' \
         "$(printf '%s' "$path" | json_escape)" \
         "$(basename "$path" | json_escape)" \
         "$kb_num" \
@@ -3009,7 +3030,9 @@ screenshots() {
         "${epoch:-0}" \
         "$(file_mtime_iso "${epoch:-0}" | json_escape)" \
         "${age_days:-0}" \
-        "$(printf 'open -R %s' "$(shell_quote "$path")" | json_escape)"
+        "$(printf 'open -R %s' "$(shell_quote "$path")" | json_escape)" \
+        "$(printf 'cleanroom clean --include-screenshots --days %s' "$DAYS" | json_escape)" \
+        "$(printf 'cleanroom clean --apply --trash --include-screenshots --days %s' "$DAYS" | json_escape)"
     done <<<"$rows"
     printf ']\n'
     return 0
@@ -3037,6 +3060,18 @@ screenshots() {
     printf '%-10s %4sd     %-12s %s\n' "$(human_kb "$kb")" "${age_days:-0}" "$(file_mtime_iso "${epoch:-0}")" "$path"
     printf '  reveal: open -R %s\n' "$(shell_quote "$path")"
   done <<<"$rows"
+  printf '\nPreview cleanup with: cleanroom clean --include-screenshots --days %s\n' "$DAYS"
+  printf 'Apply cleanup with: cleanroom clean --apply --trash --include-screenshots --days %s\n' "$DAYS"
+}
+
+screenshot_total_kb() {
+  local total=0 kb epoch age_days path kb_num
+  while IFS=$'\t' read -r kb epoch age_days path; do
+    [[ -z "${path:-}" ]] && continue
+    kb_num="$(printf '%s\n' "$kb" | sed 's/^0*//; s/^$/0/')"
+    total=$((total + kb_num))
+  done < <(screenshot_rows)
+  printf '%s\n' "$total"
 }
 
 archive_roots() {
@@ -5988,7 +6023,7 @@ snapshots() {
 }
 
 plan_rows() {
-  local safe package toolchain app browsercache_total installers download_artifacts metadata_total quicklook_total fontcache_total webcache_total savedstate_total projectcache_total updatercache_total devicebackup_total node venv dev diagnostics ai_workspaces ai_models containers user_trash
+  local safe package toolchain app browsercache_total installers download_artifacts screenshots_total metadata_total quicklook_total fontcache_total webcache_total savedstate_total projectcache_total updatercache_total devicebackup_total node venv dev diagnostics ai_workspaces ai_models containers user_trash
   safe="$(sum_existing_kb \
     "~/Library/Caches" "~/.cache" "~/.npm/_cacache" "~/.npm/_logs" "~/.npm/_npx" \
     "~/.yarn/cache" "~/.yarn/berry" "~/.gradle/caches" "~/.gradle/daemon" \
@@ -6001,6 +6036,7 @@ plan_rows() {
   browsercache_total="$(browsercache_total_kb)"
   installers="$(installer_total_kb)"
   download_artifacts="$(download_artifact_total_kb)"
+  screenshots_total="$(screenshot_total_kb)"
   metadata_total="$(metadata_total_kb)"
   quicklook_total="$(quicklook_total_kb)"
   fontcache_total="$(fontcache_total_kb)"
@@ -6027,6 +6063,7 @@ plan_rows() {
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$browsercache_total" "browser-caches" "Chromium/Firefox browser caches" "cleanroom browsercaches" "cleanroom clean --apply --trash --include-browser-caches" "Rebuildable browser cache folders only. Profiles, passwords, cookies, bookmarks, sessions, extensions, and settings stay protected."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$installers" "old-installers" "Old downloaded installers" "cleanroom clean --include-installers --days $DAYS" "cleanroom clean --apply --trash --include-installers --days $DAYS" "Downloaded .dmg, .pkg, .mpkg, .xip, .ipsw, and .iso files older than $DAYS days in ~/Downloads."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$download_artifacts" "download-artifacts" "Old downloadable artifacts" "cleanroom downloads --days $DAYS" "cleanroom clean --apply --trash --include-download-artifacts --days $DAYS" "Old installers, disk images, and archive files directly under ~/Downloads. Arbitrary documents and folders stay untouched."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$screenshots_total" "screenshots" "Old screenshots and screen recordings" "cleanroom screenshots --days $DAYS" "cleanroom clean --apply --trash --include-screenshots --days $DAYS" "Known screenshot and screen recording files older than $DAYS days under Desktop, Downloads, and Documents."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$metadata_total" "metadata" "Filesystem metadata clutter" "cleanroom metadata" "cleanroom metadata --apply --trash" ".DS_Store, AppleDouble, Thumbs.db, Desktop.ini, and similar clutter under Desktop, Documents, and Downloads."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$quicklook_total" "quicklook" "Quick Look caches" "cleanroom quicklook" "cleanroom clean --apply --trash --include-quicklook" "Rebuildable Quick Look thumbnail and preview caches."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$fontcache_total" "font-caches" "Font cache databases" "cleanroom fontcaches" "cleanroom clean --apply --trash --include-font-caches" "Rebuildable Apple Type Services and font registry caches. Actual font files stay protected."
@@ -6504,6 +6541,7 @@ include_ai_models=false
 include_containers=false
 include_installers=false
 include_download_artifacts=false
+include_screenshots=false
 include_metadata=false
 include_quicklook=false
 include_font_caches=false
@@ -6545,6 +6583,7 @@ interactive() {
   ask_yes_no "Include old diagnostic reports older than ${DAYS} days?" && INCLUDE_DIAGNOSTICS=1
   ask_yes_no "Include old downloaded installers older than ${DAYS} days?" && INCLUDE_INSTALLERS=1
   ask_yes_no "Include old downloadable artifacts in Downloads older than ${DAYS} days?" && INCLUDE_DOWNLOAD_ARTIFACTS=1
+  ask_yes_no "Include old screenshots and screen recordings older than ${DAYS} days?" && INCLUDE_SCREENSHOTS=1
   ask_yes_no "Include filesystem metadata clutter?" && INCLUDE_METADATA=1
   ask_yes_no "Include Quick Look thumbnail caches?" && INCLUDE_QUICKLOOK=1
   ask_yes_no "Include user font cache databases?" && INCLUDE_FONT_CACHES=1
@@ -6602,6 +6641,11 @@ Default safe cleanup:
   Old downloadable artifacts directly in ~/Downloads, such as installers,
   disk images, .zip/.rar/.7z, and tar/gzip/xz/bzip archives older than --days.
   This does not remove arbitrary documents, photos, folders, or nested files.
+
+--include-screenshots:
+  Old screenshot and screen recording files under Desktop, Downloads, and
+  Documents. Only known screenshot/recording filenames older than --days are
+  targeted; arbitrary images and videos are not removed.
 
 --include-metadata:
   Filesystem metadata clutter such as .DS_Store, AppleDouble ._* files,
@@ -6699,6 +6743,7 @@ clean() {
   clean_dev_heavy
   clean_installers
   clean_download_artifacts
+  clean_screenshots
   clean_metadata
   clean_quicklook
   clean_font_caches
@@ -6827,6 +6872,7 @@ while [[ "$#" -gt 0 ]]; do
     --include-venv-stale) INCLUDE_VENV_STALE=1 ;;
     --include-installers) INCLUDE_INSTALLERS=1 ;;
     --include-download-artifacts|--include-downloads-artifacts|--include-downloadartifacts) INCLUDE_DOWNLOAD_ARTIFACTS=1 ;;
+    --include-screenshots|--include-screen-recordings|--include-screenrecordings) INCLUDE_SCREENSHOTS=1 ;;
     --include-package-stores) INCLUDE_PACKAGE_STORES=1 ;;
     --include-toolchains) INCLUDE_TOOLCHAINS=1 ;;
     --include-diagnostics) INCLUDE_DIAGNOSTICS=1 ;;
