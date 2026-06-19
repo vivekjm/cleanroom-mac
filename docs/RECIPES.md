@@ -240,6 +240,8 @@ cleanroom permissions --json
 
 `pnpm-store --json` emits the command, exit code, apply mode, and output from pnpm's native store status check. Use `--apply --yes` to run `pnpm store prune`.
 
+`cocoapods-cache --json` emits the command, exit code, apply mode, and output from CocoaPods' native cache list command. Use `--apply --yes` to run `pod cache clean --all`.
+
 `receipts --json` emits readable macOS package installer receipt files with package IDs, receipt kind, path, size, modified date, and a matching `cleanroom leftovers <package-id>` review command. Receipts are install records and are never cleanup targets.
 
 `homebrew --json` emits Homebrew cache, log, Cellar, Caskroom, and service/runtime bucket sizes plus installed formula/cask counts when `brew` is available.

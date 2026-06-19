@@ -948,6 +948,8 @@ Config files use simple `key=value` lines and are never executed as shell.
 
 `pnpm-store` runs pnpm's native store workflow. It defaults to `pnpm store status`; add `--apply --yes` to run `pnpm store prune` and remove unreferenced packages.
 
+`cocoapods-cache` runs CocoaPods' native cache workflow. It defaults to `pod cache list`; add `--apply --yes` to run `pod cache clean --all`.
+
 `receipts` inventories macOS package installer receipt records from `/var/db/receipts`, `/Library/Receipts`, and `~/Library/Receipts`. It is useful when investigating software installed by `.pkg` installers, because package IDs often hint at vendor leftovers to inspect next. Cleanroom never removes receipt records.
 
 `homebrew` inventories Homebrew cache, logs, Cellar, Caskroom, and service/runtime folders. It is review-only and points to `cleanroom homebrew-cleanup` for Homebrew-native dry-run detail.

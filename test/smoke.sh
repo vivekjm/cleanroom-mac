@@ -376,6 +376,20 @@ fi
 exit 2
 SH
 chmod +x "$TEST_HOME/bin/pnpm"
+cat >"$TEST_HOME/bin/pod" <<'SH'
+#!/usr/bin/env bash
+if [[ "${1:-}" == "cache" && "${2:-}" == "list" ]]; then
+  printf 'AFNetworking:\n  - 4.0.1\n'
+  exit 0
+fi
+if [[ "${1:-}" == "cache" && "${2:-}" == "clean" && "${3:-}" == "--all" ]]; then
+  printf 'Cleaning CocoaPods cache\n'
+  printf 'applied\n' >"$HOME/cocoapods-cache-clean-applied"
+  exit 0
+fi
+exit 2
+SH
+chmod +x "$TEST_HOME/bin/pod"
 export HOME="$TEST_HOME"
 export PATH="$TEST_HOME/bin:$PATH"
 
@@ -950,9 +964,11 @@ packages_json="$(mktemp)"
 "$BIN" packages --json > "$packages_json"
 python3 -m json.tool "$packages_json" >/dev/null
 grep 'pnpm-store' "$packages_json" >/dev/null
+grep 'cocoapods-cache' "$packages_json" >/dev/null
 grep 'homebrew-cache' "$packages_json" >/dev/null
 grep 'cleanroom yarn-cache --apply --yes' "$packages_json" >/dev/null
 grep 'cleanroom pnpm-store --apply --yes' "$packages_json" >/dev/null
+grep 'cleanroom cocoapods-cache --apply --yes' "$packages_json" >/dev/null
 rm -f "$packages_json"
 "$BIN" npm-cache | grep 'Cache verified' >/dev/null
 npm_cache_json="$(mktemp)"
@@ -990,6 +1006,18 @@ rm -f "$pnpm_store_log" "$TEST_HOME/pnpm-store-prune-applied"
 "$BIN" pnpm-store --apply --yes --log "$pnpm_store_log" | grep 'Removed 3 packages' >/dev/null
 test -f "$TEST_HOME/pnpm-store-prune-applied"
 grep 'pnpm-store' "$pnpm_store_log" >/dev/null
+"$BIN" cocoapods-cache | grep 'AFNetworking' >/dev/null
+cocoapods_cache_json="$(mktemp)"
+"$BIN" cocoapods-cache --json > "$cocoapods_cache_json"
+python3 -m json.tool "$cocoapods_cache_json" >/dev/null
+grep '"command":"pod cache list"' "$cocoapods_cache_json" >/dev/null
+grep 'AFNetworking' "$cocoapods_cache_json" >/dev/null
+rm -f "$cocoapods_cache_json"
+cocoapods_cache_log="$(mktemp)"
+rm -f "$cocoapods_cache_log" "$TEST_HOME/cocoapods-cache-clean-applied"
+"$BIN" cocoapods-cache --apply --yes --log "$cocoapods_cache_log" | grep 'Cleaning CocoaPods cache' >/dev/null
+test -f "$TEST_HOME/cocoapods-cache-clean-applied"
+grep 'cocoapods-cache' "$cocoapods_cache_log" >/dev/null
 "$BIN" receipts --limit 20 | grep 'com.cleanroom.test.pkg' >/dev/null
 receipts_json="$(mktemp)"
 "$BIN" receipts --json --limit 20 > "$receipts_json"

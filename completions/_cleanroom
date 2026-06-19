@@ -68,6 +68,8 @@ _cleanroom() {
     'yarncache:Alias for yarn-cache'
     'pnpm-store:Run pnpm store status or explicit prune'
     'pnpmstore:Alias for pnpm-store'
+    'cocoapods-cache:List CocoaPods cache or explicit clean'
+    'pod-cache:Alias for cocoapods-cache'
     'receipts:Inventory macOS package installer receipts'
     'homebrew:Inventory Homebrew cache, Cellar, Caskroom, and logs'
     'homebrew-cleanup:Run Homebrew cleanup dry-run or apply'
