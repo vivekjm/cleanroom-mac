@@ -277,6 +277,9 @@ dd if=/dev/zero of="$TEST_HOME/Downloads/old-installer.dmg" bs=1024 count=1024 >
 touch -t 202001010000 "$TEST_HOME/Downloads/old-installer.dmg"
 dd if=/dev/zero of="$TEST_HOME/Downloads/old-package.pkg" bs=1024 count=1024 >/dev/null 2>&1
 touch -t 202001010000 "$TEST_HOME/Downloads/old-package.pkg"
+dd if=/dev/zero of="$TEST_HOME/Downloads/old-download-artifact.tar.gz" bs=1024 count=768 >/dev/null 2>&1
+printf 'keep me\n' >"$TEST_HOME/Downloads/old-report.pdf"
+touch -t 202001010000 "$TEST_HOME/Downloads/old-download-artifact.tar.gz" "$TEST_HOME/Downloads/old-report.pdf"
 dd if=/dev/zero of="$TEST_HOME/Documents/duplicates/copy-a.bin" bs=1024 count=2048 >/dev/null 2>&1
 cp "$TEST_HOME/Documents/duplicates/copy-a.bin" "$TEST_HOME/Documents/duplicates/copy-b.bin"
 dd if=/dev/zero of="$TEST_HOME/Applications/FakeBig.app/Contents/MacOS/fake" bs=1024 count=2048 >/dev/null 2>&1
@@ -410,6 +413,7 @@ grep 'project-caches' "$rules_json" >/dev/null
 grep 'updater-caches' "$rules_json" >/dev/null
 grep 'browser-caches' "$rules_json" >/dev/null
 grep 'device-backups' "$rules_json" >/dev/null
+grep 'download-artifacts' "$rules_json" >/dev/null
 grep 'screenshots-inventory' "$rules_json" >/dev/null
 grep 'archives-inventory' "$rules_json" >/dev/null
 grep 'android-inventory' "$rules_json" >/dev/null
@@ -452,6 +456,7 @@ grep 'cleanroom clean --apply --trash --include-project-caches' "$plan_json" >/d
 grep 'cleanroom clean --apply --trash --include-updater-caches' "$plan_json" >/dev/null
 grep 'cleanroom clean --apply --trash --include-browser-caches' "$plan_json" >/dev/null
 grep 'cleanroom clean --include-device-backups --days 30 --apply --trash' "$plan_json" >/dev/null
+grep 'cleanroom clean --apply --trash --include-download-artifacts --days 30' "$plan_json" >/dev/null
 rm -f "$plan_json"
 "$BIN" large "$HOME/Downloads" --min-mb 1 --limit 5 | grep 'big-test.bin' >/dev/null
 large_json="$(mktemp)"
@@ -671,6 +676,8 @@ downloads_json="$(mktemp)"
 python3 -m json.tool "$downloads_json" >/dev/null
 grep 'old-installer.dmg' "$downloads_json" >/dev/null
 grep '"age_days"' "$downloads_json" >/dev/null
+grep '"cleanup_eligible":true' "$downloads_json" >/dev/null
+grep 'cleanroom clean --apply --trash --include-download-artifacts --days 30' "$downloads_json" >/dev/null
 rm -f "$downloads_json"
 "$BIN" installers --days 30 --limit 5 | grep 'old-installer.dmg' >/dev/null
 installers_json="$(mktemp)"
@@ -981,6 +988,7 @@ grep '^include_project_caches=false' "$config_file" >/dev/null
 grep '^include_updater_caches=false' "$config_file" >/dev/null
 grep '^include_browser_caches=false' "$config_file" >/dev/null
 grep '^include_device_backups=false' "$config_file" >/dev/null
+grep '^include_download_artifacts=false' "$config_file" >/dev/null
 "$BIN" doctor --config "$config_file" | grep "$config_file" >/dev/null
 
 report_stdout="$("$BIN" report)"
@@ -1033,13 +1041,16 @@ browsercaches_preflight="$("$BIN" clean --include-browser-caches --preflight)"
 grep 'browser-caches' <<<"$browsercaches_preflight" >/dev/null
 devicebackups_preflight="$("$BIN" clean --include-device-backups --preflight)"
 grep 'device-backups' <<<"$devicebackups_preflight" >/dev/null
+downloadartifacts_preflight="$("$BIN" clean --include-download-artifacts --preflight)"
+grep 'download-artifacts' <<<"$downloadartifacts_preflight" >/dev/null
 preflight_json="$(mktemp)"
-"$BIN" clean --preset deep --include-ai-models --include-containers --include-user-trash --include-metadata --include-quicklook --include-font-caches --include-web-caches --include-saved-state --include-project-caches --include-updater-caches --include-browser-caches --include-device-backups --apply --trash --yes --preflight --json > "$preflight_json"
+"$BIN" clean --preset deep --include-ai-models --include-containers --include-user-trash --include-metadata --include-download-artifacts --include-quicklook --include-font-caches --include-web-caches --include-saved-state --include-project-caches --include-updater-caches --include-browser-caches --include-device-backups --apply --trash --yes --preflight --json > "$preflight_json"
 python3 -m json.tool "$preflight_json" >/dev/null
 grep '"apply":true' "$preflight_json" >/dev/null
 grep '"trash":true' "$preflight_json" >/dev/null
 grep '"id":"containers"' "$preflight_json" >/dev/null
 grep '"id":"metadata"' "$preflight_json" >/dev/null
+grep '"id":"download-artifacts"' "$preflight_json" >/dev/null
 grep '"id":"quicklook"' "$preflight_json" >/dev/null
 grep '"id":"font-caches"' "$preflight_json" >/dev/null
 grep '"id":"web-caches"' "$preflight_json" >/dev/null
@@ -1096,6 +1107,15 @@ grep 'old-package.pkg' "$installer_log" >/dev/null
 test ! -e "$HOME/Downloads/old-package.pkg"
 find "$HOME/.Trash" -name old-package.pkg -print -quit | grep old-package.pkg >/dev/null
 rm -f "$installer_log"
+download_artifacts_log="$(mktemp)"
+rm -f "$download_artifacts_log"
+"$BIN" clean --include-download-artifacts --days 30 --apply --trash --yes --log "$download_artifacts_log" >/dev/null 2>&1
+grep 'old-download-artifact.tar.gz' "$download_artifacts_log" >/dev/null
+test ! -e "$HOME/Downloads/old-download-artifact.tar.gz"
+test -e "$HOME/Downloads/old-report.pdf"
+"$BIN" restore --log "$download_artifacts_log" --apply --yes >/dev/null
+test -e "$HOME/Downloads/old-download-artifact.tar.gz"
+rm -f "$download_artifacts_log"
 
 venv_log="$(mktemp)"
 rm -f "$venv_log"

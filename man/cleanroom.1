@@ -1,4 +1,4 @@
-.TH CLEANROOM 1 "June 2026" "cleanroom 0.69.0" "User Commands"
+.TH CLEANROOM 1 "June 2026" "cleanroom 0.70.0" "User Commands"
 .SH NAME
 cleanroom \- safe-by-default macOS storage cleaner
 .SH SYNOPSIS
@@ -299,7 +299,7 @@ List screenshot and screen recording files for review without deleting anything.
 List archive and disk image files for review without deleting anything.
 .TP
 .B downloads
-List old files in ~/Downloads for review without deleting anything.
+List old files in ~/Downloads for review. Cleanup is opt-in for old downloadable artifacts only.
 .TP
 .B installers
 List old downloaded installer files in ~/Downloads for review.
@@ -497,6 +497,11 @@ Empty ~/.Trash during apply. This is irreversible.
 .TP
 .B --include-installers
 Remove old downloaded installer files from ~/Downloads during apply.
+.TP
+.B --include-download-artifacts
+Remove old installers, disk images, and archive files directly under
+~/Downloads during apply. Arbitrary documents, photos, folders, and nested
+files are not targeted.
 .TP
 .B --include-metadata
 Remove filesystem metadata clutter from Desktop, Documents, and Downloads.

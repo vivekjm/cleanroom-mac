@@ -101,6 +101,7 @@ _cleanroom() {
     '--include-node-stale[Remove stale node_modules]'
     '--include-venv-stale[Remove stale Python virtualenv folders]'
     '--include-installers[Remove old downloaded installers]'
+    '--include-download-artifacts[Remove old installers, disk images, and archives from Downloads]'
     '--include-metadata[Remove filesystem metadata clutter]'
     '--include-quicklook[Remove Quick Look thumbnail and preview caches]'
     '--include-font-caches[Remove user font cache databases]'

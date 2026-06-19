@@ -309,6 +309,8 @@ Review old Downloads files:
 cleanroom downloads
 cleanroom downloads --days 30 --limit 50
 cleanroom downloads --json
+cleanroom clean --include-download-artifacts --days 30
+cleanroom clean --apply --trash --include-download-artifacts --days 30
 ```
 
 Review old downloaded installers:
@@ -888,7 +890,7 @@ Config files use simple `key=value` lines and are never executed as shell.
 
 `duplicates` hashes files above `--min-mb`, groups exact matches, estimates possible reclaim, and never deletes anything.
 
-`downloads` lists old files in `~/Downloads` for manual review and never deletes them.
+`downloads` lists old files in `~/Downloads` for manual review. Cleanup is opt-in for old downloadable artifacts only with `--include-download-artifacts`; arbitrary documents, photos, folders, and nested files are not targeted.
 
 `installers` lists old `.dmg`, `.pkg`, `.mpkg`, `.xip`, `.ipsw`, and `.iso` files in `~/Downloads`. Cleanup is opt-in with `--include-installers`.
 

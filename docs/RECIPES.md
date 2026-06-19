@@ -188,7 +188,7 @@ cleanroom permissions --json
 
 `archives --json [PATH]` emits archive and disk image files with type, age, modified date, size, and Finder reveal command. It is intentionally review-only because archives can be backups, deliverables, or installer sources.
 
-`downloads --json` emits old files in `~/Downloads` with age, modified date, path, and size. It is intentionally review-only and does not delete anything.
+`downloads --json` emits old files in `~/Downloads` with age, modified date, path, size, artifact cleanup eligibility, and matching preview/apply commands. Cleanup remains opt-in and only targets installer, disk image, and archive-style files directly under Downloads.
 
 `installers --json` emits old downloaded installer files in `~/Downloads` with age, modified date, path, size, and matching preview/apply commands.
 
@@ -358,6 +358,16 @@ cleanroom clean --apply --trash --include-installers --days 30
 ```
 
 Use this for old `.dmg`, `.pkg`, `.mpkg`, `.xip`, `.ipsw`, and `.iso` files in `~/Downloads`. The inventory is review-only; cleanup requires the explicit `--include-installers` flag.
+
+## Download Artifacts
+
+```sh
+cleanroom downloads
+cleanroom clean --include-download-artifacts --days 30
+cleanroom clean --apply --trash --include-download-artifacts --days 30
+```
+
+Use this for old installers, disk images, and archive files directly under `~/Downloads`. It is broader than `--include-installers`, but still does not target arbitrary documents, photos, folders, or nested files.
 
 ## Metadata Clutter
 
