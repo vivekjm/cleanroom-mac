@@ -19,6 +19,7 @@ macOS Storage often labels hidden user folders as **Documents** or **System Data
 - Docker Desktop, Colima, Lima, and Podman container storage
 - old `node_modules`
 - stale Python virtualenv folders
+- Python/dev project caches such as `__pycache__`, pytest, mypy, ruff, tox, nox, and coverage artifacts
 - AI-agent recordings, scratch data, local memory, and generated workspaces
 - local AI model downloads and backends
 - Chrome/VS Code/Cursor cache folders
@@ -239,6 +240,14 @@ Review saved app window/session state:
 ```sh
 cleanroom savedstate
 cleanroom savedstate --json
+```
+
+Review rebuildable project cache artifacts:
+
+```sh
+cleanroom projectcaches
+cleanroom projectcaches ~/Documents --limit 50
+cleanroom projectcaches --json
 ```
 
 Find exact duplicate files for manual review:
@@ -656,6 +665,14 @@ cleanroom clean --include-saved-state
 cleanroom clean --apply --trash --include-saved-state
 ```
 
+Clean rebuildable project cache artifacts:
+
+```sh
+cleanroom projectcaches
+cleanroom clean --include-project-caches
+cleanroom clean --apply --trash --include-project-caches
+```
+
 Empty current user Trash:
 
 ```sh
@@ -759,6 +776,8 @@ Config files use simple `key=value` lines and are never executed as shell.
 
 `--include-saved-state` removes saved app window/session restoration state. Apps may reopen without previous windows, but documents, app profiles, and account data stay protected.
 
+`--include-project-caches` removes known rebuildable project cache artifacts such as `__pycache__`, `.pytest_cache`, `.mypy_cache`, `.ruff_cache`, `.tox`, `.nox`, `htmlcov`, and `.coverage` under Desktop, Documents, and Downloads. It prunes `.git`, `node_modules`, and virtualenv folders.
+
 `--trash` applies to paths that `cleanroom` removes directly. System commands delegated to macOS or developer tools, such as Time Machine snapshot thinning or simulator reset, may still be irreversible.
 
 `restore` only restores entries that were moved by `--trash` and still exist in the cleanroom Trash folder. It skips destinations that already exist.
@@ -816,6 +835,8 @@ Config files use simple `key=value` lines and are never executed as shell.
 `webcaches` inventories Safari and WebKit cache folders that can grow in System Data. Cleanup is opt-in with `cleanroom clean --include-web-caches`; browser history, cookies, bookmarks, website data, passwords, and profiles stay protected.
 
 `savedstate` inventories saved application window/session state under `~/Library/Saved Application State`. Cleanup is opt-in with `cleanroom clean --include-saved-state`; documents and app profiles stay protected.
+
+`projectcaches` inventories known rebuildable project cache artifacts under Desktop, Documents, Downloads, or a provided folder. Cleanup is opt-in with `cleanroom clean --include-project-caches`; source, `.git`, `node_modules`, and virtualenv folders stay protected.
 
 `duplicates` hashes files above `--min-mb`, groups exact matches, estimates possible reclaim, and never deletes anything.
 

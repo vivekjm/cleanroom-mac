@@ -1,4 +1,4 @@
-.TH CLEANROOM 1 "June 2026" "cleanroom 0.65.0" "User Commands"
+.TH CLEANROOM 1 "June 2026" "cleanroom 0.66.0" "User Commands"
 .SH NAME
 cleanroom \- safe-by-default macOS storage cleaner
 .SH SYNOPSIS
@@ -55,6 +55,9 @@ cleanroom \- safe-by-default macOS storage cleaner
 .br
 .B cleanroom
 .RI "savedstate [--json]"
+.br
+.B cleanroom
+.RI "projectcaches [path] [--limit n] [--json]"
 .br
 .B cleanroom
 .RI "duplicates [path] [--min-mb n] [--limit n] [--json]"
@@ -261,6 +264,10 @@ passwords, bookmarks, website data, or profiles.
 .B savedstate
 Inventory saved app window/session restoration state without touching documents
 or app profiles.
+.TP
+.B projectcaches
+Inventory known rebuildable project cache artifacts such as __pycache__,
+pytest, mypy, ruff, tox, nox, and coverage caches.
 .TP
 .B duplicates
 Find exact duplicate files for review without deleting anything.
@@ -492,6 +499,10 @@ Remove Safari and WebKit cache folders only. Browser profile data stays protecte
 .B --include-saved-state
 Remove saved app window/session state. Documents and app profiles stay protected.
 .TP
+.B --include-project-caches
+Remove known rebuildable project cache artifacts under Desktop, Documents, and
+Downloads. Source, .git, node_modules, and virtualenv folders are pruned.
+.TP
 .B --include-venv-stale
 Remove stale Python virtualenv folders older than
 .BR --days
@@ -535,6 +546,7 @@ cleanroom quicklook --json
 cleanroom fontcaches --json
 cleanroom webcaches --json
 cleanroom savedstate --json
+cleanroom projectcaches --json
 cleanroom leftovers adobe --limit 50
 cleanroom leftovers adobe --apply --trash
 cleanroom backups --json

@@ -22,6 +22,7 @@ cleanroom quicklook
 cleanroom fontcaches
 cleanroom webcaches
 cleanroom savedstate
+cleanroom projectcaches
 cleanroom duplicates
 cleanroom downloads
 cleanroom installers
@@ -84,6 +85,7 @@ cleanroom quicklook --json
 cleanroom fontcaches --json
 cleanroom webcaches --json
 cleanroom savedstate --json
+cleanroom projectcaches --json
 cleanroom duplicates --json ~/Documents
 cleanroom documents --json ~/Documents
 cleanroom desktop --json
@@ -169,6 +171,8 @@ cleanroom permissions --json
 `webcaches --json` emits Safari and WebKit cache buckets with path, size, existence, and matching cleanup commands. Browser history, cookies, bookmarks, passwords, website data, and profiles are never targeted.
 
 `savedstate --json` emits saved application window/session state with path, size, existence, and matching cleanup commands. Documents and app profiles are never targeted.
+
+`projectcaches --json` emits known rebuildable project cache artifacts such as `__pycache__`, pytest, mypy, ruff, tox, nox, and coverage caches. Source, `.git`, `node_modules`, and virtualenv folders are pruned.
 
 `duplicates --json [PATH]` emits exact duplicate groups with SHA-256 hashes, paths, and estimated possible reclaim. It is intentionally review-only and does not delete anything.
 
@@ -406,6 +410,18 @@ cleanroom clean --apply --trash --include-saved-state
 ```
 
 Use this when apps keep restoring stale windows or when System Data includes saved app state. Cleanroom removes saved window/session state only; documents, app profiles, account data, and preferences stay protected.
+
+## Project Caches
+
+```sh
+cleanroom projectcaches
+cleanroom projectcaches ~/Documents --limit 50
+cleanroom projectcaches --json
+cleanroom clean --include-project-caches
+cleanroom clean --apply --trash --include-project-caches
+```
+
+Use this for Python and test/tooling cache clutter inside local projects. Cleanroom targets known rebuildable cache artifacts only and prunes `.git`, `node_modules`, and virtualenv folders.
 
 ## Applications Storage
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.65.0"
+VERSION="0.66.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -40,6 +40,7 @@ INCLUDE_QUICKLOOK=0
 INCLUDE_FONT_CACHES=0
 INCLUDE_WEB_CACHES=0
 INCLUDE_SAVED_STATE=0
+INCLUDE_PROJECT_CACHES=0
 
 RED="$(printf '\033[31m')"
 GREEN="$(printf '\033[32m')"
@@ -70,6 +71,7 @@ Usage:
   cleanroom fontcaches [--json]
   cleanroom webcaches [--json]
   cleanroom savedstate [--json]
+  cleanroom projectcaches [PATH] [--limit N] [--json]
   cleanroom duplicates [PATH] [--min-mb N] [--limit N] [--json]
   cleanroom documents [PATH] [--limit N] [--json]
   cleanroom desktop [--limit N] [--json]
@@ -136,6 +138,7 @@ Actions:
   fontcaches           Inventory rebuildable user font cache databases.
   webcaches            Inventory Safari and WebKit browser cache folders.
   savedstate           Inventory saved app window/session state.
+  projectcaches        Inventory Python/dev project cache folders and files.
   duplicates           Find exact duplicate files for review without deleting anything.
   documents            Rank top-level user folders/files for review without deleting anything.
   desktop              Rank top-level Desktop folders/files for review without deleting anything.
@@ -187,7 +190,7 @@ Options:
   --trash              Move deleted files to ~/.Trash/cleanroom-* instead of rm -rf.
   --yes                Do not prompt before --apply cleanup.
   --verbose            Print every path touched.
-  --json               Emit JSON for overview, map, snapshot, diff, state, permissions, review, scan, system-data, plan, large, brokenlinks, quarantine, metadata, quicklook, fontcaches, webcaches, savedstate, duplicates,
+  --json               Emit JSON for overview, map, snapshot, diff, state, permissions, review, scan, system-data, plan, large, brokenlinks, quarantine, metadata, quicklook, fontcaches, webcaches, savedstate, projectcaches, duplicates,
                        documents, desktop, screenshots, archives, downloads, installers, nodes, venvs, apps, uninstallers, appreview, appdata, libraries, cloud, cloudfiles, personal, communications,
                        browsers, leftovers, startup, loginitems,
                        trash, backups, xcode, caches, diagnostics, packages, receipts, homebrew, toolchains,
@@ -230,6 +233,10 @@ Options:
                        history, cookies, passwords, bookmarks, or profiles.
   --include-saved-state
                        Remove rebuildable saved app window/session state.
+  --include-project-caches
+                       Remove rebuildable project caches such as __pycache__,
+                       .pytest_cache, .mypy_cache, .ruff_cache, .tox, .nox,
+                       and .coverage under Desktop/Documents/Downloads.
   --include-ai-workspaces
                        Remove generated AI-agent workspace state: recordings, scratch, brain,
                        implicit data, and local conversation caches where known.
@@ -287,6 +294,9 @@ Examples:
   cleanroom webcaches --json
   cleanroom savedstate
   cleanroom savedstate --json
+  cleanroom projectcaches
+  cleanroom projectcaches ~/Documents --limit 50
+  cleanroom projectcaches --json
   cleanroom duplicates ~/Documents --min-mb 100
   cleanroom duplicates --json ~/Downloads
   cleanroom documents
@@ -511,6 +521,7 @@ load_config() {
       include_font_caches) truthy "$value" && INCLUDE_FONT_CACHES=1 ;;
       include_web_caches) truthy "$value" && INCLUDE_WEB_CACHES=1 ;;
       include_saved_state) truthy "$value" && INCLUDE_SAVED_STATE=1 ;;
+      include_project_caches) truthy "$value" && INCLUDE_PROJECT_CACHES=1 ;;
       trash) truthy "$value" && TRASH=1 ;;
       log_file) LOG_FILE="$(expand_path "$value")" ;;
       exclude) add_exclude "$value" ;;
@@ -776,6 +787,7 @@ preflight_rows() {
   [[ "$INCLUDE_FONT_CACHES" -eq 1 ]] && printf '%s\t%s\t%s\t%s\n' "font-caches" "Font cache databases" "rebuildable" "Actual font files stay protected; macOS recreates font caches as needed."
   [[ "$INCLUDE_WEB_CACHES" -eq 1 ]] && printf '%s\t%s\t%s\t%s\n' "web-caches" "Safari/WebKit caches" "rebuildable" "Safari history, cookies, bookmarks, passwords, and profiles stay protected."
   [[ "$INCLUDE_SAVED_STATE" -eq 1 ]] && printf '%s\t%s\t%s\t%s\n' "saved-state" "Saved Application State" "rebuildable" "Apps may forget restored windows; app documents and profiles stay protected."
+  [[ "$INCLUDE_PROJECT_CACHES" -eq 1 ]] && printf '%s\t%s\t%s\t%s\n' "project-caches" "Project cache artifacts" "rebuildable" "Only known cache folders/files are targeted; source and dependency folders stay protected."
   [[ "$INCLUDE_NODE_STALE" -eq 1 ]] && printf '%s\t%s\t%s\t%s\n' "node-modules" "Stale node_modules" "rebuildable" "Dependencies may need to be installed again."
   [[ "$INCLUDE_VENV_STALE" -eq 1 ]] && printf '%s\t%s\t%s\t%s\n' "python-virtualenvs" "Stale Python virtualenvs" "rebuildable" "Virtualenvs may need to be recreated."
   [[ "$INCLUDE_DEV_HEAVY" -eq 1 ]] && printf '%s\t%s\t%s\t%s\n' "dev-heavy" "Heavy SDK and simulator data" "high-impact" "Some SDKs, symbols, or simulator app state may need reinstalling or resetting."
@@ -1618,6 +1630,132 @@ clean_saved_state() {
     [[ -z "${id:-}" ]] && continue
     run_rm "$path_template"
   done < <(savedstate_specs)
+}
+
+projectcache_roots() {
+  if [[ "${#PATH_ARGS[@]}" -gt 0 ]]; then
+    local path
+    for path in "${PATH_ARGS[@]}"; do
+      printf '%s\n' "$(expand_path "$path")"
+    done
+  else
+    printf '%s\n' "$HOME/Desktop"
+    printf '%s\n' "$HOME/Documents"
+    printf '%s\n' "$HOME/Downloads"
+  fi
+}
+
+projectcache_kind() {
+  local name="$1"
+  case "$name" in
+    __pycache__) printf 'python-bytecode' ;;
+    .pytest_cache) printf 'pytest-cache' ;;
+    .mypy_cache) printf 'mypy-cache' ;;
+    .ruff_cache) printf 'ruff-cache' ;;
+    .tox) printf 'tox-cache' ;;
+    .nox) printf 'nox-cache' ;;
+    .coverage) printf 'coverage-data' ;;
+    htmlcov) printf 'coverage-report' ;;
+    *) printf '' ;;
+  esac
+}
+
+projectcache_rows() {
+  local root path name kind kb epoch
+  while IFS= read -r root; do
+    [[ -d "$root" ]] || continue
+    find "$root" -xdev \( \
+      -name '.git' -o -name 'node_modules' -o -name '.venv' -o -name 'venv' -o -name 'env' \
+    \) -prune -o \( \
+      \( -type d \( -name '__pycache__' -o -name '.pytest_cache' -o -name '.mypy_cache' -o -name '.ruff_cache' -o -name '.tox' -o -name '.nox' -o -name 'htmlcov' \) \) \
+      -o \( -type f -name '.coverage' \) \
+    \) -print0 2>/dev/null |
+      while IFS= read -r -d '' path; do
+        name="$(basename "$path")"
+        kind="$(projectcache_kind "$name")"
+        [[ -n "$kind" ]] || continue
+        kb="$(size_kb "$path")"
+        epoch="$(path_mtime_epoch "$path")"
+        printf '%012d\t%012d\t%s\t%s\t%s\n' "$kb" "$epoch" "$kind" "$name" "$path"
+      done
+  done < <(projectcache_roots) | sort -t $'\t' -k1,1rn -k2,2rn | head -n "$LIMIT"
+}
+
+projectcache_total_kb() {
+  local total=0 kb epoch kind name path kb_num
+  while IFS=$'\t' read -r kb epoch kind name path; do
+    [[ -z "${path:-}" ]] && continue
+    kb_num="$(printf '%s\n' "${kb:-0}" | sed 's/^0*//; s/^$/0/')"
+    total=$((total + kb_num))
+  done < <(projectcache_rows)
+  printf '%s\n' "$total"
+}
+
+projectcaches() {
+  local rows
+  rows="$(projectcache_rows)"
+
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '['
+    local first=1 kb epoch kind name path kb_num epoch_num
+    while IFS=$'\t' read -r kb epoch kind name path; do
+      [[ -z "${path:-}" ]] && continue
+      kb_num="$(printf '%s\n' "$kb" | sed 's/^0*//; s/^$/0/')"
+      epoch_num="$(printf '%s\n' "${epoch:-0}" | sed 's/^0*//; s/^$/0/')"
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '{"path":"%s","name":"%s","kind":"%s","size_kb":%s,"size":"%s","modified_epoch":%s,"modified":"%s","preview_command":"%s","apply_command":"%s"}' \
+        "$(printf '%s' "$path" | json_escape)" \
+        "$(printf '%s' "$name" | json_escape)" \
+        "$(printf '%s' "$kind" | json_escape)" \
+        "$kb_num" \
+        "$(human_kb "${kb:-0}" | json_escape)" \
+        "${epoch_num:-0}" \
+        "$(file_mtime_iso "${epoch_num:-0}" | json_escape)" \
+        "$(printf 'cleanroom projectcaches --limit %s' "$LIMIT" | json_escape)" \
+        "$(printf 'cleanroom clean --apply --trash --include-project-caches --limit %s' "$LIMIT" | json_escape)"
+    done <<<"$rows"
+    printf ']\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}cleanroom project caches${RESET}"
+  printf 'Review-only inventory. Cleanup is opt-in with --include-project-caches and targets only known rebuildable cache artifacts.\n'
+  printf 'Limit: %s\n' "$LIMIT"
+  printf 'Paths: '
+  local root first_root=1
+  while IFS= read -r root; do
+    [[ "$first_root" -eq 0 ]] && printf '; '
+    first_root=0
+    printf '%s' "$root"
+  done < <(projectcache_roots)
+  printf '\n\n'
+
+  if [[ -z "$rows" ]]; then
+    printf 'No project cache artifacts found.\n'
+    return 0
+  fi
+
+  printf '%-10s %-18s %-12s %s\n' "size" "kind" "modified" "path"
+  local kb epoch kind name path epoch_num
+  while IFS=$'\t' read -r kb epoch kind name path; do
+    [[ -z "${path:-}" ]] && continue
+    epoch_num="$(printf '%s\n' "${epoch:-0}" | sed 's/^0*//; s/^$/0/')"
+    printf '%-10s %-18s %-12s %s\n' "$(human_kb "$kb")" "$kind" "$(file_mtime_iso "${epoch_num:-0}")" "$path"
+    printf '  reveal: open -R %s\n' "$(shell_quote "$path")"
+  done <<<"$rows"
+  printf '\nPreview cleanup with: cleanroom clean --include-project-caches\n'
+  printf 'Apply cleanup with: cleanroom clean --apply --trash --include-project-caches\n'
+}
+
+clean_project_caches() {
+  [[ "$INCLUDE_PROJECT_CACHES" -eq 1 ]] || return 0
+  log "${BOLD}Project cache artifacts${RESET}"
+  local kb epoch kind name path
+  while IFS=$'\t' read -r kb epoch kind name path; do
+    [[ -z "${path:-}" ]] && continue
+    run_rm "$path"
+  done < <(projectcache_rows)
 }
 
 clean_dev_heavy() {
@@ -4753,6 +4891,7 @@ cache_rows() {
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "font-caches" "font-caches" "Apple Type Services and Font Registry user cache paths" "cleanroom fontcaches" "cleanroom clean --apply --trash --include-font-caches" "Rebuildable user font cache databases. Actual fonts stay protected."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "web-caches" "web-caches" "Safari and WebKit cache paths" "cleanroom webcaches" "cleanroom clean --apply --trash --include-web-caches" "Safari/WebKit cache folders only; history, cookies, bookmarks, passwords, website data, and profiles stay protected."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "saved-state" "saved-state" "~/Library/Saved Application State" "cleanroom savedstate" "cleanroom clean --apply --trash --include-saved-state" "Saved app window/session restoration state. Documents and app profiles stay protected."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "project-caches" "project-caches" "__pycache__, .pytest_cache, .mypy_cache, .ruff_cache, .tox, .nox, htmlcov, .coverage" "cleanroom projectcaches" "cleanroom clean --apply --trash --include-project-caches" "Known rebuildable project cache artifacts under Desktop, Documents, and Downloads. Source and dependency folders stay protected."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "safe-app-caches" "app-caches" "known nested app cache folders" "cleanroom clean --include-app-caches" "cleanroom clean --apply --trash --include-app-caches" "Nested cache folders for apps such as Chrome, Brave, Edge, Arc, VS Code, Cursor, Slack, Comet, and Trae. Profiles, passwords, cookies, bookmarks, and settings stay protected."
 }
 
@@ -5462,7 +5601,7 @@ snapshots() {
 }
 
 plan_rows() {
-  local safe package toolchain app installers metadata_total quicklook_total fontcache_total webcache_total savedstate_total node venv dev diagnostics ai_workspaces ai_models containers user_trash
+  local safe package toolchain app installers metadata_total quicklook_total fontcache_total webcache_total savedstate_total projectcache_total node venv dev diagnostics ai_workspaces ai_models containers user_trash
   safe="$(sum_existing_kb \
     "~/Library/Caches" "~/.cache" "~/.npm/_cacache" "~/.npm/_logs" "~/.npm/_npx" \
     "~/.yarn/cache" "~/.yarn/berry" "~/.gradle/caches" "~/.gradle/daemon" \
@@ -5478,6 +5617,7 @@ plan_rows() {
   fontcache_total="$(fontcache_total_kb)"
   webcache_total="$(webcache_total_kb)"
   savedstate_total="$(savedstate_total_kb)"
+  projectcache_total="$(projectcache_total_kb)"
   node="$(stale_node_kb)"
   venv="$(stale_venv_kb)"
   dev="$(sum_existing_kb \
@@ -5499,6 +5639,7 @@ plan_rows() {
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$fontcache_total" "font-caches" "Font cache databases" "cleanroom fontcaches" "cleanroom clean --apply --trash --include-font-caches" "Rebuildable Apple Type Services and font registry caches. Actual font files stay protected."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$webcache_total" "web-caches" "Safari/WebKit caches" "cleanroom webcaches" "cleanroom clean --apply --trash --include-web-caches" "Rebuildable Safari and WebKit cache folders. Browser history, cookies, bookmarks, passwords, website data, and profiles stay protected."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$savedstate_total" "saved-state" "Saved Application State" "cleanroom savedstate" "cleanroom clean --apply --trash --include-saved-state" "Rebuildable app window/session restoration state. Documents and app profiles stay protected."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$projectcache_total" "project-caches" "Project cache artifacts" "cleanroom projectcaches" "cleanroom clean --apply --trash --include-project-caches" "Rebuildable project caches such as __pycache__, pytest, mypy, ruff, tox, nox, and coverage artifacts."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$package" "package-stores" "Package-manager stores" "cleanroom clean --include-package-stores" "cleanroom clean --apply --trash --include-package-stores" "Rebuildable package stores such as pnpm, CocoaPods, Cargo, and Gradle-related stores."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$toolchain" "toolchains" "Language toolchain caches" "cleanroom toolchains" "cleanroom clean --apply --trash --include-toolchains" "Rebuildable caches for Go, Python, SwiftPM, Maven, Composer, RubyGems, Bundler, uv, and Poetry."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$node" "node-stale" "Stale node_modules" "cleanroom clean --include-node-stale --days $DAYS" "cleanroom clean --apply --trash --include-node-stale --days $DAYS" "node_modules older than $DAYS days under Desktop, Documents, and Downloads."
@@ -5972,6 +6113,7 @@ include_quicklook=false
 include_font_caches=false
 include_web_caches=false
 include_saved_state=false
+include_project_caches=false
 
 # Apply safety
 trash=false
@@ -6008,6 +6150,7 @@ interactive() {
   ask_yes_no "Include user font cache databases?" && INCLUDE_FONT_CACHES=1
   ask_yes_no "Include Safari and WebKit cache folders?" && INCLUDE_WEB_CACHES=1
   ask_yes_no "Include saved app window/session state?" && INCLUDE_SAVED_STATE=1
+  ask_yes_no "Include project cache artifacts?" && INCLUDE_PROJECT_CACHES=1
   ask_yes_no "Include stale node_modules older than ${DAYS} days?" && INCLUDE_NODE_STALE=1
   ask_yes_no "Include stale Python virtualenvs older than ${DAYS} days?" && INCLUDE_VENV_STALE=1
   ask_yes_no "Include heavy SDK/simulator cleanup?" && INCLUDE_DEV_HEAVY=1
@@ -6074,6 +6217,12 @@ Default safe cleanup:
   Saved app window/session restoration state. Apps may reopen without their
   previous windows, but documents and app profiles are never removed.
 
+--include-project-caches:
+  Rebuildable project cache artifacts such as __pycache__, .pytest_cache,
+  .mypy_cache, .ruff_cache, .tox, .nox, htmlcov, and .coverage under Desktop,
+  Documents, and Downloads. Source, .git, node_modules, and virtualenv folders
+  are not targeted by this category.
+
 --include-dev-heavy:
   Xcode device support, unavailable simulators, simulator app data, Android NDK,
   and Android system images.
@@ -6133,6 +6282,7 @@ clean() {
   clean_font_caches
   clean_web_caches
   clean_saved_state
+  clean_project_caches
   clean_node_stale
   clean_venv_stale
   clean_snapshots
@@ -6179,7 +6329,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  overview|map|snapshot|diff|state|permissions|review|scan|system-data|plan|large|brokenlinks|quarantine|metadata|quicklook|fontcaches|font-caches|webcaches|web-caches|savedstate|saved-state|duplicates|documents|desktop|screenshots|archives|downloads|installers|nodes|venvs|virtualenvs|apps|uninstallers|appreview|appdata|libraries|cloud|cloudfiles|cloud-files|personal|communications|comms|browsers|leftovers|backups|xcode|android|startup|loginitems|trash|caches|diagnostics|packages|receipts|homebrew|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
+  overview|map|snapshot|diff|state|permissions|review|scan|system-data|plan|large|brokenlinks|quarantine|metadata|quicklook|fontcaches|font-caches|webcaches|web-caches|savedstate|saved-state|projectcaches|project-caches|duplicates|documents|desktop|screenshots|archives|downloads|installers|nodes|venvs|virtualenvs|apps|uninstallers|appreview|appdata|libraries|cloud|cloudfiles|cloud-files|personal|communications|comms|browsers|leftovers|backups|xcode|android|startup|loginitems|trash|caches|diagnostics|packages|receipts|homebrew|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -6265,12 +6415,13 @@ while [[ "$#" -gt 0 ]]; do
     --include-font-caches|--include-fontcaches) INCLUDE_FONT_CACHES=1 ;;
     --include-web-caches|--include-webcaches) INCLUDE_WEB_CACHES=1 ;;
     --include-saved-state|--include-savedstate) INCLUDE_SAVED_STATE=1 ;;
+    --include-project-caches|--include-projectcaches) INCLUDE_PROJECT_CACHES=1 ;;
     --include-gemini) INCLUDE_GEMINI=1; INCLUDE_AI_WORKSPACES=1 ;;
     --include-lmstudio) INCLUDE_LMSTUDIO=1; INCLUDE_AI_MODELS=1 ;;
     -h|--help) usage; exit 0 ;;
     -v|--version) echo "$VERSION"; exit 0 ;;
     *)
-      if [[ "$ACTION" == "guard" || "$ACTION" == "diff" || "$ACTION" == "large" || "$ACTION" == "brokenlinks" || "$ACTION" == "quarantine" || "$ACTION" == "metadata" || "$ACTION" == "duplicates" || "$ACTION" == "documents" || "$ACTION" == "screenshots" || "$ACTION" == "archives" || "$ACTION" == "nodes" || "$ACTION" == "venvs" || "$ACTION" == "virtualenvs" || "$ACTION" == "apps" || "$ACTION" == "uninstallers" || "$ACTION" == "appreview" || "$ACTION" == "cloudfiles" || "$ACTION" == "cloud-files" || "$ACTION" == "leftovers" ]]; then
+      if [[ "$ACTION" == "guard" || "$ACTION" == "diff" || "$ACTION" == "large" || "$ACTION" == "brokenlinks" || "$ACTION" == "quarantine" || "$ACTION" == "metadata" || "$ACTION" == "projectcaches" || "$ACTION" == "project-caches" || "$ACTION" == "duplicates" || "$ACTION" == "documents" || "$ACTION" == "screenshots" || "$ACTION" == "archives" || "$ACTION" == "nodes" || "$ACTION" == "venvs" || "$ACTION" == "virtualenvs" || "$ACTION" == "apps" || "$ACTION" == "uninstallers" || "$ACTION" == "appreview" || "$ACTION" == "cloudfiles" || "$ACTION" == "cloud-files" || "$ACTION" == "leftovers" ]]; then
         PATH_ARGS+=("$1")
       else
         die "Unknown option: $1"
@@ -6299,6 +6450,7 @@ case "$ACTION" in
   fontcaches|font-caches) fontcaches ;;
   webcaches|web-caches) webcaches ;;
   savedstate|saved-state) savedstate ;;
+  projectcaches|project-caches) projectcaches ;;
   duplicates) duplicates ;;
   documents) documents ;;
   desktop) desktop ;;

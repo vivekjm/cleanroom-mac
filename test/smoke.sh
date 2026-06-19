@@ -107,6 +107,14 @@ mkdir -p \
   "$TEST_HOME/Documents/duplicates" \
   "$TEST_HOME/Documents/media-project" \
   "$TEST_HOME/Documents/example/node_modules" \
+  "$TEST_HOME/Documents/python-cache-project/pkg/__pycache__" \
+  "$TEST_HOME/Documents/python-cache-project/.pytest_cache" \
+  "$TEST_HOME/Documents/python-cache-project/.mypy_cache" \
+  "$TEST_HOME/Documents/python-cache-project/.ruff_cache" \
+  "$TEST_HOME/Documents/python-cache-project/.tox" \
+  "$TEST_HOME/Documents/python-cache-project/.nox" \
+  "$TEST_HOME/Documents/python-cache-project/htmlcov" \
+  "$TEST_HOME/Documents/python-cache-project/node_modules/__pycache__" \
   "$TEST_HOME/Documents/python-app/.venv/bin"
 
 printf 'cache\n' >"$TEST_HOME/Library/Caches/example.cache"
@@ -206,6 +214,15 @@ printf 'appledouble metadata\n' >"$TEST_HOME/Downloads/._old-installer.dmg"
 printf 'windows metadata\n' >"$TEST_HOME/Desktop/Thumbs.db"
 dd if=/dev/zero of="$TEST_HOME/Documents/media-project/clip.mov" bs=1024 count=64 >/dev/null 2>&1
 printf 'old dependency\n' >"$TEST_HOME/Documents/example/node_modules/package.txt"
+printf 'bytecode\n' >"$TEST_HOME/Documents/python-cache-project/pkg/__pycache__/module.cpython-312.pyc"
+printf 'pytest cache\n' >"$TEST_HOME/Documents/python-cache-project/.pytest_cache/CACHEDIR.TAG"
+printf 'mypy cache\n' >"$TEST_HOME/Documents/python-cache-project/.mypy_cache/meta.json"
+printf 'ruff cache\n' >"$TEST_HOME/Documents/python-cache-project/.ruff_cache/cache.db"
+printf 'tox cache\n' >"$TEST_HOME/Documents/python-cache-project/.tox/state.json"
+printf 'nox cache\n' >"$TEST_HOME/Documents/python-cache-project/.nox/state.json"
+printf 'coverage report\n' >"$TEST_HOME/Documents/python-cache-project/htmlcov/index.html"
+printf 'coverage data\n' >"$TEST_HOME/Documents/python-cache-project/.coverage"
+printf 'ignored dependency cache\n' >"$TEST_HOME/Documents/python-cache-project/node_modules/__pycache__/ignored.pyc"
 printf 'home = /usr/bin\n' >"$TEST_HOME/Documents/python-app/.venv/pyvenv.cfg"
 printf 'python shim\n' >"$TEST_HOME/Documents/python-app/.venv/bin/python"
 ln -s "$TEST_HOME/Documents/missing-target" "$TEST_HOME/Documents/broken-link"
@@ -374,6 +391,7 @@ grep 'quicklook-caches' "$rules_json" >/dev/null
 grep 'font-caches' "$rules_json" >/dev/null
 grep 'web-caches' "$rules_json" >/dev/null
 grep 'saved-state' "$rules_json" >/dev/null
+grep 'project-caches' "$rules_json" >/dev/null
 grep 'screenshots-inventory' "$rules_json" >/dev/null
 grep 'archives-inventory' "$rules_json" >/dev/null
 grep 'android-inventory' "$rules_json" >/dev/null
@@ -412,6 +430,7 @@ grep 'cleanroom clean --apply --trash --include-quicklook' "$plan_json" >/dev/nu
 grep 'cleanroom clean --apply --trash --include-font-caches' "$plan_json" >/dev/null
 grep 'cleanroom clean --apply --trash --include-web-caches' "$plan_json" >/dev/null
 grep 'cleanroom clean --apply --trash --include-saved-state' "$plan_json" >/dev/null
+grep 'cleanroom clean --apply --trash --include-project-caches' "$plan_json" >/dev/null
 rm -f "$plan_json"
 "$BIN" large "$HOME/Downloads" --min-mb 1 --limit 5 | grep 'big-test.bin' >/dev/null
 large_json="$(mktemp)"
@@ -523,6 +542,28 @@ test -f "$savedstate_log"
 grep $'\ttrash\tok\t' "$savedstate_log" >/dev/null
 "$BIN" restore --log "$savedstate_log" --apply --yes >/dev/null
 test -e "$TEST_HOME/Library/Saved Application State/com.example.Test.savedState/window.plist"
+"$BIN" projectcaches "$HOME/Documents" --limit 20 | grep '__pycache__' >/dev/null
+"$BIN" projectcaches "$HOME/Documents" --limit 20 | grep '.pytest_cache' >/dev/null
+if "$BIN" projectcaches "$HOME/Documents" --limit 20 | grep 'node_modules/__pycache__' >/dev/null; then
+  echo "projectcaches should prune node_modules" >&2
+  exit 1
+fi
+projectcaches_json="$(mktemp)"
+"$BIN" projectcaches --json "$HOME/Documents" --limit 20 > "$projectcaches_json"
+python3 -m json.tool "$projectcaches_json" >/dev/null
+grep '"kind":"python-bytecode"' "$projectcaches_json" >/dev/null
+grep '"kind":"pytest-cache"' "$projectcaches_json" >/dev/null
+grep 'cleanroom clean --apply --trash --include-project-caches' "$projectcaches_json" >/dev/null
+rm -f "$projectcaches_json"
+projectcaches_log="$TEST_HOME/projectcaches-apply.log"
+"$BIN" clean --include-project-caches --apply --trash --yes --log "$projectcaches_log" >/dev/null
+test ! -e "$TEST_HOME/Documents/python-cache-project/pkg/__pycache__"
+test ! -e "$TEST_HOME/Documents/python-cache-project/.pytest_cache"
+test -e "$TEST_HOME/Documents/python-cache-project/node_modules/__pycache__/ignored.pyc"
+test -f "$projectcaches_log"
+grep $'\ttrash\tok\t' "$projectcaches_log" >/dev/null
+"$BIN" restore --log "$projectcaches_log" --apply --yes >/dev/null
+test -e "$TEST_HOME/Documents/python-cache-project/pkg/__pycache__/module.cpython-312.pyc"
 "$BIN" duplicates "$HOME/Documents" --min-mb 1 --limit 5 | grep 'copy-a.bin' >/dev/null
 "$BIN" duplicates "$HOME/Documents" --min-mb 1 --limit 5 | grep 'copy-b.bin' >/dev/null
 duplicates_json="$(mktemp)"
@@ -799,6 +840,7 @@ grep 'quicklook-caches' "$caches_json" >/dev/null
 grep 'font-caches' "$caches_json" >/dev/null
 grep 'web-caches' "$caches_json" >/dev/null
 grep 'saved-state' "$caches_json" >/dev/null
+grep 'project-caches' "$caches_json" >/dev/null
 grep 'cleanroom clean --apply --trash --include-app-caches' "$caches_json" >/dev/null
 rm -f "$caches_json"
 "$BIN" diagnostics | grep 'diagnostic-reports' >/dev/null
@@ -865,6 +907,7 @@ grep '^include_quicklook=false' "$config_file" >/dev/null
 grep '^include_font_caches=false' "$config_file" >/dev/null
 grep '^include_web_caches=false' "$config_file" >/dev/null
 grep '^include_saved_state=false' "$config_file" >/dev/null
+grep '^include_project_caches=false' "$config_file" >/dev/null
 "$BIN" doctor --config "$config_file" | grep "$config_file" >/dev/null
 
 report_stdout="$("$BIN" report)"
@@ -909,8 +952,10 @@ webcaches_preflight="$("$BIN" clean --include-web-caches --preflight)"
 grep 'web-caches' <<<"$webcaches_preflight" >/dev/null
 savedstate_preflight="$("$BIN" clean --include-saved-state --preflight)"
 grep 'saved-state' <<<"$savedstate_preflight" >/dev/null
+projectcaches_preflight="$("$BIN" clean --include-project-caches --preflight)"
+grep 'project-caches' <<<"$projectcaches_preflight" >/dev/null
 preflight_json="$(mktemp)"
-"$BIN" clean --preset deep --include-ai-models --include-containers --include-user-trash --include-metadata --include-quicklook --include-font-caches --include-web-caches --include-saved-state --apply --trash --yes --preflight --json > "$preflight_json"
+"$BIN" clean --preset deep --include-ai-models --include-containers --include-user-trash --include-metadata --include-quicklook --include-font-caches --include-web-caches --include-saved-state --include-project-caches --apply --trash --yes --preflight --json > "$preflight_json"
 python3 -m json.tool "$preflight_json" >/dev/null
 grep '"apply":true' "$preflight_json" >/dev/null
 grep '"trash":true' "$preflight_json" >/dev/null
@@ -920,6 +965,7 @@ grep '"id":"quicklook"' "$preflight_json" >/dev/null
 grep '"id":"font-caches"' "$preflight_json" >/dev/null
 grep '"id":"web-caches"' "$preflight_json" >/dev/null
 grep '"id":"saved-state"' "$preflight_json" >/dev/null
+grep '"id":"project-caches"' "$preflight_json" >/dev/null
 grep '"id":"user-trash"' "$preflight_json" >/dev/null
 grep '"safety":"irreversible"' "$preflight_json" >/dev/null
 grep 'Container cleanup can remove local containers' "$preflight_json" >/dev/null
