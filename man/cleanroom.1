@@ -1,4 +1,4 @@
-.TH CLEANROOM 1 "June 2026" "cleanroom 0.73.0" "User Commands"
+.TH CLEANROOM 1 "June 2026" "cleanroom 0.74.0" "User Commands"
 .SH NAME
 cleanroom \- safe-by-default macOS storage cleaner
 .SH SYNOPSIS
@@ -157,6 +157,9 @@ cleanroom \- safe-by-default macOS storage cleaner
 .br
 .B cleanroom
 .RI "homebrew [--json]"
+.br
+.B cleanroom
+.RI "homebrew-cleanup [--json] [--apply --yes]"
 .br
 .B cleanroom
 .RI "toolchains [--json]"
@@ -394,6 +397,9 @@ leftovers.
 .B homebrew
 Inventory Homebrew cache, logs, Cellar, Caskroom, and service/runtime folders.
 .TP
+.B homebrew-cleanup
+Run Homebrew's own cleanup dry-run, or apply it with --apply.
+.TP
 .B toolchains
 Inventory language and toolchain caches such as Go, pip, uv, SwiftPM, Maven,
 Composer, RubyGems, and Bundler.
@@ -606,6 +612,8 @@ cleanroom diagnostics --json
 cleanroom packages --json
 cleanroom receipts --json
 cleanroom homebrew --json
+cleanroom homebrew-cleanup
+cleanroom homebrew-cleanup --apply --yes
 cleanroom toolchains --json
 cleanroom containers --json
 cleanroom snapshots --json

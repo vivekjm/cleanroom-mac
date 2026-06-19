@@ -64,6 +64,8 @@ _cleanroom() {
     'packages:Inventory package-manager stores'
     'receipts:Inventory macOS package installer receipts'
     'homebrew:Inventory Homebrew cache, Cellar, Caskroom, and logs'
+    'homebrew-cleanup:Run Homebrew cleanup dry-run or apply'
+    'brewcleanup:Alias for homebrew-cleanup'
     'toolchains:Inventory language/toolchain caches'
     'containers:Inventory container VM disks and stores'
     'snapshots:List local Time Machine snapshots'

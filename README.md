@@ -944,7 +944,9 @@ Config files use simple `key=value` lines and are never executed as shell.
 
 `receipts` inventories macOS package installer receipt records from `/var/db/receipts`, `/Library/Receipts`, and `~/Library/Receipts`. It is useful when investigating software installed by `.pkg` installers, because package IDs often hint at vendor leftovers to inspect next. Cleanroom never removes receipt records.
 
-`homebrew` inventories Homebrew cache, logs, Cellar, Caskroom, and service/runtime folders. It is review-only and points to `brew cleanup -n` for Homebrew-native dry-run detail.
+`homebrew` inventories Homebrew cache, logs, Cellar, Caskroom, and service/runtime folders. It is review-only and points to `cleanroom homebrew-cleanup` for Homebrew-native dry-run detail.
+
+`homebrew-cleanup` runs Homebrew's own cleanup flow. It defaults to `brew cleanup -n`; add `--apply --yes` to run `brew cleanup`. This delegates formula and cask cleanup decisions to Homebrew instead of hand-deleting Cellar or Caskroom internals.
 
 `toolchains` inventories rebuildable language/toolchain caches for Go, pip, uv, Poetry, SwiftPM, Maven, Composer, RubyGems, and Bundler. Cleanup is opt-in with `cleanroom clean --include-toolchains`, and `--trash` keeps removals restorable through the normal apply log.
 

@@ -299,6 +299,35 @@ fi
 exit 1
 SH
 chmod +x "$TEST_HOME/bin/xattr"
+cat >"$TEST_HOME/bin/brew" <<'SH'
+#!/usr/bin/env bash
+case "${1:-}" in
+  --prefix)
+    printf '%s/homebrew-prefix\n' "$HOME"
+    ;;
+  list)
+    case "${2:-}" in
+      --formula) printf 'node\nopenssl\n' ;;
+      --cask) printf 'visual-studio-code\n' ;;
+      *) exit 2 ;;
+    esac
+    ;;
+  cleanup)
+    if [[ "${2:-}" == "-n" ]]; then
+      printf 'Would remove: old-bottle.tar.gz\n'
+    elif [[ -z "${2:-}" ]]; then
+      printf 'Removing: old-bottle.tar.gz\n'
+      printf 'applied\n' >"$HOME/brew-cleanup-applied"
+    else
+      exit 2
+    fi
+    ;;
+  *)
+    exit 2
+    ;;
+esac
+SH
+chmod +x "$TEST_HOME/bin/brew"
 export HOME="$TEST_HOME"
 export PATH="$TEST_HOME/bin:$PATH"
 
@@ -891,6 +920,18 @@ python3 -m json.tool "$homebrew_json" >/dev/null
 grep '"installed_formulae"' "$homebrew_json" >/dev/null
 grep 'homebrew-logs' "$homebrew_json" >/dev/null
 rm -f "$homebrew_json"
+"$BIN" homebrew-cleanup | grep 'Would remove: old-bottle.tar.gz' >/dev/null
+homebrew_cleanup_json="$(mktemp)"
+"$BIN" homebrew-cleanup --json > "$homebrew_cleanup_json"
+python3 -m json.tool "$homebrew_cleanup_json" >/dev/null
+grep '"command":"brew cleanup -n"' "$homebrew_cleanup_json" >/dev/null
+grep 'Would remove: old-bottle.tar.gz' "$homebrew_cleanup_json" >/dev/null
+rm -f "$homebrew_cleanup_json"
+homebrew_cleanup_log="$(mktemp)"
+rm -f "$homebrew_cleanup_log" "$TEST_HOME/brew-cleanup-applied"
+"$BIN" homebrew-cleanup --apply --yes --log "$homebrew_cleanup_log" | grep 'Removing: old-bottle.tar.gz' >/dev/null
+test -f "$TEST_HOME/brew-cleanup-applied"
+grep 'homebrew-cleanup' "$homebrew_cleanup_log" >/dev/null
 "$BIN" toolchains | grep 'go-build-cache' >/dev/null
 toolchains_json="$(mktemp)"
 "$BIN" toolchains --json > "$toolchains_json"

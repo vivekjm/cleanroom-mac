@@ -238,6 +238,8 @@ cleanroom permissions --json
 
 `homebrew --json` emits Homebrew cache, log, Cellar, Caskroom, and service/runtime bucket sizes plus installed formula/cask counts when `brew` is available.
 
+`homebrew-cleanup --json` emits the command, exit code, apply mode, and output from Homebrew's native cleanup dry-run. Use `--apply --yes` to run `brew cleanup`.
+
 `toolchains --json` emits rebuildable language/toolchain cache sizes with matching preview/apply commands.
 
 `containers --json` emits local container VM disk and image-store sizes with high-impact cleanup guidance.
