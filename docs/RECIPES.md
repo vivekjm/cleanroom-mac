@@ -19,6 +19,7 @@ cleanroom brokenlinks
 cleanroom quarantine
 cleanroom metadata
 cleanroom quicklook
+cleanroom fontcaches
 cleanroom duplicates
 cleanroom downloads
 cleanroom installers
@@ -78,6 +79,7 @@ cleanroom brokenlinks --json ~/Documents
 cleanroom quarantine --json ~/Downloads
 cleanroom metadata --json ~/Documents ~/Downloads
 cleanroom quicklook --json
+cleanroom fontcaches --json
 cleanroom duplicates --json ~/Documents
 cleanroom documents --json ~/Documents
 cleanroom desktop --json
@@ -157,6 +159,8 @@ cleanroom permissions --json
 `metadata --json [PATH...]` emits removable filesystem metadata clutter such as `.DS_Store`, AppleDouble `._*` files, `__MACOSX`, `Thumbs.db`, and `Desktop.ini` with guard status and matching apply command. Direct apply mode requires `--trash`.
 
 `quicklook --json` emits rebuildable Quick Look thumbnail and preview cache buckets with path, size, existence, and matching cleanup commands.
+
+`fontcaches --json` emits rebuildable user font cache database buckets with path, size, existence, and matching cleanup commands. Actual font files are never targeted.
 
 `duplicates --json [PATH]` emits exact duplicate groups with SHA-256 hashes, paths, and estimated possible reclaim. It is intentionally review-only and does not delete anything.
 
@@ -361,6 +365,17 @@ cleanroom clean --apply --trash --include-quicklook
 ```
 
 Use this when System Data is large and Finder thumbnails/previews have accumulated. Quick Look caches are rebuildable; macOS recreates thumbnails and previews as files are browsed again.
+
+## Font Caches
+
+```sh
+cleanroom fontcaches
+cleanroom fontcaches --json
+cleanroom clean --include-font-caches
+cleanroom clean --apply --trash --include-font-caches
+```
+
+Use this when font menus, previews, or rendering feel stale after installing or removing fonts. Cleanroom removes rebuildable user font cache databases only; it does not remove fonts from user, shared, or system font folders.
 
 ## Applications Storage
 

@@ -1,4 +1,4 @@
-.TH CLEANROOM 1 "June 2026" "cleanroom 0.62.0" "User Commands"
+.TH CLEANROOM 1 "June 2026" "cleanroom 0.63.0" "User Commands"
 .SH NAME
 cleanroom \- safe-by-default macOS storage cleaner
 .SH SYNOPSIS
@@ -46,6 +46,9 @@ cleanroom \- safe-by-default macOS storage cleaner
 .br
 .B cleanroom
 .RI "quicklook [--json]"
+.br
+.B cleanroom
+.RI "fontcaches [--json]"
 .br
 .B cleanroom
 .RI "duplicates [path] [--min-mb n] [--limit n] [--json]"
@@ -241,6 +244,9 @@ files, __MACOSX folders, Thumbs.db, and Desktop.ini. Applied cleanup requires
 .TP
 .B quicklook
 Inventory rebuildable Quick Look thumbnail and preview caches.
+.TP
+.B fontcaches
+Inventory rebuildable user font cache databases without touching actual fonts.
 .TP
 .B duplicates
 Find exact duplicate files for review without deleting anything.
@@ -463,6 +469,9 @@ Remove filesystem metadata clutter from Desktop, Documents, and Downloads.
 .B --include-quicklook
 Remove rebuildable Quick Look thumbnail and preview caches.
 .TP
+.B --include-font-caches
+Remove rebuildable user font cache databases. Actual font files stay protected.
+.TP
 .B --include-venv-stale
 Remove stale Python virtualenv folders older than
 .BR --days
@@ -503,6 +512,7 @@ cleanroom browsers --json
 cleanroom metadata --json
 cleanroom metadata --apply --trash
 cleanroom quicklook --json
+cleanroom fontcaches --json
 cleanroom leftovers adobe --limit 50
 cleanroom leftovers adobe --apply --trash
 cleanroom backups --json

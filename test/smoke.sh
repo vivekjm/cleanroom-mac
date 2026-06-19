@@ -24,6 +24,10 @@ mkdir -p \
   "$TEST_HOME/Library/Caches/com.apple.QuickLook.thumbnailcache" \
   "$TEST_HOME/Library/Caches/com.apple.quicklook.ThumbnailsAgent" \
   "$TEST_HOME/Library/Caches/com.apple.QuickLookDaemon" \
+  "$TEST_HOME/Library/Caches/com.apple.ATS/User" \
+  "$TEST_HOME/Library/Caches/com.apple.FontRegistry" \
+  "$TEST_HOME/Library/Caches/com.apple.FontWorker" \
+  "$TEST_HOME/Library/Caches/com.apple.FontServices" \
   "$TEST_HOME/Library/Containers/com.apple.QuickLook.thumbnailcache/Data/Library/Caches" \
   "$TEST_HOME/Library/Containers/com.apple.quicklook.ThumbnailsAgent/Data/Library/Caches" \
   "$TEST_HOME/Library/Logs/Homebrew" \
@@ -110,6 +114,10 @@ printf 'brew cache\n' >"$TEST_HOME/Library/Caches/Homebrew/bottle.tar.gz"
 printf 'quicklook thumbnail\n' >"$TEST_HOME/Library/Caches/com.apple.QuickLook.thumbnailcache/thumb.db"
 printf 'quicklook agent\n' >"$TEST_HOME/Library/Caches/com.apple.quicklook.ThumbnailsAgent/thumb.db"
 printf 'quicklook daemon\n' >"$TEST_HOME/Library/Caches/com.apple.QuickLookDaemon/cache.db"
+printf 'ats font cache\n' >"$TEST_HOME/Library/Caches/com.apple.ATS/User/annex.db"
+printf 'font registry\n' >"$TEST_HOME/Library/Caches/com.apple.FontRegistry/registry.db"
+printf 'font worker\n' >"$TEST_HOME/Library/Caches/com.apple.FontWorker/cache.db"
+printf 'font services\n' >"$TEST_HOME/Library/Caches/com.apple.FontServices/cache.db"
 printf 'quicklook container\n' >"$TEST_HOME/Library/Containers/com.apple.QuickLook.thumbnailcache/Data/Library/Caches/thumb.db"
 printf 'quicklook agent container\n' >"$TEST_HOME/Library/Containers/com.apple.quicklook.ThumbnailsAgent/Data/Library/Caches/thumb.db"
 printf 'brew log\n' >"$TEST_HOME/Library/Logs/Homebrew/build.log"
@@ -320,6 +328,7 @@ grep 'media-libraries' "$system_data_json" >/dev/null
 grep 'cloud-sync' "$system_data_json" >/dev/null
 grep 'personal-data' "$system_data_json" >/dev/null
 grep 'quicklook' "$system_data_json" >/dev/null
+grep 'font-caches' "$system_data_json" >/dev/null
 grep '"category":"protected"' "$system_data_json" >/dev/null
 grep 'cleanroom containers' "$system_data_json" >/dev/null
 rm -f "$system_data_json"
@@ -343,6 +352,7 @@ grep 'brokenlinks-inventory' "$rules_json" >/dev/null
 grep 'quarantine-inventory' "$rules_json" >/dev/null
 grep 'metadata-clutter' "$rules_json" >/dev/null
 grep 'quicklook-caches' "$rules_json" >/dev/null
+grep 'font-caches' "$rules_json" >/dev/null
 grep 'screenshots-inventory' "$rules_json" >/dev/null
 grep 'archives-inventory' "$rules_json" >/dev/null
 grep 'android-inventory' "$rules_json" >/dev/null
@@ -378,6 +388,7 @@ grep 'cleanroom clean --apply --trash --include-containers' "$plan_json" >/dev/n
 grep 'cleanroom clean --apply --trash --include-diagnostics --days 30' "$plan_json" >/dev/null
 grep 'cleanroom metadata --apply --trash' "$plan_json" >/dev/null
 grep 'cleanroom clean --apply --trash --include-quicklook' "$plan_json" >/dev/null
+grep 'cleanroom clean --apply --trash --include-font-caches' "$plan_json" >/dev/null
 rm -f "$plan_json"
 "$BIN" large "$HOME/Downloads" --min-mb 1 --limit 5 | grep 'big-test.bin' >/dev/null
 large_json="$(mktemp)"
@@ -439,6 +450,21 @@ test -f "$quicklook_log"
 grep $'\ttrash\tok\t' "$quicklook_log" >/dev/null
 "$BIN" restore --log "$quicklook_log" --apply --yes >/dev/null
 test -e "$TEST_HOME/Library/Containers/com.apple.QuickLook.thumbnailcache/Data/Library/Caches"
+"$BIN" fontcaches | grep 'ATS User Font Cache' >/dev/null
+fontcaches_json="$(mktemp)"
+"$BIN" fontcaches --json > "$fontcaches_json"
+python3 -m json.tool "$fontcaches_json" >/dev/null
+grep '"id":"ats-user-cache"' "$fontcaches_json" >/dev/null
+grep '"exists":true' "$fontcaches_json" >/dev/null
+grep 'cleanroom clean --apply --trash --include-font-caches' "$fontcaches_json" >/dev/null
+rm -f "$fontcaches_json"
+fontcaches_log="$TEST_HOME/fontcaches-apply.log"
+"$BIN" clean --include-font-caches --apply --trash --yes --log "$fontcaches_log" >/dev/null
+test ! -e "$TEST_HOME/Library/Caches/com.apple.ATS"
+test -f "$fontcaches_log"
+grep $'\ttrash\tok\t' "$fontcaches_log" >/dev/null
+"$BIN" restore --log "$fontcaches_log" --apply --yes >/dev/null
+test -e "$TEST_HOME/Library/Caches/com.apple.ATS"
 "$BIN" duplicates "$HOME/Documents" --min-mb 1 --limit 5 | grep 'copy-a.bin' >/dev/null
 "$BIN" duplicates "$HOME/Documents" --min-mb 1 --limit 5 | grep 'copy-b.bin' >/dev/null
 duplicates_json="$(mktemp)"
@@ -712,6 +738,7 @@ caches_json="$(mktemp)"
 python3 -m json.tool "$caches_json" >/dev/null
 grep 'safe-app-caches' "$caches_json" >/dev/null
 grep 'quicklook-caches' "$caches_json" >/dev/null
+grep 'font-caches' "$caches_json" >/dev/null
 grep 'cleanroom clean --apply --trash --include-app-caches' "$caches_json" >/dev/null
 rm -f "$caches_json"
 "$BIN" diagnostics | grep 'diagnostic-reports' >/dev/null
@@ -775,6 +802,7 @@ rm -f "$config_file"
 grep '^preset=dev' "$config_file" >/dev/null
 grep '^include_metadata=false' "$config_file" >/dev/null
 grep '^include_quicklook=false' "$config_file" >/dev/null
+grep '^include_font_caches=false' "$config_file" >/dev/null
 "$BIN" doctor --config "$config_file" | grep "$config_file" >/dev/null
 
 report_stdout="$("$BIN" report)"
@@ -813,14 +841,17 @@ metadata_preflight="$("$BIN" clean --include-metadata --preflight)"
 grep 'metadata' <<<"$metadata_preflight" >/dev/null
 quicklook_preflight="$("$BIN" clean --include-quicklook --preflight)"
 grep 'quicklook' <<<"$quicklook_preflight" >/dev/null
+fontcaches_preflight="$("$BIN" clean --include-font-caches --preflight)"
+grep 'font-caches' <<<"$fontcaches_preflight" >/dev/null
 preflight_json="$(mktemp)"
-"$BIN" clean --preset deep --include-ai-models --include-containers --include-user-trash --include-metadata --include-quicklook --apply --trash --yes --preflight --json > "$preflight_json"
+"$BIN" clean --preset deep --include-ai-models --include-containers --include-user-trash --include-metadata --include-quicklook --include-font-caches --apply --trash --yes --preflight --json > "$preflight_json"
 python3 -m json.tool "$preflight_json" >/dev/null
 grep '"apply":true' "$preflight_json" >/dev/null
 grep '"trash":true' "$preflight_json" >/dev/null
 grep '"id":"containers"' "$preflight_json" >/dev/null
 grep '"id":"metadata"' "$preflight_json" >/dev/null
 grep '"id":"quicklook"' "$preflight_json" >/dev/null
+grep '"id":"font-caches"' "$preflight_json" >/dev/null
 grep '"id":"user-trash"' "$preflight_json" >/dev/null
 grep '"safety":"irreversible"' "$preflight_json" >/dev/null
 grep 'Container cleanup can remove local containers' "$preflight_json" >/dev/null

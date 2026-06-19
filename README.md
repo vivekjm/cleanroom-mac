@@ -220,6 +220,13 @@ cleanroom quicklook
 cleanroom quicklook --json
 ```
 
+Review rebuildable user font cache databases:
+
+```sh
+cleanroom fontcaches
+cleanroom fontcaches --json
+```
+
 Find exact duplicate files for manual review:
 
 ```sh
@@ -611,6 +618,14 @@ cleanroom clean --include-quicklook
 cleanroom clean --apply --trash --include-quicklook
 ```
 
+Clean user font cache databases:
+
+```sh
+cleanroom fontcaches
+cleanroom clean --include-font-caches
+cleanroom clean --apply --trash --include-font-caches
+```
+
 Empty current user Trash:
 
 ```sh
@@ -708,6 +723,8 @@ Config files use simple `key=value` lines and are never executed as shell.
 
 `--include-quicklook` removes rebuildable Quick Look thumbnail and preview caches. Finder and file dialogs may briefly regenerate previews afterward.
 
+`--include-font-caches` removes rebuildable Apple Type Services and Font Registry user cache databases. It does not remove actual fonts from user, system, or shared font folders.
+
 `--trash` applies to paths that `cleanroom` removes directly. System commands delegated to macOS or developer tools, such as Time Machine snapshot thinning or simulator reset, may still be irreversible.
 
 `restore` only restores entries that were moved by `--trash` and still exist in the cleanroom Trash folder. It skips destinations that already exist.
@@ -759,6 +776,8 @@ Config files use simple `key=value` lines and are never executed as shell.
 `metadata` lists `.DS_Store`, AppleDouble `._*` files, `__MACOSX` folders, `Thumbs.db`, `Desktop.ini`, and similar cross-platform metadata clutter under Desktop, Documents, Downloads, or paths you provide. Its direct apply mode requires `--trash`.
 
 `quicklook` inventories rebuildable Quick Look thumbnail and preview caches that can contribute to System Data. Cleanup is opt-in with `cleanroom clean --include-quicklook`.
+
+`fontcaches` inventories rebuildable user font cache databases that can contribute to System Data or font rendering weirdness. Cleanup is opt-in with `cleanroom clean --include-font-caches`; actual font files stay protected.
 
 `duplicates` hashes files above `--min-mb`, groups exact matches, estimates possible reclaim, and never deletes anything.
 
