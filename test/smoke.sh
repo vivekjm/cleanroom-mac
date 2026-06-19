@@ -21,6 +21,11 @@ mkdir -p \
   "$TEST_HOME/.m2/repository" \
   "$TEST_HOME/Library/Caches/composer" \
   "$TEST_HOME/Library/Caches/Homebrew" \
+  "$TEST_HOME/Library/Caches/com.apple.QuickLook.thumbnailcache" \
+  "$TEST_HOME/Library/Caches/com.apple.quicklook.ThumbnailsAgent" \
+  "$TEST_HOME/Library/Caches/com.apple.QuickLookDaemon" \
+  "$TEST_HOME/Library/Containers/com.apple.QuickLook.thumbnailcache/Data/Library/Caches" \
+  "$TEST_HOME/Library/Containers/com.apple.quicklook.ThumbnailsAgent/Data/Library/Caches" \
   "$TEST_HOME/Library/Logs/Homebrew" \
   "$TEST_HOME/Library/Receipts" \
   "$TEST_HOME/.bundle/cache" \
@@ -102,6 +107,11 @@ printf 'swiftpm cache\n' >"$TEST_HOME/Library/Caches/org.swift.swiftpm/pkg.cache
 printf 'maven cache\n' >"$TEST_HOME/.m2/repository/artifact.jar"
 printf 'composer cache\n' >"$TEST_HOME/Library/Caches/composer/pkg.zip"
 printf 'brew cache\n' >"$TEST_HOME/Library/Caches/Homebrew/bottle.tar.gz"
+printf 'quicklook thumbnail\n' >"$TEST_HOME/Library/Caches/com.apple.QuickLook.thumbnailcache/thumb.db"
+printf 'quicklook agent\n' >"$TEST_HOME/Library/Caches/com.apple.quicklook.ThumbnailsAgent/thumb.db"
+printf 'quicklook daemon\n' >"$TEST_HOME/Library/Caches/com.apple.QuickLookDaemon/cache.db"
+printf 'quicklook container\n' >"$TEST_HOME/Library/Containers/com.apple.QuickLook.thumbnailcache/Data/Library/Caches/thumb.db"
+printf 'quicklook agent container\n' >"$TEST_HOME/Library/Containers/com.apple.quicklook.ThumbnailsAgent/Data/Library/Caches/thumb.db"
 printf 'brew log\n' >"$TEST_HOME/Library/Logs/Homebrew/build.log"
 printf 'receipt plist\n' >"$TEST_HOME/Library/Receipts/com.cleanroom.test.pkg.plist"
 printf 'receipt bom\n' >"$TEST_HOME/Library/Receipts/com.cleanroom.test.pkg.bom"
@@ -309,6 +319,7 @@ grep 'mobile-backups' "$system_data_json" >/dev/null
 grep 'media-libraries' "$system_data_json" >/dev/null
 grep 'cloud-sync' "$system_data_json" >/dev/null
 grep 'personal-data' "$system_data_json" >/dev/null
+grep 'quicklook' "$system_data_json" >/dev/null
 grep '"category":"protected"' "$system_data_json" >/dev/null
 grep 'cleanroom containers' "$system_data_json" >/dev/null
 rm -f "$system_data_json"
@@ -331,6 +342,7 @@ grep 'desktop-inventory' "$rules_json" >/dev/null
 grep 'brokenlinks-inventory' "$rules_json" >/dev/null
 grep 'quarantine-inventory' "$rules_json" >/dev/null
 grep 'metadata-clutter' "$rules_json" >/dev/null
+grep 'quicklook-caches' "$rules_json" >/dev/null
 grep 'screenshots-inventory' "$rules_json" >/dev/null
 grep 'archives-inventory' "$rules_json" >/dev/null
 grep 'android-inventory' "$rules_json" >/dev/null
@@ -365,6 +377,7 @@ grep 'cleanroom clean --apply --trash --include-venv-stale --days 30' "$plan_jso
 grep 'cleanroom clean --apply --trash --include-containers' "$plan_json" >/dev/null
 grep 'cleanroom clean --apply --trash --include-diagnostics --days 30' "$plan_json" >/dev/null
 grep 'cleanroom metadata --apply --trash' "$plan_json" >/dev/null
+grep 'cleanroom clean --apply --trash --include-quicklook' "$plan_json" >/dev/null
 rm -f "$plan_json"
 "$BIN" large "$HOME/Downloads" --min-mb 1 --limit 5 | grep 'big-test.bin' >/dev/null
 large_json="$(mktemp)"
@@ -411,6 +424,21 @@ test -f "$metadata_log"
 grep $'\ttrash\tok\t' "$metadata_log" >/dev/null
 "$BIN" restore --log "$metadata_log" --apply --yes >/dev/null
 test -e "$TEST_HOME/Documents/.DS_Store"
+"$BIN" quicklook | grep 'Quick Look Thumbnail Cache' >/dev/null
+quicklook_json="$(mktemp)"
+"$BIN" quicklook --json > "$quicklook_json"
+python3 -m json.tool "$quicklook_json" >/dev/null
+grep '"id":"quicklook-thumbnail-cache"' "$quicklook_json" >/dev/null
+grep '"exists":true' "$quicklook_json" >/dev/null
+grep 'cleanroom clean --apply --trash --include-quicklook' "$quicklook_json" >/dev/null
+rm -f "$quicklook_json"
+quicklook_log="$TEST_HOME/quicklook-apply.log"
+"$BIN" clean --include-quicklook --apply --trash --yes --log "$quicklook_log" >/dev/null
+test ! -e "$TEST_HOME/Library/Containers/com.apple.QuickLook.thumbnailcache/Data/Library/Caches"
+test -f "$quicklook_log"
+grep $'\ttrash\tok\t' "$quicklook_log" >/dev/null
+"$BIN" restore --log "$quicklook_log" --apply --yes >/dev/null
+test -e "$TEST_HOME/Library/Containers/com.apple.QuickLook.thumbnailcache/Data/Library/Caches"
 "$BIN" duplicates "$HOME/Documents" --min-mb 1 --limit 5 | grep 'copy-a.bin' >/dev/null
 "$BIN" duplicates "$HOME/Documents" --min-mb 1 --limit 5 | grep 'copy-b.bin' >/dev/null
 duplicates_json="$(mktemp)"
@@ -683,6 +711,7 @@ caches_json="$(mktemp)"
 "$BIN" caches --json > "$caches_json"
 python3 -m json.tool "$caches_json" >/dev/null
 grep 'safe-app-caches' "$caches_json" >/dev/null
+grep 'quicklook-caches' "$caches_json" >/dev/null
 grep 'cleanroom clean --apply --trash --include-app-caches' "$caches_json" >/dev/null
 rm -f "$caches_json"
 "$BIN" diagnostics | grep 'diagnostic-reports' >/dev/null
@@ -745,6 +774,7 @@ rm -f "$config_file"
 "$BIN" init-config --config "$config_file" --yes >/dev/null
 grep '^preset=dev' "$config_file" >/dev/null
 grep '^include_metadata=false' "$config_file" >/dev/null
+grep '^include_quicklook=false' "$config_file" >/dev/null
 "$BIN" doctor --config "$config_file" | grep "$config_file" >/dev/null
 
 report_stdout="$("$BIN" report)"
@@ -781,13 +811,16 @@ grep 'app-caches' <<<"$preflight_output" >/dev/null
 grep 'node-modules' <<<"$preflight_output" >/dev/null
 metadata_preflight="$("$BIN" clean --include-metadata --preflight)"
 grep 'metadata' <<<"$metadata_preflight" >/dev/null
+quicklook_preflight="$("$BIN" clean --include-quicklook --preflight)"
+grep 'quicklook' <<<"$quicklook_preflight" >/dev/null
 preflight_json="$(mktemp)"
-"$BIN" clean --preset deep --include-ai-models --include-containers --include-user-trash --include-metadata --apply --trash --yes --preflight --json > "$preflight_json"
+"$BIN" clean --preset deep --include-ai-models --include-containers --include-user-trash --include-metadata --include-quicklook --apply --trash --yes --preflight --json > "$preflight_json"
 python3 -m json.tool "$preflight_json" >/dev/null
 grep '"apply":true' "$preflight_json" >/dev/null
 grep '"trash":true' "$preflight_json" >/dev/null
 grep '"id":"containers"' "$preflight_json" >/dev/null
 grep '"id":"metadata"' "$preflight_json" >/dev/null
+grep '"id":"quicklook"' "$preflight_json" >/dev/null
 grep '"id":"user-trash"' "$preflight_json" >/dev/null
 grep '"safety":"irreversible"' "$preflight_json" >/dev/null
 grep 'Container cleanup can remove local containers' "$preflight_json" >/dev/null

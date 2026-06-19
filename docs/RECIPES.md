@@ -18,6 +18,7 @@ cleanroom large
 cleanroom brokenlinks
 cleanroom quarantine
 cleanroom metadata
+cleanroom quicklook
 cleanroom duplicates
 cleanroom downloads
 cleanroom installers
@@ -76,6 +77,7 @@ cleanroom large --json ~/Documents
 cleanroom brokenlinks --json ~/Documents
 cleanroom quarantine --json ~/Downloads
 cleanroom metadata --json ~/Documents ~/Downloads
+cleanroom quicklook --json
 cleanroom duplicates --json ~/Documents
 cleanroom documents --json ~/Documents
 cleanroom desktop --json
@@ -153,6 +155,8 @@ cleanroom permissions --json
 `quarantine --json [PATH]` emits files and apps carrying macOS quarantine metadata with path, size, modified date, raw quarantine value, and Finder reveal command. It is intentionally review-only and does not delete files or clear attributes.
 
 `metadata --json [PATH...]` emits removable filesystem metadata clutter such as `.DS_Store`, AppleDouble `._*` files, `__MACOSX`, `Thumbs.db`, and `Desktop.ini` with guard status and matching apply command. Direct apply mode requires `--trash`.
+
+`quicklook --json` emits rebuildable Quick Look thumbnail and preview cache buckets with path, size, existence, and matching cleanup commands.
 
 `duplicates --json [PATH]` emits exact duplicate groups with SHA-256 hashes, paths, and estimated possible reclaim. It is intentionally review-only and does not delete anything.
 
@@ -346,6 +350,17 @@ cleanroom clean --apply --trash --include-metadata
 ```
 
 Use this after unzipping archives, working with network shares, or copying files between macOS and Windows. It targets removable metadata clutter such as `.DS_Store`, AppleDouble `._*` files, `__MACOSX` folders, `Thumbs.db`, and `Desktop.ini`; direct `metadata --apply` requires Trash mode.
+
+## Quick Look Caches
+
+```sh
+cleanroom quicklook
+cleanroom quicklook --json
+cleanroom clean --include-quicklook
+cleanroom clean --apply --trash --include-quicklook
+```
+
+Use this when System Data is large and Finder thumbnails/previews have accumulated. Quick Look caches are rebuildable; macOS recreates thumbnails and previews as files are browsed again.
 
 ## Applications Storage
 

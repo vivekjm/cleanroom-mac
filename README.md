@@ -23,6 +23,7 @@ macOS Storage often labels hidden user folders as **Documents** or **System Data
 - local AI model downloads and backends
 - Chrome/VS Code/Cursor cache folders
 - browser profile and cache footprint
+- Quick Look thumbnail and preview caches
 - large app support, container, and group-container folders
 - Photos, Music, TV, iMovie, GarageBand, and Logic library footprint
 - app leftovers after manual uninstalls
@@ -210,6 +211,13 @@ cleanroom metadata
 cleanroom metadata ~/Documents ~/Downloads --limit 50
 cleanroom metadata --apply --trash
 cleanroom metadata --json
+```
+
+Review Quick Look thumbnail and preview caches:
+
+```sh
+cleanroom quicklook
+cleanroom quicklook --json
 ```
 
 Find exact duplicate files for manual review:
@@ -595,6 +603,14 @@ cleanroom clean --include-metadata
 cleanroom clean --apply --trash --include-metadata
 ```
 
+Clean Quick Look thumbnail caches:
+
+```sh
+cleanroom quicklook
+cleanroom clean --include-quicklook
+cleanroom clean --apply --trash --include-quicklook
+```
+
 Empty current user Trash:
 
 ```sh
@@ -690,6 +706,8 @@ Config files use simple `key=value` lines and are never executed as shell.
 
 `--include-metadata` removes filesystem metadata clutter such as `.DS_Store`, AppleDouble `._*` files, `__MACOSX` folders, `Thumbs.db`, `Desktop.ini`, and similar removable metadata from Desktop, Documents, and Downloads.
 
+`--include-quicklook` removes rebuildable Quick Look thumbnail and preview caches. Finder and file dialogs may briefly regenerate previews afterward.
+
 `--trash` applies to paths that `cleanroom` removes directly. System commands delegated to macOS or developer tools, such as Time Machine snapshot thinning or simulator reset, may still be irreversible.
 
 `restore` only restores entries that were moved by `--trash` and still exist in the cleanroom Trash folder. It skips destinations that already exist.
@@ -739,6 +757,8 @@ Config files use simple `key=value` lines and are never executed as shell.
 `quarantine` lists files and apps carrying macOS `com.apple.quarantine` metadata, usually downloaded from browsers, chat apps, or email. It never deletes files or clears attributes; use it to review downloaded content before deciding what to keep.
 
 `metadata` lists `.DS_Store`, AppleDouble `._*` files, `__MACOSX` folders, `Thumbs.db`, `Desktop.ini`, and similar cross-platform metadata clutter under Desktop, Documents, Downloads, or paths you provide. Its direct apply mode requires `--trash`.
+
+`quicklook` inventories rebuildable Quick Look thumbnail and preview caches that can contribute to System Data. Cleanup is opt-in with `cleanroom clean --include-quicklook`.
 
 `duplicates` hashes files above `--min-mb`, groups exact matches, estimates possible reclaim, and never deletes anything.
 
