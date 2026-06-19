@@ -96,7 +96,7 @@ _cleanroom() {
     '--config[Config file path]:file:_files'
     '--exclude[Protect path from deletion]:path:_files'
     '--days[Age threshold for stale node_modules and virtualenvs]:days:'
-    '--preset[Enable preset]:preset:(safe dev deep)'
+    '--preset[Enable preset]:preset:(safe dev ai deep)'
     '--include-dev-heavy[Include heavy developer artifacts]'
     '--include-node-stale[Remove stale node_modules]'
     '--include-venv-stale[Remove stale Python virtualenv folders]'

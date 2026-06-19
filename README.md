@@ -608,6 +608,7 @@ Use presets:
 ```sh
 cleanroom clean --preset safe
 cleanroom clean --preset dev
+cleanroom clean --preset ai
 cleanroom clean --preset deep
 ```
 
@@ -616,6 +617,7 @@ Preset meanings:
 ```text
 safe  default rebuildable caches
 dev   safe + app caches + package/toolchain stores + stale node_modules + stale virtualenvs
+ai    generated AI workspace state + downloaded local AI models/backends
 deep  dev + heavy SDKs + snapshots + AI workspace data
 ```
 

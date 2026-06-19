@@ -1,4 +1,4 @@
-.TH CLEANROOM 1 "June 2026" "cleanroom 0.72.0" "User Commands"
+.TH CLEANROOM 1 "June 2026" "cleanroom 0.73.0" "User Commands"
 .SH NAME
 cleanroom \- safe-by-default macOS storage cleaner
 .SH SYNOPSIS
@@ -464,7 +464,7 @@ Minimum file size for large and duplicate review commands. Defaults to 500.
 .B --yes
 Skip confirmation prompts.
 .TP
-.B --preset " safe|dev|deep"
+.B --preset " safe|dev|ai|deep"
 Enable a group of cleanup categories.
 .TP
 .B --config " path"
@@ -615,6 +615,8 @@ cleanroom doctor --json
 cleanroom clean --preset dev
 cleanroom clean --preset dev --preflight
 cleanroom clean --preset dev --preflight --json
+cleanroom clean --preset ai
+cleanroom clean --preset ai --preflight
 cleanroom clean --preset dev --apply --trash
 cleanroom clean --include-user-trash --apply
 cleanroom history

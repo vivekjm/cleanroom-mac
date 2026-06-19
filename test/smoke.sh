@@ -1030,6 +1030,9 @@ preflight_output="$("$BIN" clean --preset dev --preflight)"
 grep 'cleanroom clean preflight' <<<"$preflight_output" >/dev/null
 grep 'app-caches' <<<"$preflight_output" >/dev/null
 grep 'node-modules' <<<"$preflight_output" >/dev/null
+ai_preflight_output="$("$BIN" clean --preset ai --preflight)"
+grep 'ai-workspaces' <<<"$ai_preflight_output" >/dev/null
+grep 'ai-models' <<<"$ai_preflight_output" >/dev/null
 metadata_preflight="$("$BIN" clean --include-metadata --preflight)"
 grep 'metadata' <<<"$metadata_preflight" >/dev/null
 quicklook_preflight="$("$BIN" clean --include-quicklook --preflight)"

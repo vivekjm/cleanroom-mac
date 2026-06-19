@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.72.0"
+VERSION="0.73.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -214,10 +214,12 @@ Options:
   --days N             Age threshold for stale node_modules and virtualenvs. Default: 30.
   --limit N            Number of history entries or large files to show. Default: 20.
   --min-mb N           Minimum file size for large-file discovery. Default: 500.
-  --preset NAME        Enable a useful group: safe, dev, deep.
+  --preset NAME        Enable a useful group: safe, dev, ai, deep.
                        safe: default rebuildable caches.
                        dev: safe + app caches + package/toolchain stores + stale node_modules
                             and stale virtualenvs.
+                       ai: generated AI-agent workspace state plus downloaded local AI
+                           model/backends where known.
                        deep: dev + heavy SDKs + snapshots + AI workspaces.
   --include-dev-heavy  Include heavier developer data:
                        Xcode device support, simulator app data, Android NDK/system images.
@@ -6596,7 +6598,7 @@ init_config() {
 # cleanroom config
 # Data only: this file is not executed as shell.
 
-# preset can be: safe, dev, deep
+# preset can be: safe, dev, ai, deep
 preset=dev
 
 # stale node_modules and virtualenv threshold
@@ -6859,6 +6861,10 @@ apply_preset() {
       INCLUDE_TOOLCHAINS=1
       INCLUDE_NODE_STALE=1
       INCLUDE_VENV_STALE=1
+      ;;
+    ai)
+      INCLUDE_AI_WORKSPACES=1
+      INCLUDE_AI_MODELS=1
       ;;
     deep)
       INCLUDE_APP_CACHES=1

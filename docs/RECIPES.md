@@ -259,6 +259,8 @@ cleanroom permissions --json
 ```sh
 cleanroom clean --preset dev
 cleanroom clean --preset dev --preflight
+cleanroom clean --preset ai
+cleanroom clean --preset ai --preflight
 cleanroom clean --preset dev --apply
 cleanroom clean --preset dev --apply --trash
 ```
