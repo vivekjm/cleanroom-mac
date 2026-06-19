@@ -271,6 +271,7 @@ cat >"$TEST_HOME/Library/Application Support/MobileSync/Backup/FakeDeviceBackup/
 </plist>
 PLIST
 dd if=/dev/zero of="$TEST_HOME/Library/Application Support/MobileSync/Backup/FakeDeviceBackup/Manifest.db" bs=1024 count=1024 >/dev/null 2>&1
+touch -t 202001010000 "$TEST_HOME/Library/Application Support/MobileSync/Backup/FakeDeviceBackup" "$TEST_HOME/Library/Application Support/MobileSync/Backup/FakeDeviceBackup/Info.plist" "$TEST_HOME/Library/Application Support/MobileSync/Backup/FakeDeviceBackup/Manifest.db"
 dd if=/dev/zero of="$TEST_HOME/Downloads/big-test.bin" bs=1024 count=2048 >/dev/null 2>&1
 dd if=/dev/zero of="$TEST_HOME/Downloads/old-installer.dmg" bs=1024 count=1024 >/dev/null 2>&1
 touch -t 202001010000 "$TEST_HOME/Downloads/old-installer.dmg"
@@ -408,6 +409,7 @@ grep 'saved-state' "$rules_json" >/dev/null
 grep 'project-caches' "$rules_json" >/dev/null
 grep 'updater-caches' "$rules_json" >/dev/null
 grep 'browser-caches' "$rules_json" >/dev/null
+grep 'device-backups' "$rules_json" >/dev/null
 grep 'screenshots-inventory' "$rules_json" >/dev/null
 grep 'archives-inventory' "$rules_json" >/dev/null
 grep 'android-inventory' "$rules_json" >/dev/null
@@ -449,6 +451,7 @@ grep 'cleanroom clean --apply --trash --include-saved-state' "$plan_json" >/dev/
 grep 'cleanroom clean --apply --trash --include-project-caches' "$plan_json" >/dev/null
 grep 'cleanroom clean --apply --trash --include-updater-caches' "$plan_json" >/dev/null
 grep 'cleanroom clean --apply --trash --include-browser-caches' "$plan_json" >/dev/null
+grep 'cleanroom clean --include-device-backups --days 30 --apply --trash' "$plan_json" >/dev/null
 rm -f "$plan_json"
 "$BIN" large "$HOME/Downloads" --min-mb 1 --limit 5 | grep 'big-test.bin' >/dev/null
 large_json="$(mktemp)"
@@ -805,7 +808,16 @@ backups_json="$(mktemp)"
 python3 -m json.tool "$backups_json" >/dev/null
 grep 'Vivek Test iPhone' "$backups_json" >/dev/null
 grep '"protected":true' "$backups_json" >/dev/null
+grep '"cleanup_eligible":true' "$backups_json" >/dev/null
+grep 'cleanroom clean --include-device-backups --days 30 --apply --trash' "$backups_json" >/dev/null
 rm -f "$backups_json"
+device_backups_log="$TEST_HOME/device-backups-apply.log"
+"$BIN" clean --include-device-backups --days 30 --apply --trash --yes --log "$device_backups_log" >/dev/null
+test ! -e "$TEST_HOME/Library/Application Support/MobileSync/Backup/FakeDeviceBackup"
+test -f "$device_backups_log"
+grep $'\ttrash\tok\t' "$device_backups_log" >/dev/null
+"$BIN" restore --log "$device_backups_log" --apply --yes >/dev/null
+test -e "$TEST_HOME/Library/Application Support/MobileSync/Backup/FakeDeviceBackup/Info.plist"
 "$BIN" xcode | grep 'Xcode Archives' >/dev/null
 xcode_json="$(mktemp)"
 "$BIN" xcode --json > "$xcode_json"
@@ -968,6 +980,7 @@ grep '^include_saved_state=false' "$config_file" >/dev/null
 grep '^include_project_caches=false' "$config_file" >/dev/null
 grep '^include_updater_caches=false' "$config_file" >/dev/null
 grep '^include_browser_caches=false' "$config_file" >/dev/null
+grep '^include_device_backups=false' "$config_file" >/dev/null
 "$BIN" doctor --config "$config_file" | grep "$config_file" >/dev/null
 
 report_stdout="$("$BIN" report)"
@@ -1018,8 +1031,10 @@ updaters_preflight="$("$BIN" clean --include-updater-caches --preflight)"
 grep 'updater-caches' <<<"$updaters_preflight" >/dev/null
 browsercaches_preflight="$("$BIN" clean --include-browser-caches --preflight)"
 grep 'browser-caches' <<<"$browsercaches_preflight" >/dev/null
+devicebackups_preflight="$("$BIN" clean --include-device-backups --preflight)"
+grep 'device-backups' <<<"$devicebackups_preflight" >/dev/null
 preflight_json="$(mktemp)"
-"$BIN" clean --preset deep --include-ai-models --include-containers --include-user-trash --include-metadata --include-quicklook --include-font-caches --include-web-caches --include-saved-state --include-project-caches --include-updater-caches --include-browser-caches --apply --trash --yes --preflight --json > "$preflight_json"
+"$BIN" clean --preset deep --include-ai-models --include-containers --include-user-trash --include-metadata --include-quicklook --include-font-caches --include-web-caches --include-saved-state --include-project-caches --include-updater-caches --include-browser-caches --include-device-backups --apply --trash --yes --preflight --json > "$preflight_json"
 python3 -m json.tool "$preflight_json" >/dev/null
 grep '"apply":true' "$preflight_json" >/dev/null
 grep '"trash":true' "$preflight_json" >/dev/null
@@ -1032,6 +1047,7 @@ grep '"id":"saved-state"' "$preflight_json" >/dev/null
 grep '"id":"project-caches"' "$preflight_json" >/dev/null
 grep '"id":"updater-caches"' "$preflight_json" >/dev/null
 grep '"id":"browser-caches"' "$preflight_json" >/dev/null
+grep '"id":"device-backups"' "$preflight_json" >/dev/null
 grep '"id":"user-trash"' "$preflight_json" >/dev/null
 grep '"safety":"irreversible"' "$preflight_json" >/dev/null
 grep 'Container cleanup can remove local containers' "$preflight_json" >/dev/null

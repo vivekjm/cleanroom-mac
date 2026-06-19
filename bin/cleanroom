@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.68.0"
+VERSION="0.69.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -43,6 +43,7 @@ INCLUDE_SAVED_STATE=0
 INCLUDE_PROJECT_CACHES=0
 INCLUDE_UPDATER_CACHES=0
 INCLUDE_BROWSER_CACHES=0
+INCLUDE_DEVICE_BACKUPS=0
 
 RED="$(printf '\033[31m')"
 GREEN="$(printf '\033[32m')"
@@ -248,6 +249,9 @@ Options:
   --include-browser-caches
                        Remove Chromium and Firefox cache folders only. Does not remove
                        profiles, passwords, cookies, bookmarks, sessions, or settings.
+  --include-device-backups
+                       Remove local iPhone/iPad backups older than --days. Requires
+                       --apply --trash and is never enabled by presets.
   --include-ai-workspaces
                        Remove generated AI-agent workspace state: recordings, scratch, brain,
                        implicit data, and local conversation caches where known.
@@ -539,6 +543,7 @@ load_config() {
       include_project_caches) truthy "$value" && INCLUDE_PROJECT_CACHES=1 ;;
       include_updater_caches) truthy "$value" && INCLUDE_UPDATER_CACHES=1 ;;
       include_browser_caches) truthy "$value" && INCLUDE_BROWSER_CACHES=1 ;;
+      include_device_backups) truthy "$value" && INCLUDE_DEVICE_BACKUPS=1 ;;
       trash) truthy "$value" && TRASH=1 ;;
       log_file) LOG_FILE="$(expand_path "$value")" ;;
       exclude) add_exclude "$value" ;;
@@ -807,6 +812,7 @@ preflight_rows() {
   [[ "$INCLUDE_PROJECT_CACHES" -eq 1 ]] && printf '%s\t%s\t%s\t%s\n' "project-caches" "Project cache artifacts" "rebuildable" "Only known cache folders/files are targeted; source and dependency folders stay protected."
   [[ "$INCLUDE_UPDATER_CACHES" -eq 1 ]] && printf '%s\t%s\t%s\t%s\n' "updater-caches" "App updater caches" "rebuildable" "Only Sparkle/Squirrel updater cache and staging data is targeted; apps and profiles stay protected."
   [[ "$INCLUDE_BROWSER_CACHES" -eq 1 ]] && printf '%s\t%s\t%s\t%s\n' "browser-caches" "Chromium/Firefox browser caches" "rebuildable" "Profiles, passwords, cookies, bookmarks, sessions, extensions, and settings stay protected."
+  [[ "$INCLUDE_DEVICE_BACKUPS" -eq 1 ]] && printf '%s\t%s\t%s\t%s\n' "device-backups" "Old local iPhone/iPad backups" "high-impact" "Only direct MobileSync backup folders older than ${DAYS} days are targeted; --trash is required."
   [[ "$INCLUDE_NODE_STALE" -eq 1 ]] && printf '%s\t%s\t%s\t%s\n' "node-modules" "Stale node_modules" "rebuildable" "Dependencies may need to be installed again."
   [[ "$INCLUDE_VENV_STALE" -eq 1 ]] && printf '%s\t%s\t%s\t%s\n' "python-virtualenvs" "Stale Python virtualenvs" "rebuildable" "Virtualenvs may need to be recreated."
   [[ "$INCLUDE_DEV_HEAVY" -eq 1 ]] && printf '%s\t%s\t%s\t%s\n' "dev-heavy" "Heavy SDK and simulator data" "high-impact" "Some SDKs, symbols, or simulator app state may need reinstalling or resetting."
@@ -1184,6 +1190,7 @@ run_rm() {
   else
     printf 'would remove %8s  %s\n' "$(human_kb "$kb")" "$path"
   fi
+  return 0
 }
 
 run_find_delete_children() {
@@ -4585,10 +4592,88 @@ backup_rows() {
   return 0
 }
 
+backup_cleanup_rows() {
+  local cutoff kb epoch device product last_backup path
+  cutoff=$(( $(date +%s) - DAYS * 86400 ))
+  while IFS=$'\t' read -r kb epoch device product last_backup path; do
+    [[ -z "${path:-}" ]] && continue
+    [[ "${epoch:-0}" -le "$cutoff" ]] || continue
+    printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$kb" "$epoch" "$device" "$product" "$last_backup" "$path"
+  done < <(backup_rows)
+}
+
+device_backup_trash_path() {
+  local path="$1"
+  local root target kb
+  root="$(canonical_existing_path "$HOME/Library/Application Support/MobileSync/Backup")"
+  path="$(canonical_existing_path "$path")"
+
+  case "$path" in
+    "$root"/*) ;;
+    *)
+      warn "refusing non-MobileSync backup path: $path"
+      record_apply "device-backup" "refused-scope" "0" "$path" ""
+      return 0
+      ;;
+  esac
+
+  if [[ "$(dirname "$path")" != "$root" ]]; then
+    warn "refusing nested MobileSync backup item: $path"
+    record_apply "device-backup" "refused-nested" "0" "$path" ""
+    return 0
+  fi
+
+  if is_excluded "$path"; then
+    [[ "$VERBOSE" -eq 1 ]] && warn "skipping excluded device backup: $path"
+    return 0
+  fi
+
+  kb="$(size_kb "$path")"
+  if [[ "$APPLY" -eq 1 ]]; then
+    target="$(trash_path "$path" 2>/dev/null || true)"
+    if [[ -n "$target" ]]; then
+      record_apply "trash" "ok" "$kb" "$path" "$target"
+      [[ "$VERBOSE" -eq 1 ]] && log "moved device backup $(human_kb "$kb")  $path -> $target"
+    else
+      warn "Could not move device backup to Trash: $path"
+      record_apply "trash" "failed" "$kb" "$path" ""
+    fi
+  else
+    printf 'would remove %8s  %s\n' "$(human_kb "$kb")" "$path"
+  fi
+  return 0
+}
+
+clean_device_backups() {
+  [[ "$INCLUDE_DEVICE_BACKUPS" -eq 1 ]] || return 0
+  log "${BOLD}Old local iPhone/iPad backups older than ${DAYS} days${RESET}"
+  [[ "$TRASH" -eq 1 ]] || die "--include-device-backups requires --trash so backups can be restored from the apply log."
+  if [[ "$APPLY" -eq 1 && "$ASSUME_YES" -ne 1 ]]; then
+    warn "This can remove local iPhone/iPad backups that may be the only copy of device data."
+    printf 'Continue? Type "device backups" to proceed: '
+    local answer
+    read -r answer
+    [[ "$answer" == "device backups" ]] || die "Cancelled."
+  fi
+
+  local rows kb epoch device product last_backup path
+  rows="$(backup_cleanup_rows)"
+  if [[ -z "$rows" ]]; then
+    printf 'No local device backups older than %s days found.\n' "$DAYS"
+    return 0
+  fi
+  while IFS=$'\t' read -r kb epoch device product last_backup path; do
+    [[ -z "${path:-}" ]] && continue
+    device_backup_trash_path "$path"
+  done <<<"$rows"
+  return 0
+}
+
 backups() {
-  local rows root
+  local rows root cutoff
   root="$HOME/Library/Application Support/MobileSync/Backup"
   rows="$(backup_rows)"
+  cutoff=$(( $(date +%s) - DAYS * 86400 ))
 
   if [[ "$JSON" -eq 1 ]]; then
     printf '['
@@ -4598,7 +4683,7 @@ backups() {
       kb_num="$(printf '%s\n' "$kb" | sed 's/^0*//; s/^$/0/')"
       [[ "$first" -eq 0 ]] && printf ','
       first=0
-      printf '{"path":"%s","device_name":"%s","product_name":"%s","last_backup":"%s","size_kb":%s,"size":"%s","modified_epoch":%s,"modified":"%s","protected":true}' \
+      printf '{"path":"%s","device_name":"%s","product_name":"%s","last_backup":"%s","size_kb":%s,"size":"%s","modified_epoch":%s,"modified":"%s","protected":true,"cleanup_eligible":%s,"cleanup_command":"%s"}' \
         "$(printf '%s' "$path" | json_escape)" \
         "$(printf '%s' "$device" | json_escape)" \
         "$(printf '%s' "$product" | json_escape)" \
@@ -4606,14 +4691,16 @@ backups() {
         "$kb_num" \
         "$(human_kb "${kb:-0}" | json_escape)" \
         "${epoch:-0}" \
-        "$(file_mtime_iso "${epoch:-0}" | json_escape)"
+        "$(file_mtime_iso "${epoch:-0}" | json_escape)" \
+        "$(if [[ "${epoch:-0}" -le "$cutoff" ]]; then echo true; else echo false; fi)" \
+        "$(printf 'cleanroom clean --include-device-backups --days %s --apply --trash' "$DAYS" | json_escape)"
     done <<<"$rows"
     printf ']\n'
     return 0
   fi
 
   printf '%s\n' "${BOLD}cleanroom local iPhone/iPad backups${RESET}"
-  printf 'Review-only inventory. cleanroom does not delete local device backups.\n'
+  printf 'Review-first inventory. Cleanup is high-impact, opt-in, limited to backups older than --days, and requires --trash.\n'
   printf 'Path: %s\n\n' "$root"
   if [[ -z "$rows" ]]; then
     printf 'No local MobileSync backups found.\n'
@@ -4626,7 +4713,9 @@ backups() {
     printf '%-10s %-12s %-24s %-20s %s\n' "$(human_kb "$kb")" "$(file_mtime_iso "${epoch:-0}")" "$device" "$product" "$path"
     [[ -n "$last_backup" ]] && printf '  last backup: %s\n' "$last_backup"
   done <<<"$rows"
-  printf '\nManage these through Finder or Apple Devices after confirming you have another backup.\n'
+  printf '\nPreferred: manage these through Finder or Apple Devices after confirming you have another backup.\n'
+  printf 'Opt-in cleanup preview: cleanroom clean --include-device-backups --days %s --trash\n' "$DAYS"
+  printf 'Opt-in cleanup apply: cleanroom clean --include-device-backups --days %s --apply --trash\n' "$DAYS"
 }
 
 xcode_rows() {
@@ -5818,7 +5907,7 @@ snapshots() {
 }
 
 plan_rows() {
-  local safe package toolchain app browsercache_total installers metadata_total quicklook_total fontcache_total webcache_total savedstate_total projectcache_total updatercache_total node venv dev diagnostics ai_workspaces ai_models containers user_trash
+  local safe package toolchain app browsercache_total installers metadata_total quicklook_total fontcache_total webcache_total savedstate_total projectcache_total updatercache_total devicebackup_total node venv dev diagnostics ai_workspaces ai_models containers user_trash
   safe="$(sum_existing_kb \
     "~/Library/Caches" "~/.cache" "~/.npm/_cacache" "~/.npm/_logs" "~/.npm/_npx" \
     "~/.yarn/cache" "~/.yarn/berry" "~/.gradle/caches" "~/.gradle/daemon" \
@@ -5837,6 +5926,7 @@ plan_rows() {
   savedstate_total="$(savedstate_total_kb)"
   projectcache_total="$(projectcache_total_kb)"
   updatercache_total="$(updatercache_total_kb)"
+  devicebackup_total="$(backup_cleanup_rows | tab_rows_total_kb)"
   node="$(stale_node_kb)"
   venv="$(stale_venv_kb)"
   dev="$(sum_existing_kb \
@@ -5861,6 +5951,7 @@ plan_rows() {
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$savedstate_total" "saved-state" "Saved Application State" "cleanroom savedstate" "cleanroom clean --apply --trash --include-saved-state" "Rebuildable app window/session restoration state. Documents and app profiles stay protected."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$projectcache_total" "project-caches" "Project cache artifacts" "cleanroom projectcaches" "cleanroom clean --apply --trash --include-project-caches" "Rebuildable project caches such as __pycache__, pytest, mypy, ruff, tox, nox, and coverage artifacts."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$updatercache_total" "updater-caches" "App updater caches" "cleanroom updaters" "cleanroom clean --apply --trash --include-updater-caches" "Rebuildable Sparkle/Squirrel updater cache and staging data. Apps and profiles stay protected."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$devicebackup_total" "device-backups" "Old local iPhone/iPad backups" "cleanroom backups" "cleanroom clean --include-device-backups --days $DAYS --apply --trash" "High-impact opt-in cleanup for direct MobileSync backup folders older than $DAYS days. Confirm another backup exists first."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$package" "package-stores" "Package-manager stores" "cleanroom clean --include-package-stores" "cleanroom clean --apply --trash --include-package-stores" "Rebuildable package stores such as pnpm, CocoaPods, Cargo, and Gradle-related stores."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$toolchain" "toolchains" "Language toolchain caches" "cleanroom toolchains" "cleanroom clean --apply --trash --include-toolchains" "Rebuildable caches for Go, Python, SwiftPM, Maven, Composer, RubyGems, Bundler, uv, and Poetry."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$node" "node-stale" "Stale node_modules" "cleanroom clean --include-node-stale --days $DAYS" "cleanroom clean --apply --trash --include-node-stale --days $DAYS" "node_modules older than $DAYS days under Desktop, Documents, and Downloads."
@@ -6337,6 +6428,7 @@ include_saved_state=false
 include_project_caches=false
 include_updater_caches=false
 include_browser_caches=false
+include_device_backups=false
 
 # Apply safety
 trash=false
@@ -6376,6 +6468,7 @@ interactive() {
   ask_yes_no "Include project cache artifacts?" && INCLUDE_PROJECT_CACHES=1
   ask_yes_no "Include Sparkle/Squirrel app updater caches?" && INCLUDE_UPDATER_CACHES=1
   ask_yes_no "Include Chromium/Firefox browser cache folders?" && INCLUDE_BROWSER_CACHES=1
+  ask_yes_no "Include old local iPhone/iPad backups older than ${DAYS} days?" && INCLUDE_DEVICE_BACKUPS=1
   ask_yes_no "Include stale node_modules older than ${DAYS} days?" && INCLUDE_NODE_STALE=1
   ask_yes_no "Include stale Python virtualenvs older than ${DAYS} days?" && INCLUDE_VENV_STALE=1
   ask_yes_no "Include heavy SDK/simulator cleanup?" && INCLUDE_DEV_HEAVY=1
@@ -6456,6 +6549,11 @@ Default safe cleanup:
   Rebuildable Chromium and Firefox cache folders only. Browser profiles, password
   databases, cookies, bookmarks, sessions, extensions, and settings are not targeted.
 
+--include-device-backups:
+  High-impact cleanup for local iPhone/iPad backups under MobileSync older than
+  --days. Requires --trash, is never included in presets, and should only be used
+  after confirming another backup exists.
+
 --include-dev-heavy:
   Xcode device support, unavailable simulators, simulator app data, Android NDK,
   and Android system images.
@@ -6518,6 +6616,7 @@ clean() {
   clean_project_caches
   clean_updater_caches
   clean_browser_caches
+  clean_device_backups
   clean_node_stale
   clean_venv_stale
   clean_snapshots
@@ -6653,6 +6752,7 @@ while [[ "$#" -gt 0 ]]; do
     --include-project-caches|--include-projectcaches) INCLUDE_PROJECT_CACHES=1 ;;
     --include-updater-caches|--include-updatercaches|--include-updaters) INCLUDE_UPDATER_CACHES=1 ;;
     --include-browser-caches|--include-browsercaches) INCLUDE_BROWSER_CACHES=1 ;;
+    --include-device-backups|--include-devicebackups|--include-ios-backups|--include-mobile-backups) INCLUDE_DEVICE_BACKUPS=1 ;;
     --include-gemini) INCLUDE_GEMINI=1; INCLUDE_AI_WORKSPACES=1 ;;
     --include-lmstudio) INCLUDE_LMSTUDIO=1; INCLUDE_AI_MODELS=1 ;;
     -h|--help) usage; exit 0 ;;

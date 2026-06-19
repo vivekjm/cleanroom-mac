@@ -489,7 +489,16 @@ cleanroom backups --json
 cleanroom guard ~/Library/Application\ Support/MobileSync/Backup
 ```
 
-Use this when System Data is large and you suspect local iPhone or iPad backups. cleanroom treats MobileSync backups as protected personal data and does not delete them.
+Use this when System Data is large and you suspect local iPhone or iPad backups. cleanroom treats the MobileSync backup root as protected personal data.
+
+After confirming another backup exists, old local device backups can be moved to the cleanroom Trash folder explicitly:
+
+```sh
+cleanroom clean --include-device-backups --days 90 --trash
+cleanroom clean --include-device-backups --days 90 --apply --trash
+```
+
+This category is never enabled by presets and only targets direct MobileSync backup folders older than `--days`.
 
 ## Xcode Storage
 

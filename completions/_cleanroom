@@ -109,6 +109,7 @@ _cleanroom() {
     '--include-project-caches[Remove Python/dev project cache artifacts]'
     '--include-updater-caches[Remove app updater cache and staging data]'
     '--include-browser-caches[Remove Chromium and Firefox browser cache folders]'
+    '--include-device-backups[Remove old local iPhone/iPad backups through Trash mode]'
     '--include-package-stores[Include package-manager stores]'
     '--include-toolchains[Include language/toolchain caches]'
     '--include-diagnostics[Include old diagnostic reports]'

@@ -426,6 +426,14 @@ cleanroom backups
 cleanroom backups --json
 ```
 
+Clean old local iPhone/iPad backups after review:
+
+```sh
+cleanroom backups
+cleanroom clean --include-device-backups --days 90 --trash
+cleanroom clean --include-device-backups --days 90 --apply --trash
+```
+
 Review Xcode and simulator storage:
 
 ```sh
@@ -812,6 +820,8 @@ Config files use simple `key=value` lines and are never executed as shell.
 
 `--include-browser-caches` removes Chromium and Firefox browser cache folders only. Browser profiles, password databases, cookies, bookmarks, sessions, extensions, and settings are not targeted.
 
+`--include-device-backups` moves local iPhone/iPad backups older than `--days` from MobileSync to the cleanroom Trash folder. It requires `--trash`, is never included in presets, and should only be used after confirming another backup exists.
+
 `--trash` applies to paths that `cleanroom` removes directly. System commands delegated to macOS or developer tools, such as Time Machine snapshot thinning or simulator reset, may still be irreversible.
 
 `restore` only restores entries that were moved by `--trash` and still exist in the cleanroom Trash folder. It skips destinations that already exist.
@@ -908,7 +918,7 @@ Config files use simple `key=value` lines and are never executed as shell.
 
 `leftovers` searches common support, cache, preference, container, WebKit, log, and launch-item locations for an app or vendor name. By default it previews only. If you explicitly pass `--apply --trash`, matches move into a cleanroom Trash folder and are recorded in the apply log so `cleanroom restore --log PATH --apply` can put them back. Protected browser profiles, Keychains, device backups, Photos, Mail, iCloud Drive, and broad Library folders are still refused.
 
-`backups` inventories local iPhone and iPad backups under MobileSync. It is review-only and protected because those backups may be the only copy of device data.
+`backups` inventories local iPhone and iPad backups under MobileSync. Device-backup cleanup is high-impact and opt-in with `cleanroom clean --include-device-backups --days N --apply --trash`; only direct backup folders older than `--days` are moved, and the MobileSync root remains protected.
 
 `xcode` inventories DerivedData, simulator caches, DeviceSupport, simulator devices, and Xcode Archives. It separates rebuildable caches from review-only archives and high-impact simulator data.
 

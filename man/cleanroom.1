@@ -1,4 +1,4 @@
-.TH CLEANROOM 1 "June 2026" "cleanroom 0.68.0" "User Commands"
+.TH CLEANROOM 1 "June 2026" "cleanroom 0.69.0" "User Commands"
 .SH NAME
 cleanroom \- safe-by-default macOS storage cleaner
 .SH SYNOPSIS
@@ -523,6 +523,13 @@ Remove rebuildable Sparkle/Squirrel app updater cache and staging data.
 .B --include-browser-caches
 Remove Chromium and Firefox browser cache folders only. Browser profiles and
 credential data stay protected.
+.TP
+.B --include-device-backups
+Move local iPhone/iPad backups older than
+.BR --days
+to the cleanroom Trash folder. Requires
+.BR --trash
+and should only be used after confirming another backup exists.
 .TP
 .B --include-venv-stale
 Remove stale Python virtualenv folders older than
