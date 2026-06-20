@@ -23,7 +23,7 @@ final class CleanroomAppDelegate: NSObject, NSApplicationDelegate {
             backing: .buffered,
             defer: false
         )
-        window.title = "cleanroom"
+        window.title = "Cleanroom"
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
         window.isMovableByWindowBackground = true

@@ -1,4 +1,4 @@
-.TH CLEANROOM 1 "June 2026" "cleanroom 0.78.0" "User Commands"
+.TH CLEANROOM 1 "June 2026" "cleanroom 0.79.0" "User Commands"
 .SH NAME
 cleanroom \- safe-by-default macOS storage cleaner
 .SH SYNOPSIS
@@ -163,6 +163,9 @@ cleanroom \- safe-by-default macOS storage cleaner
 .br
 .B cleanroom
 .RI "cocoapods-cache [--json] [--apply --yes]"
+.br
+.B cleanroom
+.RI "pip-cache [--json] [--apply --yes]"
 .br
 .B cleanroom
 .RI "receipts [--limit n] [--json]"
@@ -413,6 +416,9 @@ Run pnpm store status, or prune unreferenced packages with --apply.
 .B cocoapods-cache
 List CocoaPods cache, or clean all cached pods with --apply.
 .TP
+.B pip-cache
+Show pip cache info, or purge pip cache with --apply.
+.TP
 .B receipts
 Inventory macOS package installer receipts. Receipts are install records, not
 uninstall targets; use vendor uninstallers first, then review matching
@@ -642,6 +648,8 @@ cleanroom pnpm-store
 cleanroom pnpm-store --apply --yes
 cleanroom cocoapods-cache
 cleanroom cocoapods-cache --apply --yes
+cleanroom pip-cache
+cleanroom pip-cache --apply --yes
 cleanroom receipts --json
 cleanroom homebrew --json
 cleanroom homebrew-cleanup

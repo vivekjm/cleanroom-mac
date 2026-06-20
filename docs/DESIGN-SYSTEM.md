@@ -48,7 +48,7 @@ TYPOGRAPHY LOGIC
   Headlines          = semibold sans, 16–26px
   Body               = regular sans, 13px
   Labels             = all-caps, 10px, semibold, +0.6 letter-spacing
-  Terminal           = monospaced, 11–12px
+  Activity details   = monospaced, 11–12px
 
 INTERACTION LOGIC
   Hover              = scale(1.012–1.04) on cards; subtle bg tint on rows
@@ -71,7 +71,7 @@ All tokens live in `macos/CleanroomApp/DesignSystem.swift` under the `DS` namesp
 | `surfaceMint` | `#E8F5E8` | Header stats + filter bar surface |
 | `surfaceRaised` | `#F0FAF0` | Hover state on mint surface |
 | `sidebarBg` | `#0F1A0F` | Sidebar background |
-| `terminalBg` | `#0B160B` | Output panel background |
+| `terminalBg` | `#0B160B` | Activity details panel background |
 | `brandPurple` | `#7C3AED` | Brand anchor colour |
 | `brandLavender` | `#A78BFA` | Interactive / icon on dark |
 | `ctaOrange` | `#F59E0B` | Primary CTA, active filter chip |
@@ -87,7 +87,7 @@ All tokens live in `macos/CleanroomApp/DesignSystem.swift` under the `DS` namesp
 | `textPrimary` | `#0D1A0D` | Main text (green-tinted near-black) |
 | `textSecondary` | `#475569` | Secondary / label text |
 | `textMuted` | `#94A3B8` | Placeholder / disabled |
-| `textOnDark` | `#E8F5E8` | Text on sidebar / terminal |
+| `textOnDark` | `#E8F5E8` | Text on sidebar / activity details |
 | `positive` | `#22C55E` | Up-trend indicator |
 | `negative` | `#EF4444` | Down-trend indicator |
 | `divider` | `rgba(0,0,0,0.07)` | Divider on light surfaces |
@@ -106,7 +106,7 @@ All tokens live in `macos/CleanroomApp/DesignSystem.swift` under the `DS` namesp
 | `bodySm` | 12px | Regular | Default | Secondary body |
 | `label` | 12px | Medium | Default | Labels |
 | `tag` | 10px | Semibold | Default | All-caps micro labels; use with `.kerning(0.6)` |
-| `mono` | 12px | Regular | Monospaced | Terminal output |
+| `mono` | 12px | Regular | Monospaced | Activity details |
 | `monoSm` | 11px | Regular | Monospaced | Status bar text |
 
 ### Spacing Tokens (`DS.Sp`)
@@ -234,7 +234,7 @@ Structure (top → bottom):
 ```
 
 ### OutputPanel
-Dark-forest terminal panel, collapsible.
+Dark-forest activity details panel, collapsible.
 
 ```
 Chrome bar (always visible):
@@ -312,7 +312,7 @@ Groups nav items with an all-caps 10px header label.
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │ ██████ SIDEBAR (220px dark)  │  CANVAS (flex, pale lavender)                │
 │ ██████                       │                                              │
-│ ██████  sparkles  cleanroom  │  ┌──── MINT SURFACE ───────────────────────┐ │
+│ ██████  sparkles  Cleanroom  │  ┌──── MINT SURFACE ───────────────────────┐ │
 │ ██████  ─────────────────── │  │  Browse all storage        [Refresh][→] │ │
 │ ██████  OVERVIEW             │  │                                         │ │
 │ ██████  ● Dashboard          │  │  156.2 GB │ 8.4 GB │ 12,847 │ Never   │ │
@@ -330,10 +330,10 @@ Groups nav items with an all-caps 10px header label.
 │ ██████                       │  │ [Inspect→│  │ [Inspect→│  │ [Inspect→│  │
 │ ██████  SYSTEM               │  └──────────┘  └──────────┘  └──────────┘  │
 │ ██████  ○ Xcode              │                                              │
-│ ██████  ○ Backups            │  ● Ready     [Copy Apply]  [Clear]  [∨]      │
-│ ██████  ○ System Data        │  $ cleanroom overview                        │
+│ ██████  ○ Backups            │  ● Ready     [Copy Details][Clear]  [∨]      │
+│ ██████  ○ System Data        │  Storage summary updated                    │
 │ ██████                       │  → /Library/Caches: 2.3 GB                  │
-│ ██████  v0.78.0              │                                              │
+│ ██████  Protected mode       │                                              │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -376,9 +376,9 @@ swiftc -O \
 2. Pick a card colour from `DS.C.card*` or add a new hex colour to `DS.C`.
 3. No other changes needed — `LazyVGrid` adapts automatically.
 
-### Populating Stats from CLI
+### Populating Stats
 
-After running `cleanroom overview`, parse the output and update `state.stats`:
+After refreshing the storage summary, parse the output and update `state.stats`:
 
 ```swift
 // Example: update after overview runs

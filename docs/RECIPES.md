@@ -49,6 +49,7 @@ cleanroom trash
 cleanroom caches
 cleanroom diagnostics
 cleanroom packages
+cleanroom pip-cache
 cleanroom receipts
 cleanroom homebrew
 cleanroom toolchains
@@ -241,6 +242,8 @@ cleanroom permissions --json
 `pnpm-store --json` emits the command, exit code, apply mode, and output from pnpm's native store status check. Use `--apply --yes` to run `pnpm store prune`.
 
 `cocoapods-cache --json` emits the command, exit code, apply mode, and output from CocoaPods' native cache list command. Use `--apply --yes` to run `pod cache clean --all`.
+
+`pip-cache --json` emits the command, exit code, apply mode, and output from pip's native cache info command. Use `--apply --yes` to run `pip cache purge`.
 
 `receipts --json` emits readable macOS package installer receipt files with package IDs, receipt kind, path, size, modified date, and a matching `cleanroom leftovers <package-id>` review command. Receipts are install records and are never cleanup targets.
 

@@ -40,7 +40,7 @@ final class AppState: ObservableObject {
 
     @Published var dest:             NavDest = .dashboard
     @Published var filter:           String  = "all"
-    @Published var output:           String  = "cleanroom ready.\n"
+    @Published var output:           String  = "Ready.\n"
     @Published var running:          Bool    = false
     @Published var status:           String  = "Ready"
     @Published var outputOpen:       Bool    = false
@@ -76,6 +76,7 @@ final class AppState: ObservableObject {
     ]
 
     var cliPath = ""
+    private var lastStatsRefresh: Date? = nil
 
     func resolveCLI() {
         if let r = Bundle.main.resourceURL {
@@ -94,17 +95,27 @@ final class AppState: ObservableObject {
     }
 
     // Silently fetch overview JSON to populate stats row
-    func refreshStats() {
+    func refreshStats(force: Bool = false) {
         guard !running else { return }
-        let exe = quotedCLI()
+        if !force,
+           let lastStatsRefresh,
+           Date().timeIntervalSince(lastStatsRefresh) < 30 {
+            status = "Storage summary is up to date"
+            return
+        }
+        lastStatsRefresh = Date()
+        let command = resolvedCommand(["overview", "--json"])
         Task.detached(priority: .background) {
-            let raw = await Self.execShell("\(exe) overview --json 2>/dev/null || \(exe) overview 2>/dev/null")
-            await MainActor.run { self.parseStats(raw) }
+            let raw = await Self.exec(command.executable, command.arguments)
+            await MainActor.run {
+                self.parseStats(raw)
+                self.status = "Storage summary updated"
+            }
         }
     }
 
     private func parseStats(_ raw: String) {
-        // Best-effort: scan for recognisable patterns in text/JSON output
+        // Best-effort: scan for recognisable patterns in JSON output.
         func grab(_ key: String) -> String? {
             let patterns = ["\"\(key)\"\\s*:\\s*\"([^\"]+)\"",
                             "\"\(key)\"\\s*:\\s*([0-9.]+[KMGT]?B?)"]
@@ -129,34 +140,62 @@ final class AppState: ObservableObject {
     func run(_ args: String, title: String) {
         guard !running else { return }
         running    = true
-        status     = "Running \(title)…"
-        output    += "\n$ cleanroom \(args)\n"
-        let cmd    = "\(quotedCLI()) \(args)"
+        status     = "\(title) in progress..."
+        output    += "\n\(title) started\n"
+        let command = resolvedCommand(splitArgs(args))
         Task.detached(priority: .userInitiated) {
-            let result = await Self.execShell(cmd)
+            let result = await Self.exec(command.executable, command.arguments)
             await MainActor.run {
                 self.output    += result
-                self.status     = "Done · \(title)"
+                self.status     = "\(title) complete"
                 self.running    = false
                 self.outputOpen = true
+                if title != "Apply" && title != "Safe Cleanup" {
+                    self.refreshStats(force: true)
+                }
             }
         }
     }
 
     func runLeftovers(_ query: String) {
-        let safe = query.replacingOccurrences(of: "'", with: "'\\''")
-        run("appreview '\(safe)' --limit 40", title: "App Review: \(query)")
+        run("appreview \(query) --limit 40", title: "App Review: \(query)")
     }
 
-    func copyCmd(_ cmd: String) {
+    func copyDetails() {
         NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(cmd, forType: .string)
-        status = "Copied to clipboard"
+        NSPasteboard.general.setString(output, forType: .string)
+        status = "Details copied"
     }
 
-    func quotedCLI() -> String {
-        cliPath.isEmpty ? "cleanroom"
-                        : "'\(cliPath.replacingOccurrences(of: "'", with: "'\\''"))'"
+    private func resolvedCommand(_ args: [String]) -> (executable: String, arguments: [String]) {
+        if cliPath.isEmpty || cliPath == "cleanroom" {
+            return ("/usr/bin/env", ["cleanroom"] + args)
+        }
+        return (cliPath, args)
+    }
+
+    private func splitArgs(_ raw: String) -> [String] {
+        var args: [String] = []
+        var current = ""
+        var inSingleQuote = false
+        var inDoubleQuote = false
+
+        for ch in raw {
+            if ch == "'" && !inDoubleQuote {
+                inSingleQuote.toggle()
+            } else if ch == "\"" && !inSingleQuote {
+                inDoubleQuote.toggle()
+            } else if ch.isWhitespace && !inSingleQuote && !inDoubleQuote {
+                if !current.isEmpty {
+                    args.append(current)
+                    current = ""
+                }
+            } else {
+                current.append(ch)
+            }
+        }
+        if !current.isEmpty { args.append(current) }
+        return args
     }
 
     func filteredCategories() -> [CleanCategory] {
@@ -170,17 +209,22 @@ final class AppState: ObservableObject {
         }
     }
 
-    private static func execShell(_ cmd: String) async -> String {
+    private static func exec(_ executable: String, _ arguments: [String]) async -> String {
         let p = Process()
-        p.executableURL = URL(fileURLWithPath: "/bin/zsh")
-        p.arguments = ["-lc", cmd]
+        p.executableURL = URL(fileURLWithPath: executable)
+        p.arguments = arguments
         let pipe = Pipe()
         p.standardOutput = pipe; p.standardError = pipe
         do {
-            try p.run(); p.waitUntilExit()
+            try p.run()
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            return (String(data: data, encoding: .utf8) ?? "") + "(exit \(p.terminationStatus))\n"
-        } catch { return "Error: \(error.localizedDescription)\n" }
+            p.waitUntilExit()
+            let text = String(data: data, encoding: .utf8) ?? ""
+            if p.terminationStatus == 0 {
+                return text.isEmpty ? "Completed.\n" : text
+            }
+            return text + "\nThe action could not finish. Status \(p.terminationStatus).\n"
+        } catch { return "Could not start this action: \(error.localizedDescription)\n" }
     }
 }
 
@@ -232,7 +276,7 @@ struct SidebarView: View {
                     Image(systemName: "sparkles.rectangle.stack.fill")
                         .font(.system(size: 18, weight: .light))
                         .foregroundColor(DS.C.brandLavender)
-                    Text("cleanroom")
+                    Text("Cleanroom")
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundColor(DS.C.textOnDark)
                     Spacer()
@@ -304,7 +348,7 @@ struct SidebarView: View {
 
                 Rectangle().fill(DS.C.dividerOnDark).frame(height: 1)
                 HStack {
-                    Text(state.cliPath.isEmpty ? "CLI not found" : "v0.78.0")
+                    Text("Protected mode")
                         .font(DS.T.tag)
                         .foregroundColor(DS.C.textOnDark.opacity(0.35))
                     Spacer()
@@ -463,10 +507,10 @@ struct HeaderStats: View {
 
             // Action strip below stats
             HStack(spacing: DS.Sp.sm) {
-                PillBtn("Refresh Stats", style: .ghost) { state.refreshStats() }
-                PillBtn("Scan →", style: .ghost) { state.run("scan", title: "Scan") }
+                PillBtn("Refresh", style: .ghost) { state.refreshStats(force: true) }
+                PillBtn("Scan Now", style: .ghost) { state.run("scan", title: "Scan") }
                 Spacer()
-                PillBtn("Apply Safely →", style: .primary) {
+                PillBtn("Clean Safely", style: .primary) {
                     state.showApplyConfirm = true
                 }
             }
@@ -696,7 +740,7 @@ struct EmptyFilterState: View {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// MARK: – Output / Terminal Panel
+// MARK: – Activity Details Panel
 // ═══════════════════════════════════════════════════════════════
 
 struct OutputPanel: View {
@@ -704,18 +748,17 @@ struct OutputPanel: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Chrome bar — always visible
             HStack(spacing: DS.Sp.sm) {
                 Circle()
                     .fill(state.running ? DS.C.ctaOrange : DS.C.positive)
                     .frame(width: 7, height: 7)
                     .animation(DS.Ani.std, value: state.running)
                 Text(state.status)
-                    .font(DS.T.monoSm)
+                    .font(DS.T.bodySm)
                     .foregroundColor(DS.C.textOnDark.opacity(0.72))
                 Spacer()
                 IconBtn(icon: "doc.on.clipboard", dark: true) {
-                    state.copyCmd("cleanroom clean --apply --trash")
+                    state.copyDetails()
                 }
                 IconBtn(icon: "trash", dark: true) { state.output = "" }
                 IconBtn(icon: state.outputOpen ? "chevron.down" : "chevron.up", dark: true) {
@@ -764,7 +807,7 @@ struct LeftoversSheet: View {
                 Text("Find App Leftovers")
                     .font(DS.T.h2)
                     .foregroundColor(DS.C.textPrimary)
-                Text("Enter an app or vendor name to preview matching files and copy the cleanup command.")
+                Text("Enter an app or vendor name to preview matching files before cleaning anything.")
                     .font(DS.T.body)
                     .foregroundColor(DS.C.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -856,10 +899,10 @@ struct ApplyConfirmSheet: View {
                         .foregroundColor(DS.C.ctaOrange)
                 }
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Apply safely?")
+                    Text("Clean safely?")
                         .font(DS.T.h2)
                         .foregroundColor(DS.C.textPrimary)
-                    Text("Files are moved to Trash, not permanently deleted.")
+                    Text("Eligible files move to Trash and can be restored from the activity log.")
                         .font(DS.T.bodySm)
                         .foregroundColor(DS.C.textSecondary)
                 }
@@ -867,29 +910,15 @@ struct ApplyConfirmSheet: View {
 
             Rectangle().fill(DS.C.divider).frame(height: 1)
 
-            // Command preview
             VStack(alignment: .leading, spacing: DS.Sp.sm) {
-                Text("COMMAND TO RUN")
-                    .font(DS.T.tag).kerning(0.6)
-                    .foregroundColor(DS.C.textMuted)
-                Text("cleanroom clean --apply --trash")
-                    .font(DS.T.mono)
-                    .foregroundColor(DS.C.textOnDark)
-                    .padding(DS.Sp.md)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(
-                        RoundedRectangle(cornerRadius: DS.R.sm).fill(DS.C.terminalBg)
-                    )
-            }
-
-            VStack(alignment: .leading, spacing: DS.Sp.sm) {
-                Text("WHAT THIS DOES")
+                Text("WHAT WILL HAPPEN")
                     .font(DS.T.tag).kerning(0.6)
                     .foregroundColor(DS.C.textMuted)
                 ForEach([
-                    "Cleans using the default rule set",
-                    "Sends removed files to Trash (recoverable)",
-                    "Skips all protected paths",
+                    "Rebuildable clutter is selected automatically",
+                    "Removed items are placed in Trash",
+                    "Passwords, browser profiles, Mail, Photos, and cloud folders stay protected",
+                    "A restore log is written for the cleanup session",
                 ], id: \.self) { item in
                     HStack(spacing: DS.Sp.sm) {
                         Circle().fill(DS.C.positive).frame(width: 5, height: 5)
@@ -905,12 +934,12 @@ struct ApplyConfirmSheet: View {
                     .buttonStyle(.plain)
                     .foregroundColor(DS.C.textSecondary)
                 Spacer()
-                PillBtn("Copy Command", style: .ghost) {
-                    state.copyCmd("cleanroom clean --apply --trash")
+                PillBtn("Preview First", style: .ghost) {
+                    state.run("clean --preflight", title: "Safety Preview")
                     dismiss()
                 }
-                PillBtn("Run Now →", style: .primary) {
-                    state.run("clean --apply --trash", title: "Apply")
+                PillBtn("Clean Now", style: .primary) {
+                    state.run("clean --apply --trash --yes", title: "Safe Cleanup")
                     dismiss()
                 }
             }

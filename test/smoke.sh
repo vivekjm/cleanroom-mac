@@ -390,6 +390,21 @@ fi
 exit 2
 SH
 chmod +x "$TEST_HOME/bin/pod"
+cat >"$TEST_HOME/bin/pip3" <<'SH'
+#!/usr/bin/env bash
+if [[ "${1:-}" == "cache" && "${2:-}" == "info" ]]; then
+  printf 'Package index page cache size: 48.0 MB\n'
+  printf 'Locally built wheels size: 12.0 MB\n'
+  exit 0
+fi
+if [[ "${1:-}" == "cache" && "${2:-}" == "purge" ]]; then
+  printf 'Files removed: 42\n'
+  printf 'applied\n' >"$HOME/pip-cache-purge-applied"
+  exit 0
+fi
+exit 2
+SH
+chmod +x "$TEST_HOME/bin/pip3"
 export HOME="$TEST_HOME"
 export PATH="$TEST_HOME/bin:$PATH"
 
@@ -965,10 +980,12 @@ packages_json="$(mktemp)"
 python3 -m json.tool "$packages_json" >/dev/null
 grep 'pnpm-store' "$packages_json" >/dev/null
 grep 'cocoapods-cache' "$packages_json" >/dev/null
+grep 'pip-cache' "$packages_json" >/dev/null
 grep 'homebrew-cache' "$packages_json" >/dev/null
 grep 'cleanroom yarn-cache --apply --yes' "$packages_json" >/dev/null
 grep 'cleanroom pnpm-store --apply --yes' "$packages_json" >/dev/null
 grep 'cleanroom cocoapods-cache --apply --yes' "$packages_json" >/dev/null
+grep 'cleanroom pip-cache --apply --yes' "$packages_json" >/dev/null
 rm -f "$packages_json"
 "$BIN" npm-cache | grep 'Cache verified' >/dev/null
 npm_cache_json="$(mktemp)"
@@ -1018,6 +1035,18 @@ rm -f "$cocoapods_cache_log" "$TEST_HOME/cocoapods-cache-clean-applied"
 "$BIN" cocoapods-cache --apply --yes --log "$cocoapods_cache_log" | grep 'Cleaning CocoaPods cache' >/dev/null
 test -f "$TEST_HOME/cocoapods-cache-clean-applied"
 grep 'cocoapods-cache' "$cocoapods_cache_log" >/dev/null
+"$BIN" pip-cache | grep 'Package index page cache size' >/dev/null
+pip_cache_json="$(mktemp)"
+"$BIN" pip-cache --json > "$pip_cache_json"
+python3 -m json.tool "$pip_cache_json" >/dev/null
+grep '"command":"pip3 cache info"' "$pip_cache_json" >/dev/null
+grep 'Locally built wheels size' "$pip_cache_json" >/dev/null
+rm -f "$pip_cache_json"
+pip_cache_log="$(mktemp)"
+rm -f "$pip_cache_log" "$TEST_HOME/pip-cache-purge-applied"
+"$BIN" pip-cache --apply --yes --log "$pip_cache_log" | grep 'Files removed: 42' >/dev/null
+test -f "$TEST_HOME/pip-cache-purge-applied"
+grep 'pip-cache' "$pip_cache_log" >/dev/null
 "$BIN" receipts --limit 20 | grep 'com.cleanroom.test.pkg' >/dev/null
 receipts_json="$(mktemp)"
 "$BIN" receipts --json --limit 20 > "$receipts_json"
