@@ -244,14 +244,14 @@ final class AppState: ObservableObject {
     private func appFacingArgs(_ args: [String]) -> [String] {
         guard let action = args.first else { return args }
         let jsonActions: Set<String> = [
-            "large-fast", "duplicates-fast", "quarantine-fast", "metadata-fast",
+            "large-fast", "duplicates-fast", "brokenlinks", "quarantine-fast", "metadata-fast",
             "developer-fast", "nodes-fast", "venvs-fast", "apps-fast",
             "downloads", "archives", "screenshots", "trash", "cloudfiles",
             "quicklook", "fontcaches", "webcaches", "savedstate",
             "projectcaches", "updaters", "browsercaches",
             "xcode", "backups", "system-data", "containers", "toolchains",
             "loginitems", "startup", "snapshot", "state", "protect", "rules",
-            "map", "doctor"
+            "map", "doctor", "leftovers", "appreview"
         ]
         if jsonActions.contains(action), !args.contains("--json") {
             return args + ["--json"]
@@ -319,6 +319,15 @@ final class AppState: ObservableObject {
             }
             if let array = object["items"] as? [[String: Any]] {
                 return array
+            }
+            var grouped: [[String: Any]] = []
+            for key in ["apps", "uninstallers", "receipts", "leftovers"] {
+                if let array = object[key] as? [[String: Any]] {
+                    grouped.append(contentsOf: array)
+                }
+            }
+            if !grouped.isEmpty {
+                return grouped
             }
         }
         return nil
