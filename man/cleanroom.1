@@ -1,4 +1,4 @@
-.TH CLEANROOM 1 "June 2026" "cleanroom 1.9.0" "User Commands"
+.TH CLEANROOM 1 "June 2026" "cleanroom 1.10.0" "User Commands"
 .SH NAME
 cleanroom \- safe-by-default macOS storage cleaner
 .SH SYNOPSIS
@@ -16,6 +16,9 @@ cleanroom \- safe-by-default macOS storage cleaner
 .br
 .B cleanroom
 .RI "snapshot [--json] [--output path]"
+.br
+.B cleanroom
+.RI "snapshot-fast [--json] [--output path]"
 .br
 .B cleanroom
 .RI "diff [before.json after.json] [--json]"
@@ -274,6 +277,11 @@ Buckets may overlap because smaller folders can also be part of larger parents.
 Write disk state and focused storage-map buckets into a timestamped JSON file
 under ~/.local/state/cleanroom/snapshots, or to --output path. With --json,
 emit the snapshot to stdout.
+.TP
+.B snapshot-fast
+Write a quick desktop-app snapshot from fast summary buckets. Use deep
+.B snapshot
+for exhaustive before/after diffs.
 .TP
 .B diff
 Compare two snapshot JSON files and rank bucket deltas. With no paths, compare

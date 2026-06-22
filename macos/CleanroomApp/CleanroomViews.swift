@@ -369,7 +369,7 @@ final class AppState: ObservableObject {
             "quicklook", "fontcaches", "webcaches", "savedstate",
             "projectcaches", "projectcaches-fast", "updaters", "browsercaches",
             "xcode", "backups", "system-data", "system-data-fast", "containers", "toolchains",
-            "loginitems", "startup", "snapshot", "state", "protect", "rules",
+            "loginitems", "startup", "snapshot", "snapshot-fast", "state", "protect", "rules",
             "map", "map-fast", "doctor", "leftovers", "appreview"
         ]
         if jsonActions.contains(action), !args.contains("--json") {
@@ -852,7 +852,7 @@ struct SidebarView: View {
                             NavRow("bolt.fill",               "Startup",     .run(title: "Startup",     args: "startup"), state)
                         }
                         SidebarSection("SAFETY") {
-                            NavRow("camera.fill",             "Storage Snapshot", .run(title: "Storage Snapshot", args: "snapshot"), state)
+                            NavRow("camera.fill",             "Storage Snapshot", .run(title: "Storage Snapshot", args: "snapshot-fast"), state)
                             NavRow("clock.badge.checkmark.fill", "Recovery",      .run(title: "Recovery", args: "state"), state)
                             NavRow("checkmark.shield.fill",   "Safety Check",     .run(title: "Safety Check", args: "clean --preset dev --preflight"), state)
                             NavRow("doc.text.fill",           "Privacy Report",   .run(title: "Privacy Report", args: "report --redact"), state)

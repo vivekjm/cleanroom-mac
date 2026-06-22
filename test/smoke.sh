@@ -481,6 +481,17 @@ grep '"created_at"' "$snapshot_json" >/dev/null
 grep '"buckets"' "$snapshot_json" >/dev/null
 grep '"id":"documents"' "$snapshot_json" >/dev/null
 rm -f "$snapshot_json"
+snapshot_fast_json="$(mktemp)"
+"$BIN" snapshot-fast --json > "$snapshot_fast_json"
+python3 -m json.tool "$snapshot_fast_json" >/dev/null
+grep '"mode":"fast"' "$snapshot_fast_json" >/dev/null
+grep '"buckets"' "$snapshot_fast_json" >/dev/null
+grep '"id":"caches"' "$snapshot_fast_json" >/dev/null
+rm -f "$snapshot_fast_json"
+snapshot_fast_output="$TEST_HOME/snapshot-fast-output.json"
+"$BIN" snapshot-fast --output "$snapshot_fast_output" | grep 'Wrote quick snapshot' >/dev/null
+test -f "$snapshot_fast_output"
+python3 -m json.tool "$snapshot_fast_output" >/dev/null
 snapshot_output="$TEST_HOME/snapshot-output.json"
 "$BIN" snapshot --output "$snapshot_output" | grep 'Wrote snapshot' >/dev/null
 test -f "$snapshot_output"
