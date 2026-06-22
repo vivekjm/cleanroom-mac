@@ -591,14 +591,14 @@ struct SidebarView: View {
                             NavRow("person.crop.circle",      "Login Items", .run(title: "Login Items", args: "loginitems"), state)
                             NavRow("bolt.fill",               "Startup",     .run(title: "Startup",     args: "startup"), state)
                         }
-                        SidebarSection("REPORT") {
-                            NavRow("camera.fill",             "Snapshot",    .run(title: "Snapshot",  args: "snapshot"), state)
-                            NavRow("clock.badge.checkmark.fill", "State",    .run(title: "State",     args: "state"), state)
-                            NavRow("checkmark.shield.fill",   "Preflight",   .run(title: "Clean Preflight", args: "clean --preset dev --preflight"), state)
-                            NavRow("doc.text.fill",           "Report",      .run(title: "Redacted Report", args: "report --redact"), state)
-                            NavRow("clock.fill",              "History",     .run(title: "History",   args: "history"), state)
-                            NavRow("shield.fill",             "Protected",   .run(title: "Protected", args: "protect"), state)
-                            NavRow("flag.fill",               "Rules",       .run(title: "Rules",     args: "rules"), state)
+                        SidebarSection("SAFETY") {
+                            NavRow("camera.fill",             "Storage Snapshot", .run(title: "Storage Snapshot", args: "snapshot"), state)
+                            NavRow("clock.badge.checkmark.fill", "Recovery",      .run(title: "Recovery", args: "state"), state)
+                            NavRow("checkmark.shield.fill",   "Safety Check",     .run(title: "Safety Check", args: "clean --preset dev --preflight"), state)
+                            NavRow("doc.text.fill",           "Privacy Report",   .run(title: "Privacy Report", args: "report --redact"), state)
+                            NavRow("clock.fill",              "Past Cleanups",    .run(title: "Past Cleanups", args: "history"), state)
+                            NavRow("shield.fill",             "Protected Data",   .run(title: "Protected Data", args: "protect"), state)
+                            NavRow("flag.fill",               "Safety Rules",     .run(title: "Safety Rules", args: "rules"), state)
                         }
                     }
                     .padding(.bottom, DS.Sp.xxl)
@@ -1174,7 +1174,7 @@ struct ApplyConfirmSheet: View {
                     Text("Clean safely?")
                         .font(DS.T.h2)
                         .foregroundColor(DS.C.textPrimary)
-                    Text("Eligible files move to Trash and can be restored from the activity log.")
+                    Text("Eligible files move to Trash and can be restored from a cleanup record.")
                         .font(DS.T.bodySm)
                         .foregroundColor(DS.C.textSecondary)
                 }
@@ -1190,7 +1190,7 @@ struct ApplyConfirmSheet: View {
                     "Rebuildable clutter is selected automatically",
                     "Removed items are placed in Trash",
                     "Passwords, browser profiles, Mail, Photos, and cloud folders stay protected",
-                    "A restore log is written for the cleanup session",
+                    "A restore record is written for the cleanup session",
                 ], id: \.self) { item in
                     HStack(spacing: DS.Sp.sm) {
                         Circle().fill(DS.C.positive).frame(width: 5, height: 5)
@@ -1206,8 +1206,8 @@ struct ApplyConfirmSheet: View {
                     .buttonStyle(.plain)
                     .foregroundColor(DS.C.textSecondary)
                 Spacer()
-                PillBtn("Preview First", style: .ghost) {
-                    state.run("clean --preflight", title: "Safety Preview")
+                PillBtn("Review First", style: .ghost) {
+                    state.run("clean --preflight", title: "Safety Check")
                     dismiss()
                 }
                 PillBtn("Clean Now", style: .primary) {
