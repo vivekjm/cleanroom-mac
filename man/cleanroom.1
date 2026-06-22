@@ -1,4 +1,4 @@
-.TH CLEANROOM 1 "June 2026" "cleanroom 0.87.0" "User Commands"
+.TH CLEANROOM 1 "June 2026" "cleanroom 0.88.0" "User Commands"
 .SH NAME
 cleanroom \- safe-by-default macOS storage cleaner
 .SH SYNOPSIS
@@ -311,7 +311,10 @@ Inventory Chromium and Firefox browser cache folders without touching profiles,
 password databases, cookies, bookmarks, sessions, extensions, or settings.
 .TP
 .B duplicates
-Find exact duplicate files for review without deleting anything.
+Deep-scan exact duplicate files for review without deleting anything.
+.TP
+.B duplicates-fast
+Quickly preview exact duplicate files using Spotlight size hints without deleting anything.
 .TP
 .B documents
 Rank top-level files and folders in ~/Documents or a provided directory with guard status.

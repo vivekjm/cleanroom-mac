@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.87.0"
+VERSION="0.88.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -83,6 +83,7 @@ Usage:
   cleanroom updaters [--json]
   cleanroom browsercaches [--json]
   cleanroom duplicates [PATH] [--min-mb N] [--limit N] [--json]
+  cleanroom duplicates-fast [PATH] [--min-mb N] [--limit N] [--json]
   cleanroom documents [PATH] [--limit N] [--json]
   cleanroom desktop [--limit N] [--json]
   cleanroom screenshots [PATH] [--days N] [--limit N] [--json]
@@ -159,7 +160,8 @@ Actions:
   projectcaches        Inventory Python/dev project cache folders and files.
   updaters             Inventory app updater cache and staging folders.
   browsercaches        Inventory Chromium and Firefox browser cache folders.
-  duplicates           Find exact duplicate files for review without deleting anything.
+  duplicates           Deep-scan exact duplicate files for review.
+  duplicates-fast      Quickly preview duplicate groups using Spotlight size hints.
   documents            Rank top-level user folders/files for review without deleting anything.
   desktop              Rank top-level Desktop folders/files for review without deleting anything.
   screenshots          List screenshot and screen recording files for review.
@@ -599,6 +601,16 @@ size_kb() {
   else
     printf '%s\n' "$out" | awk '{print $1; exit}'
   fi
+}
+
+size_bytes() {
+  local path
+  path="$(expand_path "$1")"
+  [[ -f "$path" ]] || { printf '0'; return; }
+  local bytes
+  bytes="$(stat -f '%z' "$path" 2>/dev/null || stat -c '%s' "$path" 2>/dev/null || true)"
+  [[ "$bytes" =~ ^[0-9]+$ ]] || bytes=0
+  printf '%s\n' "$bytes"
 }
 
 human_kb() {
@@ -3660,6 +3672,51 @@ duplicate_candidates() {
     sort -k1,1 -k2,2nr
 }
 
+duplicate_fast_candidates() {
+  local root="$1"
+  local min_bytes=$((MIN_MB * 1024 * 1024))
+  command -v mdfind >/dev/null 2>&1 || return 2
+  command -v shasum >/dev/null 2>&1 || return 3
+
+  local size_file
+  size_file="$(mktemp)"
+  mdfind -onlyin "$root" "kMDItemFSSize > $min_bytes" 2>/dev/null |
+    while IFS= read -r path; do
+      [[ -f "$path" ]] || continue
+      printf '%012d\t%s\n' "$(size_bytes "$path")" "$path"
+    done |
+    sort -rn |
+    head -n 1000 >"$size_file"
+
+  local current_size="" bytes path
+  local group_paths=()
+
+  flush_size_group() {
+    [[ -n "$current_size" ]] || return 0
+    [[ "${#group_paths[@]}" -gt 1 ]] || return 0
+    local candidate hash kb bytes_num
+    bytes_num="$(printf '%s\n' "$current_size" | sed 's/^0*//; s/^$/0/')"
+    for candidate in "${group_paths[@]}"; do
+      hash="$(shasum -a 256 "$candidate" 2>/dev/null | awk '{print $1}' || true)"
+      [[ -n "$hash" ]] || continue
+      kb="$(((bytes_num + 1023) / 1024))"
+      printf '%s\t%012d\t%s\n' "$hash" "$kb" "$candidate"
+    done
+  }
+
+  while IFS=$'\t' read -r bytes path; do
+    [[ -z "${bytes:-}" || -z "${path:-}" ]] && continue
+    if [[ -n "$current_size" && "$bytes" != "$current_size" ]]; then
+      flush_size_group
+      group_paths=()
+    fi
+    current_size="$bytes"
+    group_paths+=("$path")
+  done <"$size_file"
+  flush_size_group
+  rm -f "$size_file"
+}
+
 duplicates_json_group() {
   local hash="$1"
   local size_kb="$2"
@@ -3694,6 +3751,21 @@ duplicates_text_group() {
   reclaim_kb=$((size_kb * (count - 1)))
   printf 'duplicate group  count=%s  each=%s  potential reclaim=%s\n' "$count" "$(human_kb "$size_kb")" "$(human_kb "$reclaim_kb")"
   printf '  hash: %s\n' "$hash"
+  for path in "$@"; do
+    printf '  %s\n' "$path"
+  done
+  printf '\n'
+}
+
+duplicates_fast_text_group() {
+  local hash="$1"
+  local size_kb="$2"
+  shift 2
+  local count="$#"
+  [[ "$count" -gt 1 ]] || return 0
+  local reclaim_kb path
+  reclaim_kb=$((size_kb * (count - 1)))
+  printf '%8s  %s copies  reclaim %s\n' "$(human_kb "$size_kb")" "$count" "$(human_kb "$reclaim_kb")"
   for path in "$@"; do
     printf '  %s\n' "$path"
   done
@@ -3757,6 +3829,77 @@ duplicates() {
     printf ']\n'
   elif [[ "$emitted" -eq 0 ]]; then
     printf 'No exact duplicates found over %sMB.\n' "$MIN_MB"
+  fi
+}
+
+duplicates_fast() {
+  local root
+  if [[ "${#PATH_ARGS[@]}" -gt 0 ]]; then
+    root="$(expand_path "${PATH_ARGS[0]}")"
+  else
+    root="$HOME"
+  fi
+  [[ -e "$root" ]] || die "duplicates-fast path not found: $root"
+
+  local rows_file available=1
+  rows_file="$(mktemp)"
+  if ! duplicate_fast_candidates "$root" | sort -k1,1 -k2,2nr >"$rows_file"; then
+    available=0
+  fi
+
+  if [[ "$JSON" -eq 1 ]]; then
+    if [[ "$available" -eq 0 ]]; then
+      printf '{"available":false,"reason":"spotlight_unavailable","items":[]}\n'
+      rm -f "$rows_file"
+      return 0
+    fi
+    printf '{"available":true,"items":['
+  else
+    printf '%s\n' "${BOLD}cleanroom quick duplicate files${RESET}"
+    printf 'Review-only preview from Spotlight metadata. No files are deleted.\n'
+    printf 'Path: %s\n' "$root"
+    printf 'Minimum: %sMB  Limit: %s groups\n\n' "$MIN_MB" "$LIMIT"
+    if [[ "$available" -eq 0 ]]; then
+      printf 'Spotlight search is not available. Use the deeper Duplicates scan when you want an exhaustive review.\n'
+      rm -f "$rows_file"
+      return 0
+    fi
+  fi
+
+  local current_hash="" current_size=0 hash kb path emitted=0 json_first=1
+  local group_paths=()
+
+  flush_fast_duplicate_group() {
+    [[ -n "$current_hash" ]] || return 0
+    [[ "${#group_paths[@]}" -gt 1 ]] || return 0
+    [[ "$emitted" -lt "$LIMIT" ]] || return 0
+    if [[ "$JSON" -eq 1 ]]; then
+      [[ "$json_first" -eq 0 ]] && printf ','
+      json_first=0
+      duplicates_json_group "$current_hash" "$current_size" "${group_paths[@]}"
+    else
+      duplicates_fast_text_group "$current_hash" "$current_size" "${group_paths[@]}"
+    fi
+    emitted=$((emitted + 1))
+  }
+
+  while IFS=$'\t' read -r hash kb path; do
+    [[ -z "${hash:-}" || -z "${path:-}" ]] && continue
+    if [[ -n "$current_hash" && "$hash" != "$current_hash" ]]; then
+      flush_fast_duplicate_group
+      group_paths=()
+    fi
+    current_hash="$hash"
+    current_size="$(printf '%s\n' "$kb" | sed 's/^0*//; s/^$/0/')"
+    group_paths+=("$path")
+  done <"$rows_file"
+  flush_fast_duplicate_group
+
+  rm -f "$rows_file"
+  if [[ "$JSON" -eq 1 ]]; then
+    printf ']}\n'
+  elif [[ "$emitted" -eq 0 ]]; then
+    printf 'No exact duplicates found in the fast Spotlight candidate set.\n'
   fi
 }
 
@@ -7455,7 +7598,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  dashboard|overview|map|snapshot|diff|state|permissions|review|scan|system-data|plan|large|large-fast|largefast|brokenlinks|quarantine|metadata|quicklook|fontcaches|font-caches|webcaches|web-caches|savedstate|saved-state|projectcaches|project-caches|updaters|updater-caches|browsercaches|browser-caches|duplicates|documents|desktop|screenshots|archives|downloads|installers|nodes|venvs|virtualenvs|apps|uninstallers|appreview|appdata|libraries|cloud|cloudfiles|cloud-files|personal|communications|comms|browsers|leftovers|backups|xcode|android|startup|loginitems|trash|caches|diagnostics|packages|npm-cache|npmcache|yarn-cache|yarncache|pnpm-store|pnpmstore|cocoapods-cache|pod-cache|podcache|pip-cache|pipcache|receipts|homebrew|homebrew-cleanup|brewcleanup|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
+  dashboard|overview|map|snapshot|diff|state|permissions|review|scan|system-data|plan|large|large-fast|largefast|brokenlinks|quarantine|metadata|quicklook|fontcaches|font-caches|webcaches|web-caches|savedstate|saved-state|projectcaches|project-caches|updaters|updater-caches|browsercaches|browser-caches|duplicates|duplicates-fast|duplicatesfast|documents|desktop|screenshots|archives|downloads|installers|nodes|venvs|virtualenvs|apps|uninstallers|appreview|appdata|libraries|cloud|cloudfiles|cloud-files|personal|communications|comms|browsers|leftovers|backups|xcode|android|startup|loginitems|trash|caches|diagnostics|packages|npm-cache|npmcache|yarn-cache|yarncache|pnpm-store|pnpmstore|cocoapods-cache|pod-cache|podcache|pip-cache|pipcache|receipts|homebrew|homebrew-cleanup|brewcleanup|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -7553,7 +7696,7 @@ while [[ "$#" -gt 0 ]]; do
     -h|--help) usage; exit 0 ;;
     -v|--version) echo "$VERSION"; exit 0 ;;
     *)
-      if [[ "$ACTION" == "guard" || "$ACTION" == "diff" || "$ACTION" == "large" || "$ACTION" == "large-fast" || "$ACTION" == "largefast" || "$ACTION" == "brokenlinks" || "$ACTION" == "quarantine" || "$ACTION" == "metadata" || "$ACTION" == "projectcaches" || "$ACTION" == "project-caches" || "$ACTION" == "duplicates" || "$ACTION" == "documents" || "$ACTION" == "screenshots" || "$ACTION" == "archives" || "$ACTION" == "nodes" || "$ACTION" == "venvs" || "$ACTION" == "virtualenvs" || "$ACTION" == "apps" || "$ACTION" == "uninstallers" || "$ACTION" == "appreview" || "$ACTION" == "cloudfiles" || "$ACTION" == "cloud-files" || "$ACTION" == "leftovers" ]]; then
+      if [[ "$ACTION" == "guard" || "$ACTION" == "diff" || "$ACTION" == "large" || "$ACTION" == "large-fast" || "$ACTION" == "largefast" || "$ACTION" == "brokenlinks" || "$ACTION" == "quarantine" || "$ACTION" == "metadata" || "$ACTION" == "projectcaches" || "$ACTION" == "project-caches" || "$ACTION" == "duplicates" || "$ACTION" == "duplicates-fast" || "$ACTION" == "duplicatesfast" || "$ACTION" == "documents" || "$ACTION" == "screenshots" || "$ACTION" == "archives" || "$ACTION" == "nodes" || "$ACTION" == "venvs" || "$ACTION" == "virtualenvs" || "$ACTION" == "apps" || "$ACTION" == "uninstallers" || "$ACTION" == "appreview" || "$ACTION" == "cloudfiles" || "$ACTION" == "cloud-files" || "$ACTION" == "leftovers" ]]; then
         PATH_ARGS+=("$1")
       else
         die "Unknown option: $1"
@@ -7588,6 +7731,7 @@ case "$ACTION" in
   updaters|updater-caches) updaters ;;
   browsercaches|browser-caches) browsercaches ;;
   duplicates) duplicates ;;
+  duplicates-fast|duplicatesfast) duplicates_fast ;;
   documents) documents ;;
   desktop) desktop ;;
   screenshots) screenshots ;;

@@ -272,6 +272,7 @@ cleanroom browsercaches --json
 Find exact duplicate files for manual review:
 
 ```sh
+cleanroom duplicates-fast
 cleanroom duplicates
 cleanroom duplicates ~/Documents --min-mb 100 --limit 20
 cleanroom duplicates --json ~/Downloads

@@ -305,6 +305,8 @@ if [[ "${1:-}" == "-onlyin" ]]; then
   root="${2:-}"
   [[ -f "$root/Downloads/big-test.bin" ]] && printf '%s\n' "$root/Downloads/big-test.bin"
   [[ -f "$root/Downloads/old-installer.dmg" ]] && printf '%s\n' "$root/Downloads/old-installer.dmg"
+  [[ -f "$root/Documents/duplicates/copy-a.bin" ]] && printf '%s\n' "$root/Documents/duplicates/copy-a.bin"
+  [[ -f "$root/Documents/duplicates/copy-b.bin" ]] && printf '%s\n' "$root/Documents/duplicates/copy-b.bin"
   exit 0
 fi
 exit 2
@@ -772,6 +774,14 @@ python3 -m json.tool "$duplicates_json" >/dev/null
 grep 'potential_reclaim_kb' "$duplicates_json" >/dev/null
 grep 'copy-b.bin' "$duplicates_json" >/dev/null
 rm -f "$duplicates_json"
+"$BIN" duplicates-fast "$HOME" --min-mb 1 --limit 5 | grep 'copy-a.bin' >/dev/null
+duplicates_fast_json="$(mktemp)"
+"$BIN" duplicates-fast --json "$HOME" --min-mb 1 --limit 5 > "$duplicates_fast_json"
+python3 -m json.tool "$duplicates_fast_json" >/dev/null
+grep '"available":true' "$duplicates_fast_json" >/dev/null
+grep 'copy-a.bin' "$duplicates_fast_json" >/dev/null
+grep 'copy-b.bin' "$duplicates_fast_json" >/dev/null
+rm -f "$duplicates_fast_json"
 "$BIN" documents "$HOME/Documents" --limit 10 | grep 'media-project' >/dev/null
 documents_json="$(mktemp)"
 "$BIN" documents --json "$HOME/Documents" --limit 10 > "$documents_json"
