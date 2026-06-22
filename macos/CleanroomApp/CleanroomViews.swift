@@ -176,7 +176,8 @@ final class AppState: ObservableObject {
         status     = "\(title) in progress..."
         activityMessage = "\(title) is running. You can stop it anytime."
         output    += "\n\(title) started\n"
-        let command = resolvedCommand(splitArgs(args))
+        let commandArgs = appFacingArgs(splitArgs(args))
+        let command = resolvedCommand(commandArgs)
         Task.detached(priority: .userInitiated) {
             let result = await Self.exec(command.executable, command.arguments) { process in
                 Task { @MainActor in
@@ -188,7 +189,8 @@ final class AppState: ObservableObject {
             await MainActor.run {
                 guard self.currentRunID == runID else { return }
                 self.currentProcess = nil
-                self.output += result.output
+                let displayOutput = self.presentableDetails(title: title, args: args, details: result.output)
+                self.output += displayOutput
                 if result.status == 15 {
                     self.status = "\(title) stopped"
                     self.activityMessage = "\(title) stopped. Open details to see where it paused."
@@ -196,7 +198,7 @@ final class AppState: ObservableObject {
                     self.outputOpen = true
                 } else if result.status == 0 {
                     self.status = "\(title) complete"
-                    self.activityMessage = self.summarizeAction(title: title, args: args, details: result.output)
+                    self.activityMessage = self.summarizeAction(title: title, args: args, details: displayOutput)
                     self.outputOpen = false
                 } else {
                     self.status = "\(title) needs attention"
@@ -239,6 +241,21 @@ final class AppState: ObservableObject {
         return (enginePath, args)
     }
 
+    private func appFacingArgs(_ args: [String]) -> [String] {
+        guard let action = args.first else { return args }
+        let jsonActions: Set<String> = [
+            "large-fast", "duplicates-fast", "quarantine-fast", "metadata-fast",
+            "developer-fast", "nodes-fast", "venvs-fast", "apps-fast",
+            "downloads", "archives", "screenshots", "trash", "cloudfiles",
+            "quicklook", "fontcaches", "webcaches", "savedstate",
+            "projectcaches", "updaters", "browsercaches"
+        ]
+        if jsonActions.contains(action), !args.contains("--json") {
+            return args + ["--json"]
+        }
+        return args
+    }
+
     private func summarizeAction(title: String, args: String, details: String) -> String {
         let changedFiles = args.contains("--apply")
         let noChangeText = changedFiles ? "" : " No files were changed."
@@ -265,6 +282,63 @@ final class AppState: ObservableObject {
             return "\(title) found \(rows.count) review items. No files were changed."
         }
         return "\(title) finished. Details are available if you need them."
+    }
+
+    private func presentableDetails(title: String, args: String, details: String) -> String {
+        let trimmed = details.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let data = trimmed.data(using: .utf8),
+              let parsed = try? JSONSerialization.jsonObject(with: data),
+              let items = jsonItems(from: parsed) else {
+            return details
+        }
+
+        if items.isEmpty {
+            return "\(title) found nothing that needs attention.\n"
+        }
+
+        var lines = ["\(title) found \(items.count) review \(items.count == 1 ? "item" : "items")."]
+        for item in items.prefix(40) {
+            lines.append(summaryLine(for: item))
+        }
+        return lines.joined(separator: "\n") + "\n"
+    }
+
+    private func jsonItems(from parsed: Any) -> [[String: Any]]? {
+        if let array = parsed as? [[String: Any]] {
+            return array
+        }
+        if let object = parsed as? [String: Any] {
+            if let available = object["available"] as? Bool, !available {
+                return []
+            }
+            if let array = object["items"] as? [[String: Any]] {
+                return array
+            }
+        }
+        return nil
+    }
+
+    private func summaryLine(for item: [String: Any]) -> String {
+        let size = stringValue(item["size"]) ?? stringValue(item["potential_reclaim"]) ?? "Review"
+        let title = stringValue(item["title"]) ?? stringValue(item["name"]) ?? stringValue(item["kind"]) ?? "Item"
+        if let path = stringValue(item["path"]) {
+            return "\(size)  \(title)  \(path)"
+        }
+        if let paths = item["paths"] as? [String], let first = paths.first {
+            return "\(size)  \(title)  \(first)"
+        }
+        return "\(size)  \(title)"
+    }
+
+    private func stringValue(_ value: Any?) -> String? {
+        switch value {
+        case let text as String where !text.isEmpty:
+            return text
+        case let number as NSNumber:
+            return number.stringValue
+        default:
+            return nil
+        }
     }
 
     private func reviewRows(in details: String) -> [String] {
