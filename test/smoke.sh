@@ -1338,6 +1338,15 @@ report_fast_stdout="$("$BIN" report-fast)"
 grep '# cleanroom quick privacy report' <<<"$report_fast_stdout" >/dev/null
 grep 'Summary Buckets' <<<"$report_fast_stdout" >/dev/null
 grep 'Protected locations present' <<<"$report_fast_stdout" >/dev/null
+report_fast_json="$(mktemp)"
+"$BIN" report-fast --json > "$report_fast_json"
+python3 -m json.tool "$report_fast_json" >/dev/null
+grep '"title":"Privacy Report"' "$report_fast_json" >/dev/null
+grep '"id":"protected-data"' "$report_fast_json" >/dev/null
+grep '"status":"Protected"' "$report_fast_json" >/dev/null
+grep '"id":"scan-mode"' "$report_fast_json" >/dev/null
+grep 'browser profiles' "$report_fast_json" >/dev/null
+rm -f "$report_fast_json"
 
 report_file="$(mktemp)"
 "$BIN" report --output "$report_file" >/dev/null

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.19.0"
+VERSION="1.20.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -139,7 +139,7 @@ Usage:
   cleanroom snapshots [--json]
   cleanroom history [--json]
   cleanroom report [--output PATH] [--redact]
-  cleanroom report-fast [--output PATH] [--redact]
+  cleanroom report-fast [--json] [--output PATH] [--redact]
   cleanroom clean [options] [--preflight] [--json]
   cleanroom history [--limit N]
   cleanroom restore [--log PATH] [--apply]
@@ -248,7 +248,7 @@ Options:
                        documents, desktop, screenshots, archives, archives-fast, downloads, downloads-fast, installers, nodes, venvs, apps, uninstallers, appreview, appdata, libraries, cloud, cloudfiles, personal, communications,
                        browsers, leftovers, startup, loginitems,
                        trash, backups, xcode, caches, caches-fast, diagnostics, packages, npm-cache, yarn-cache, pnpm-store, cocoapods-cache, pip-cache, receipts, homebrew, homebrew-cleanup, toolchains,
-                       containers, android, snapshots, history, clean --preflight, doctor, protect, guard, or rules.
+                       containers, android, snapshots, history, report-fast, clean --preflight, doctor, protect, guard, or rules.
   --output PATH        Output path for report.
   --redact             Redact home, user, and temporary paths in Markdown reports.
   --preflight          Summarize selected clean options without scanning or deleting.
@@ -8044,7 +8044,45 @@ report_fast_body() {
   printf '%s\n' "- Use the full report only when you need a detailed support artifact."
 }
 
+report_fast_json_body() {
+  local now protected_count cards first kb id title value detail
+  now="$(date '+%Y-%m-%d %H:%M:%S %Z')"
+  protected_count="$(protected_present_count)"
+  cards="$(dashboard_card_rows)"
+
+  printf '{'
+  printf '"version":"%s",' "$(printf '%s' "$VERSION" | json_escape)"
+  printf '"title":"Privacy Report",'
+  printf '"created_at":"%s",' "$(printf '%s' "$now" | json_escape)"
+  printf '"items":['
+  printf '{"id":"protected-data","title":"Protected Data","size":"%s locations","status":"Protected","summary":"Passwords, browser profiles, Keychains, Photos, Mail, Messages, and cloud folders stay protected by default."}' \
+    "$(printf '%s' "$protected_count" | json_escape)"
+  printf ',{"id":"scan-mode","title":"Fast Review","size":"Fast","status":"Responsive","summary":"This privacy review skips deep path sizing to keep the app responsive."}'
+  first=0
+  while IFS=$'\t' read -r kb id title value detail; do
+    [[ -z "${id:-}" ]] && continue
+    printf ','
+    printf '{"id":"%s","title":"%s","size":"%s","status":"Review","category":"Summary","summary":"%s","size_kb":%s}' \
+      "$(printf '%s' "$id" | json_escape)" \
+      "$(printf '%s' "$title" | json_escape)" \
+      "$(printf '%s' "$value" | json_escape)" \
+      "$(printf '%s' "$detail" | json_escape)" \
+      "${kb:-0}"
+  done <<<"$cards"
+  printf ']'
+  printf '}\n'
+}
+
 report_fast() {
+  if [[ "$JSON" -eq 1 ]]; then
+    if [[ -n "$OUTPUT_FILE" ]]; then
+      report_fast_json_body | redact_stream >"$(expand_path "$OUTPUT_FILE")"
+      ok "Wrote quick report: $(redact_string "$(expand_path "$OUTPUT_FILE")")"
+    else
+      report_fast_json_body | redact_stream
+    fi
+    return 0
+  fi
   if [[ -n "$OUTPUT_FILE" ]]; then
     report_fast_body | redact_stream >"$(expand_path "$OUTPUT_FILE")"
     ok "Wrote quick report: $(redact_string "$(expand_path "$OUTPUT_FILE")")"

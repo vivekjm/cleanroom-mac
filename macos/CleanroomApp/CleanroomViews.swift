@@ -373,7 +373,7 @@ final class AppState: ObservableObject {
             "projectcaches", "projectcaches-fast", "updaters", "browsercaches",
             "xcode", "backups", "system-data", "system-data-fast", "containers", "toolchains",
             "loginitems", "startup", "snapshot", "snapshot-fast", "state", "protect", "rules",
-            "map", "map-fast", "doctor", "leftovers", "appreview", "history"
+            "map", "map-fast", "doctor", "leftovers", "appreview", "history", "report-fast"
         ]
         if jsonActions.contains(action), !args.contains("--json") {
             return args + ["--json"]
