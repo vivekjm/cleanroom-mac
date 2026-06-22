@@ -371,7 +371,7 @@ final class AppState: ObservableObject {
             "downloads", "downloads-fast", "archives", "archives-fast", "screenshots", "trash", "cloudfiles", "caches-fast",
             "quicklook", "fontcaches", "webcaches", "savedstate",
             "projectcaches", "projectcaches-fast", "updaters", "browsercaches",
-            "xcode", "backups", "system-data", "system-data-fast", "containers", "toolchains",
+            "xcode", "backups", "system-data", "system-data-fast", "containers", "containers-fast", "toolchains", "toolchains-fast",
             "loginitems", "startup", "snapshot", "snapshot-fast", "state", "protect", "rules",
             "map", "map-fast", "doctor", "leftovers", "appreview", "history", "report-fast"
         ]
@@ -879,8 +879,8 @@ struct SidebarView: View {
                             NavRow("hammer.fill",             "Xcode",       .run(title: "Xcode",       args: "xcode"), state)
                             NavRow("clock.arrow.circlepath",  "Backups",     .run(title: "Backups",     args: "backups"), state)
                             NavRow("externaldrive.fill",      "System Data", .run(title: "System Data", args: "system-data-fast"), state)
-                            NavRow("shippingbox.fill",        "Containers",  .run(title: "Containers",  args: "containers"), state)
-                            NavRow("wrench.and.screwdriver",  "Developer Tools", .run(title: "Developer Tools", args: "toolchains"), state)
+                            NavRow("shippingbox.fill",        "Containers",  .run(title: "Containers",  args: "containers-fast"), state)
+                            NavRow("wrench.and.screwdriver",  "Developer Tools", .run(title: "Developer Tools", args: "toolchains-fast"), state)
                             NavRow("person.crop.circle",      "Login Items", .run(title: "Login Items", args: "loginitems"), state)
                             NavRow("bolt.fill",               "Startup",     .run(title: "Startup",     args: "startup"), state)
                         }

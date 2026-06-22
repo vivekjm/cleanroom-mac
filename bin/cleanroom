@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.20.0"
+VERSION="1.21.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -135,7 +135,9 @@ Usage:
   cleanroom homebrew [--json]
   cleanroom homebrew-cleanup [--json] [--apply --yes]
   cleanroom toolchains [--json]
+  cleanroom toolchains-fast [--json]
   cleanroom containers [--json]
+  cleanroom containers-fast [--json]
   cleanroom snapshots [--json]
   cleanroom history [--json]
   cleanroom report [--output PATH] [--redact]
@@ -247,8 +249,8 @@ Options:
   --json               Emit JSON for dashboard, overview, map, map-fast, snapshot, snapshot-fast, diff, state, permissions, review, scan, system-data, system-data-fast, plan, large, brokenlinks, brokenlinks-fast, quarantine, metadata, quicklook, fontcaches, webcaches, savedstate, projectcaches, updaters, browsercaches, duplicates,
                        documents, desktop, screenshots, archives, archives-fast, downloads, downloads-fast, installers, nodes, venvs, apps, uninstallers, appreview, appdata, libraries, cloud, cloudfiles, personal, communications,
                        browsers, leftovers, startup, loginitems,
-                       trash, backups, xcode, caches, caches-fast, diagnostics, packages, npm-cache, yarn-cache, pnpm-store, cocoapods-cache, pip-cache, receipts, homebrew, homebrew-cleanup, toolchains,
-                       containers, android, snapshots, history, report-fast, clean --preflight, doctor, protect, guard, or rules.
+                       trash, backups, xcode, caches, caches-fast, diagnostics, packages, npm-cache, yarn-cache, pnpm-store, cocoapods-cache, pip-cache, receipts, homebrew, homebrew-cleanup, toolchains, toolchains-fast,
+                       containers, containers-fast, android, snapshots, history, report-fast, clean --preflight, doctor, protect, guard, or rules.
   --output PATH        Output path for report.
   --redact             Redact home, user, and temporary paths in Markdown reports.
   --preflight          Summarize selected clean options without scanning or deleting.
@@ -6572,6 +6574,19 @@ paths_field_kb() {
   printf '%s\n' "$total"
 }
 
+paths_field_present() {
+  local field="$1"
+  local path expanded
+  while IFS= read -r path; do
+    path="${path#"${path%%[![:space:]]*}"}"
+    path="${path%"${path##*[![:space:]]}"}"
+    [[ -z "$path" ]] && continue
+    expanded="$(expand_path "$path")"
+    [[ -e "$expanded" ]] && return 0
+  done < <(printf '%s\n' "$field" | tr ';' '\n')
+  return 1
+}
+
 caches() {
   local rows
   rows="$(cache_rows)"
@@ -7418,6 +7433,55 @@ toolchains() {
   done <<<"$rows"
 }
 
+toolchains_fast() {
+  local rows
+  rows="$(toolchain_rows)"
+
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '['
+    local first=1 id ecosystem paths category preview apply description present status size summary
+    while IFS=$'\t' read -r id ecosystem paths category preview apply description; do
+      [[ -z "${id:-}" ]] && continue
+      if paths_field_present "$paths"; then
+        present=true
+        status="Review"
+        size="Present"
+        summary="$description"
+      else
+        present=false
+        status="Clear"
+        size="Not found"
+        summary="No known local cache root found for this toolchain."
+      fi
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '{"id":"%s","title":"%s","ecosystem":"%s","present":%s,"status":"%s","category":"Developer Cache","size":"%s","summary":"%s","mode":"fast"}' \
+        "$(printf '%s' "$id" | json_escape)" \
+        "$(printf '%s' "$id" | sed 's/-/ /g' | json_escape)" \
+        "$(printf '%s' "$ecosystem" | json_escape)" \
+        "$present" \
+        "$(printf '%s' "$status" | json_escape)" \
+        "$(printf '%s' "$size" | json_escape)" \
+        "$(printf '%s' "$summary" | json_escape)"
+    done <<<"$rows"
+    printf ']\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}quick language toolchains${RESET}"
+  printf 'Fast presence check. Exact sizing is skipped to keep the app responsive.\n\n'
+  local id ecosystem paths category preview apply description status
+  while IFS=$'\t' read -r id ecosystem paths category preview apply description; do
+    [[ -z "${id:-}" ]] && continue
+    if paths_field_present "$paths"; then
+      status="present"
+    else
+      status="not found"
+    fi
+    printf '%-12s %-18s %s\n' "$status" "$ecosystem" "$id"
+  done <<<"$rows"
+}
+
 toolchain_total_kb() {
   local id ecosystem paths category preview apply description total=0 kb
   while IFS=$'\t' read -r id ecosystem paths category preview apply description; do
@@ -7467,6 +7531,56 @@ containers() {
     printf '  safety: %s\n' "$safety"
     printf '  paths: %s\n' "$paths"
     printf '  %s\n' "$description"
+  done <<<"$rows"
+}
+
+containers_fast() {
+  local rows
+  rows="$(container_rows)"
+
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '['
+    local first=1 id runtime paths safety preview apply description present status size summary
+    while IFS=$'\t' read -r id runtime paths safety preview apply description; do
+      [[ -z "${id:-}" ]] && continue
+      if paths_field_present "$paths"; then
+        present=true
+        status="Review"
+        size="Present"
+        summary="$description"
+      else
+        present=false
+        status="Clear"
+        size="Not found"
+        summary="No known local container storage root found for this runtime."
+      fi
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '{"id":"%s","title":"%s","runtime":"%s","present":%s,"status":"%s","safety":"%s","size":"%s","summary":"%s","mode":"fast"}' \
+        "$(printf '%s' "$id" | json_escape)" \
+        "$(printf '%s' "$id" | sed 's/-/ /g' | json_escape)" \
+        "$(printf '%s' "$runtime" | json_escape)" \
+        "$present" \
+        "$(printf '%s' "$status" | json_escape)" \
+        "$(printf '%s' "$safety" | json_escape)" \
+        "$(printf '%s' "$size" | json_escape)" \
+        "$(printf '%s' "$summary" | json_escape)"
+    done <<<"$rows"
+    printf ']\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}quick container storage${RESET}"
+  printf 'Fast presence check. Exact sizing is skipped because VM stores can be large.\n\n'
+  local id runtime paths safety preview apply description status
+  while IFS=$'\t' read -r id runtime paths safety preview apply description; do
+    [[ -z "${id:-}" ]] && continue
+    if paths_field_present "$paths"; then
+      status="present"
+    else
+      status="not found"
+    fi
+    printf '%-12s %-16s %s\n' "$status" "$runtime" "$id"
   done <<<"$rows"
 }
 
@@ -8711,7 +8825,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  dashboard|overview|map|map-fast|mapfast|snapshot|snapshot-fast|snapshotfast|diff|state|permissions|review|scan|system-data|system-data-fast|systemdata-fast|systemdatafast|plan|large|large-fast|largefast|brokenlinks|brokenlinks-fast|brokenlinksfast|broken-links-fast|broken-linksfast|quarantine|quarantine-fast|quarantinefast|metadata|metadata-fast|metadatafast|quicklook|fontcaches|font-caches|webcaches|web-caches|savedstate|saved-state|projectcaches|project-caches|projectcaches-fast|projectcachesfast|project-caches-fast|project-cachesfast|developer-fast|developerfast|updaters|updater-caches|browsercaches|browser-caches|duplicates|duplicates-fast|duplicatesfast|documents|desktop|screenshots|archives|archives-fast|archivesfast|downloads|downloads-fast|downloadsfast|installers|nodes|nodes-fast|nodesfast|venvs|venvs-fast|venvsfast|virtualenvs|virtualenvs-fast|virtualenvsfast|apps|apps-fast|appsfast|uninstallers|appreview|appdata|libraries|cloud|cloudfiles|cloud-files|personal|communications|comms|browsers|leftovers|backups|xcode|android|startup|loginitems|trash|caches|caches-fast|cachesfast|diagnostics|packages|npm-cache|npmcache|yarn-cache|yarncache|pnpm-store|pnpmstore|cocoapods-cache|pod-cache|podcache|pip-cache|pipcache|receipts|homebrew|homebrew-cleanup|brewcleanup|toolchains|containers|snapshots|report|report-fast|reportfast|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
+  dashboard|overview|map|map-fast|mapfast|snapshot|snapshot-fast|snapshotfast|diff|state|permissions|review|scan|system-data|system-data-fast|systemdata-fast|systemdatafast|plan|large|large-fast|largefast|brokenlinks|brokenlinks-fast|brokenlinksfast|broken-links-fast|broken-linksfast|quarantine|quarantine-fast|quarantinefast|metadata|metadata-fast|metadatafast|quicklook|fontcaches|font-caches|webcaches|web-caches|savedstate|saved-state|projectcaches|project-caches|projectcaches-fast|projectcachesfast|project-caches-fast|project-cachesfast|developer-fast|developerfast|updaters|updater-caches|browsercaches|browser-caches|duplicates|duplicates-fast|duplicatesfast|documents|desktop|screenshots|archives|archives-fast|archivesfast|downloads|downloads-fast|downloadsfast|installers|nodes|nodes-fast|nodesfast|venvs|venvs-fast|venvsfast|virtualenvs|virtualenvs-fast|virtualenvsfast|apps|apps-fast|appsfast|uninstallers|appreview|appdata|libraries|cloud|cloudfiles|cloud-files|personal|communications|comms|browsers|leftovers|backups|xcode|android|startup|loginitems|trash|caches|caches-fast|cachesfast|diagnostics|packages|npm-cache|npmcache|yarn-cache|yarncache|pnpm-store|pnpmstore|cocoapods-cache|pod-cache|podcache|pip-cache|pipcache|receipts|homebrew|homebrew-cleanup|brewcleanup|toolchains|toolchains-fast|toolchainsfast|containers|containers-fast|containersfast|snapshots|report|report-fast|reportfast|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -8896,7 +9010,9 @@ case "$ACTION" in
   homebrew) homebrew ;;
   homebrew-cleanup|brewcleanup) homebrew_cleanup ;;
   toolchains) toolchains ;;
+  toolchains-fast|toolchainsfast) toolchains_fast ;;
   containers) containers ;;
+  containers-fast|containersfast) containers_fast ;;
   snapshots) snapshots ;;
   report) report ;;
   report-fast|reportfast) report_fast ;;

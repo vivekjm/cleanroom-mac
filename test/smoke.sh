@@ -1220,6 +1220,14 @@ python3 -m json.tool "$toolchains_json" >/dev/null
 grep 'maven-repository' "$toolchains_json" >/dev/null
 grep 'cleanroom clean --apply --trash --include-toolchains' "$toolchains_json" >/dev/null
 rm -f "$toolchains_json"
+"$BIN" toolchains-fast | grep 'quick language toolchains' >/dev/null
+toolchains_fast_json="$(mktemp)"
+"$BIN" toolchains-fast --json > "$toolchains_fast_json"
+python3 -m json.tool "$toolchains_fast_json" >/dev/null
+grep '"mode":"fast"' "$toolchains_fast_json" >/dev/null
+grep '"category":"Developer Cache"' "$toolchains_fast_json" >/dev/null
+grep '"size":"Present"' "$toolchains_fast_json" >/dev/null
+rm -f "$toolchains_fast_json"
 toolchain_log="$TEST_HOME/toolchains-apply.log"
 "$BIN" clean --include-toolchains --apply --trash --yes --log "$toolchain_log" >/dev/null
 test ! -e "$TEST_HOME/go/pkg/mod"
@@ -1235,6 +1243,14 @@ grep 'podman-storage' "$containers_json" >/dev/null
 grep '"safety":"high-impact"' "$containers_json" >/dev/null
 grep 'cleanroom clean --apply --trash --include-containers' "$containers_json" >/dev/null
 rm -f "$containers_json"
+"$BIN" containers-fast | grep 'quick container storage' >/dev/null
+containers_fast_json="$(mktemp)"
+"$BIN" containers-fast --json > "$containers_fast_json"
+python3 -m json.tool "$containers_fast_json" >/dev/null
+grep '"mode":"fast"' "$containers_fast_json" >/dev/null
+grep '"safety":"high-impact"' "$containers_fast_json" >/dev/null
+grep '"size":"Present"' "$containers_fast_json" >/dev/null
+rm -f "$containers_fast_json"
 "$BIN" caches | grep 'user-caches' >/dev/null
 caches_json="$(mktemp)"
 "$BIN" caches --json > "$caches_json"
