@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.21.0"
+VERSION="1.22.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -117,7 +117,9 @@ Usage:
   cleanroom browsers [--json]
   cleanroom leftovers QUERY... [--limit N] [--json] [--apply --trash]
   cleanroom backups [--json]
+  cleanroom backups-fast [--json]
   cleanroom xcode [--json]
+  cleanroom xcode-fast [--json]
   cleanroom android [--json]
   cleanroom startup [--json]
   cleanroom loginitems [--json]
@@ -249,7 +251,7 @@ Options:
   --json               Emit JSON for dashboard, overview, map, map-fast, snapshot, snapshot-fast, diff, state, permissions, review, scan, system-data, system-data-fast, plan, large, brokenlinks, brokenlinks-fast, quarantine, metadata, quicklook, fontcaches, webcaches, savedstate, projectcaches, updaters, browsercaches, duplicates,
                        documents, desktop, screenshots, archives, archives-fast, downloads, downloads-fast, installers, nodes, venvs, apps, uninstallers, appreview, appdata, libraries, cloud, cloudfiles, personal, communications,
                        browsers, leftovers, startup, loginitems,
-                       trash, backups, xcode, caches, caches-fast, diagnostics, packages, npm-cache, yarn-cache, pnpm-store, cocoapods-cache, pip-cache, receipts, homebrew, homebrew-cleanup, toolchains, toolchains-fast,
+                       trash, backups, backups-fast, xcode, xcode-fast, caches, caches-fast, diagnostics, packages, npm-cache, yarn-cache, pnpm-store, cocoapods-cache, pip-cache, receipts, homebrew, homebrew-cleanup, toolchains, toolchains-fast,
                        containers, containers-fast, android, snapshots, history, report-fast, clean --preflight, doctor, protect, guard, or rules.
   --output PATH        Output path for report.
   --redact             Redact home, user, and temporary paths in Markdown reports.
@@ -5887,6 +5889,24 @@ backup_rows() {
   return 0
 }
 
+backup_fast_rows() {
+  local root="$HOME/Library/Application Support/MobileSync/Backup"
+  [[ -d "$root" ]] || return 0
+  local path info epoch device product last_backup
+  while IFS= read -r -d '' path; do
+    info="$path/Info.plist"
+    epoch="$(path_mtime_epoch "$path")"
+    device="$(backup_value "$info" "Device Name")"
+    product="$(backup_value "$info" "Product Name")"
+    last_backup="$(backup_value "$info" "Last Backup Date")"
+    [[ -n "$device" ]] || device="$(basename "$path")"
+    printf '%s\t%s\t%s\t%s\t%s\n' "$epoch" "$device" "$product" "$last_backup" "$path"
+  done < <(find "$root" -mindepth 1 -maxdepth 1 -type d -print0 2>/dev/null) |
+    sort -rn |
+    head -n "$LIMIT"
+  return 0
+}
+
 backup_cleanup_rows() {
   local cutoff kb epoch device product last_backup path
   cutoff=$(( $(date +%s) - DAYS * 86400 ))
@@ -6013,6 +6033,56 @@ backups() {
   printf 'Opt-in cleanup apply: cleanroom clean --include-device-backups --days %s --apply --trash\n' "$DAYS"
 }
 
+backups_fast() {
+  local rows cutoff
+  rows="$(backup_fast_rows)"
+  cutoff=$(( $(date +%s) - DAYS * 86400 ))
+
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '['
+    local first=1 epoch device product last_backup path eligible status summary
+    while IFS=$'\t' read -r epoch device product last_backup path; do
+      [[ -z "${path:-}" ]] && continue
+      if [[ "${epoch:-0}" -le "$cutoff" ]]; then
+        eligible=true
+        status="Review"
+        summary="Older local device backup. Confirm you have another backup before cleaning."
+      else
+        eligible=false
+        status="Protected"
+        summary="Recent local device backup. Cleanroom keeps device backups protected by default."
+      fi
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '{"title":"%s","device_name":"%s","product_name":"%s","last_backup":"%s","path":"%s","present":true,"protected":true,"cleanup_eligible":%s,"status":"%s","size":"Protected","modified_epoch":%s,"modified":"%s","summary":"%s","mode":"fast"}' \
+        "$(printf '%s' "$device" | json_escape)" \
+        "$(printf '%s' "$device" | json_escape)" \
+        "$(printf '%s' "$product" | json_escape)" \
+        "$(printf '%s' "$last_backup" | json_escape)" \
+        "$(printf '%s' "$path" | json_escape)" \
+        "$eligible" \
+        "$(printf '%s' "$status" | json_escape)" \
+        "${epoch:-0}" \
+        "$(file_mtime_iso "${epoch:-0}" | json_escape)" \
+        "$(printf '%s' "$summary" | json_escape)"
+    done <<<"$rows"
+    printf ']\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}quick local device backups${RESET}"
+  printf 'Fast presence check. Exact sizing is skipped because backups can be very large.\n\n'
+  if [[ -z "$rows" ]]; then
+    printf 'No local MobileSync backups found.\n'
+    return 0
+  fi
+  local epoch device product last_backup path
+  while IFS=$'\t' read -r epoch device product last_backup path; do
+    [[ -z "${path:-}" ]] && continue
+    printf '%-12s %-24s %s\n' "$(file_mtime_iso "${epoch:-0}")" "$device" "${product:-Device backup}"
+  done <<<"$rows"
+}
+
 xcode_rows() {
   printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "derived-data" "DerivedData" "rebuildable" "~/Library/Developer/Xcode/DerivedData" "cleanroom clean" "cleanroom clean --apply --trash" "Xcode build intermediates and indexes. Usually safe to rebuild."
   printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "simulator-caches" "Simulator Caches" "rebuildable" "~/Library/Developer/CoreSimulator/Caches" "cleanroom clean" "cleanroom clean --apply --trash" "CoreSimulator cache data. Recreated by simulator tooling."
@@ -6068,6 +6138,58 @@ xcode() {
     printf '  preview: %s\n' "$preview"
     printf '  apply: %s\n' "$apply"
     printf '  %s\n' "$notes"
+  done <<<"$rows"
+}
+
+xcode_fast() {
+  local rows
+  rows="$(xcode_rows)"
+
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '['
+    local first=1 id title safety path_template preview apply notes path present status size summary
+    while IFS=$'\t' read -r id title safety path_template preview apply notes; do
+      [[ -z "${id:-}" ]] && continue
+      path="$(expand_path "$path_template")"
+      if [[ -e "$path" ]]; then
+        present=true
+        status="Review"
+        size="Present"
+        summary="$notes"
+      else
+        present=false
+        status="Clear"
+        size="Not found"
+        summary="No known local Xcode storage found for this area."
+      fi
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '{"id":"%s","title":"%s","safety":"%s","path":"%s","present":%s,"status":"%s","size":"%s","summary":"%s","mode":"fast"}' \
+        "$(printf '%s' "$id" | json_escape)" \
+        "$(printf '%s' "$title" | json_escape)" \
+        "$(printf '%s' "$safety" | json_escape)" \
+        "$(printf '%s' "$path" | json_escape)" \
+        "$present" \
+        "$(printf '%s' "$status" | json_escape)" \
+        "$(printf '%s' "$size" | json_escape)" \
+        "$(printf '%s' "$summary" | json_escape)"
+    done <<<"$rows"
+    printf ']\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}quick Xcode storage${RESET}"
+  printf 'Fast presence check. Exact sizing is skipped to keep the app responsive.\n\n'
+  local id title safety path_template preview apply notes path status
+  while IFS=$'\t' read -r id title safety path_template preview apply notes; do
+    [[ -z "${id:-}" ]] && continue
+    path="$(expand_path "$path_template")"
+    if [[ -e "$path" ]]; then
+      status="present"
+    else
+      status="not found"
+    fi
+    printf '%-12s %-22s %s\n' "$status" "$safety" "$title"
   done <<<"$rows"
 }
 
@@ -8825,7 +8947,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  dashboard|overview|map|map-fast|mapfast|snapshot|snapshot-fast|snapshotfast|diff|state|permissions|review|scan|system-data|system-data-fast|systemdata-fast|systemdatafast|plan|large|large-fast|largefast|brokenlinks|brokenlinks-fast|brokenlinksfast|broken-links-fast|broken-linksfast|quarantine|quarantine-fast|quarantinefast|metadata|metadata-fast|metadatafast|quicklook|fontcaches|font-caches|webcaches|web-caches|savedstate|saved-state|projectcaches|project-caches|projectcaches-fast|projectcachesfast|project-caches-fast|project-cachesfast|developer-fast|developerfast|updaters|updater-caches|browsercaches|browser-caches|duplicates|duplicates-fast|duplicatesfast|documents|desktop|screenshots|archives|archives-fast|archivesfast|downloads|downloads-fast|downloadsfast|installers|nodes|nodes-fast|nodesfast|venvs|venvs-fast|venvsfast|virtualenvs|virtualenvs-fast|virtualenvsfast|apps|apps-fast|appsfast|uninstallers|appreview|appdata|libraries|cloud|cloudfiles|cloud-files|personal|communications|comms|browsers|leftovers|backups|xcode|android|startup|loginitems|trash|caches|caches-fast|cachesfast|diagnostics|packages|npm-cache|npmcache|yarn-cache|yarncache|pnpm-store|pnpmstore|cocoapods-cache|pod-cache|podcache|pip-cache|pipcache|receipts|homebrew|homebrew-cleanup|brewcleanup|toolchains|toolchains-fast|toolchainsfast|containers|containers-fast|containersfast|snapshots|report|report-fast|reportfast|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
+  dashboard|overview|map|map-fast|mapfast|snapshot|snapshot-fast|snapshotfast|diff|state|permissions|review|scan|system-data|system-data-fast|systemdata-fast|systemdatafast|plan|large|large-fast|largefast|brokenlinks|brokenlinks-fast|brokenlinksfast|broken-links-fast|broken-linksfast|quarantine|quarantine-fast|quarantinefast|metadata|metadata-fast|metadatafast|quicklook|fontcaches|font-caches|webcaches|web-caches|savedstate|saved-state|projectcaches|project-caches|projectcaches-fast|projectcachesfast|project-caches-fast|project-cachesfast|developer-fast|developerfast|updaters|updater-caches|browsercaches|browser-caches|duplicates|duplicates-fast|duplicatesfast|documents|desktop|screenshots|archives|archives-fast|archivesfast|downloads|downloads-fast|downloadsfast|installers|nodes|nodes-fast|nodesfast|venvs|venvs-fast|venvsfast|virtualenvs|virtualenvs-fast|virtualenvsfast|apps|apps-fast|appsfast|uninstallers|appreview|appdata|libraries|cloud|cloudfiles|cloud-files|personal|communications|comms|browsers|leftovers|backups|backups-fast|backupsfast|xcode|xcode-fast|xcodefast|android|startup|loginitems|trash|caches|caches-fast|cachesfast|diagnostics|packages|npm-cache|npmcache|yarn-cache|yarncache|pnpm-store|pnpmstore|cocoapods-cache|pod-cache|podcache|pip-cache|pipcache|receipts|homebrew|homebrew-cleanup|brewcleanup|toolchains|toolchains-fast|toolchainsfast|containers|containers-fast|containersfast|snapshots|report|report-fast|reportfast|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -8992,7 +9114,9 @@ case "$ACTION" in
   browsers) browsers ;;
   leftovers) leftovers ;;
   backups) backups ;;
+  backups-fast|backupsfast) backups_fast ;;
   xcode) xcode ;;
+  xcode-fast|xcodefast) xcode_fast ;;
   android) android ;;
   startup) startup ;;
   loginitems) loginitems ;;

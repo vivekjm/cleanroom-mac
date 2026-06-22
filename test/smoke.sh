@@ -1068,6 +1068,14 @@ grep '"protected":true' "$backups_json" >/dev/null
 grep '"cleanup_eligible":true' "$backups_json" >/dev/null
 grep 'cleanroom clean --include-device-backups --days 30 --apply --trash' "$backups_json" >/dev/null
 rm -f "$backups_json"
+"$BIN" backups-fast | grep 'quick local device backups' >/dev/null
+backups_fast_json="$(mktemp)"
+"$BIN" backups-fast --json > "$backups_fast_json"
+python3 -m json.tool "$backups_fast_json" >/dev/null
+grep '"mode":"fast"' "$backups_fast_json" >/dev/null
+grep '"protected":true' "$backups_fast_json" >/dev/null
+grep '"size":"Protected"' "$backups_fast_json" >/dev/null
+rm -f "$backups_fast_json"
 device_backups_log="$TEST_HOME/device-backups-apply.log"
 "$BIN" clean --include-device-backups --days 30 --apply --trash --yes --log "$device_backups_log" >/dev/null
 test ! -e "$TEST_HOME/Library/Application Support/MobileSync/Backup/FakeDeviceBackup"
@@ -1083,6 +1091,14 @@ grep '"id":"xcode-archives"' "$xcode_json" >/dev/null
 grep '"safety":"review-only"' "$xcode_json" >/dev/null
 grep 'cleanroom clean --apply --trash --include-dev-heavy' "$xcode_json" >/dev/null
 rm -f "$xcode_json"
+"$BIN" xcode-fast | grep 'quick Xcode storage' >/dev/null
+xcode_fast_json="$(mktemp)"
+"$BIN" xcode-fast --json > "$xcode_fast_json"
+python3 -m json.tool "$xcode_fast_json" >/dev/null
+grep '"mode":"fast"' "$xcode_fast_json" >/dev/null
+grep '"id":"xcode-archives"' "$xcode_fast_json" >/dev/null
+grep '"size":"Present"' "$xcode_fast_json" >/dev/null
+rm -f "$xcode_fast_json"
 "$BIN" android | grep 'Android Virtual Devices' >/dev/null
 android_json="$(mktemp)"
 "$BIN" android --json > "$android_json"
