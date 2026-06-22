@@ -450,6 +450,9 @@ final class AppState: ObservableObject {
             if let available = object["available"] as? Bool, !available {
                 return []
             }
+            if let preflightItems = preflightReviewItems(from: object) {
+                return appFacingItems(preflightItems)
+            }
             if let array = object["items"] as? [[String: Any]] {
                 return appFacingItems(array)
             }
@@ -476,6 +479,52 @@ final class AppState: ObservableObject {
             }
         }
         return nil
+    }
+
+    private func preflightReviewItems(from object: [String: Any]) -> [[String: Any]]? {
+        guard stringValue(object["action"]) == "clean",
+              let categories = object["categories"] as? [[String: Any]] else {
+            return nil
+        }
+
+        var items: [[String: Any]] = categories.map { item in
+            let title = stringValue(item["title"]) ?? stringValue(item["id"]) ?? "Cleanup Area"
+            let safety = Self.friendlySafety(stringValue(item["safety"]))
+            let recovery = Self.friendlyRecovery(stringValue(item["recoverability"]))
+            return [
+                "title": title,
+                "size": "Selected",
+                "status": safety,
+                "summary": recovery
+            ]
+        }
+
+        let warnings = object["warnings"] as? [String] ?? []
+        for warning in warnings {
+            let note = Self.friendlyCleanupNote(warning)
+            let status = note.localizedCaseInsensitiveContains("cannot be restored") ||
+                note.localizedCaseInsensitiveContains("can remove")
+                ? "Review"
+                : "Protected"
+            items.append([
+                "title": "Safety Note",
+                "size": status,
+                "status": status,
+                "summary": note
+            ])
+        }
+
+        let apply = (object["apply"] as? Bool) == true
+        items.insert([
+            "title": apply ? "Ready To Clean" : "Review Only",
+            "size": apply ? "Ready" : "Preview",
+            "status": apply ? "Review" : "Protected",
+            "summary": apply
+                ? "Cleaning will only start after confirmation."
+                : "No files are changed in this review."
+        ], at: 0)
+
+        return items
     }
 
     private func doctorReviewItems(from object: [String: Any]) -> [[String: Any]]? {
@@ -784,6 +833,21 @@ final class AppState: ObservableObject {
         if raw.localizedCaseInsensitiveContains("Trash mode can recover") {
             return "Moved to Trash where possible."
         }
+        if raw.localizedCaseInsensitiveContains("direct removals") {
+            return "Moved to Trash where possible."
+        }
+        if raw.localizedCaseInsensitiveContains("downloaded again") {
+            return "Can be downloaded again if needed."
+        }
+        if raw.localizedCaseInsensitiveContains("rebuilt") {
+            return "Can be rebuilt by the related app or developer tool."
+        }
+        if raw.localizedCaseInsensitiveContains("Virtualenvs may need") {
+            return "Can be recreated from the project setup."
+        }
+        if raw.localizedCaseInsensitiveContains("Dependencies may need") {
+            return "Can be reinstalled from the project manifest."
+        }
         if raw.contains("--") || raw.localizedCaseInsensitiveContains("dry-run") {
             return "Review first; cleaning only happens after confirmation."
         }
@@ -794,6 +858,15 @@ final class AppState: ObservableObject {
     nonisolated private static func friendlyCleanupNote(_ raw: String) -> String {
         if raw.localizedCaseInsensitiveContains("Dry-run mode") {
             return "This is only a review until you choose Clean Now."
+        }
+        if raw.localizedCaseInsensitiveContains("Apply mode is enabled") {
+            return "Cleaning will only start after you confirm."
+        }
+        if raw.localizedCaseInsensitiveContains("Trash mode is enabled") {
+            return "Eligible files move to Trash for easier recovery."
+        }
+        if raw.localizedCaseInsensitiveContains("Trash mode is not enabled") {
+            return "Use safe cleanup to keep eligible files recoverable from Trash."
         }
         if raw.localizedCaseInsensitiveContains("Protected browser profiles") {
             return "Passwords, browser profiles, Photos, Mail, Messages, and cloud folders stay protected."
