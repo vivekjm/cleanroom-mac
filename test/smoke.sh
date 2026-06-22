@@ -1459,6 +1459,27 @@ grep 'mode=trash' "$apply_log" >/dev/null
 grep 'trash	ok' "$apply_log" >/dev/null
 test ! -e "$HOME/.npm/_cacache"
 find "$HOME/.Trash" -name _cacache -print -quit | grep _cacache >/dev/null
+history_dir="$HOME/.local/state/cleanroom/runs"
+mkdir -p "$history_dir"
+history_log="$history_dir/history-test.log"
+{
+  printf '# cleanroom apply log\n'
+  printf 'version=%s\n' "$("$BIN" --version)"
+  printf 'run_id=history-test\n'
+  printf 'mode=trash\n'
+  printf 'started_at=2026-06-22 10:30:00 IST\n'
+  printf 'timestamp\taction\tstatus\tsize_kb\tpath\ttarget\n'
+  printf '2026-06-22 10:30:00 IST\ttrash\tok\t1\t%s\t%s\n' "$HOME/.npm/_cacache" "$HOME/.Trash/cleanroom-history-test/_cacache"
+} >"$history_log"
+history_json="$(mktemp)"
+"$BIN" history --json > "$history_json"
+python3 -m json.tool "$history_json" >/dev/null
+grep '"title":"Cleanup on 2026-06-22 10:30:00 IST"' "$history_json" >/dev/null
+grep '"status":"restorable"' "$history_json" >/dev/null
+grep '"size":"1 items"' "$history_json" >/dev/null
+grep '"record_path":' "$history_json" >/dev/null
+! grep '"path":' "$history_json" >/dev/null
+rm -f "$history_json" "$history_log"
 restore_preview="$("$BIN" restore --log "$apply_log" 2>&1)"
 grep 'Restore dry-run mode' <<<"$restore_preview" >/dev/null
 grep 'would restore' <<<"$restore_preview" >/dev/null

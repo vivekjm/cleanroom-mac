@@ -1,4 +1,4 @@
-.TH CLEANROOM 1 "June 2026" "cleanroom 1.17.0" "User Commands"
+.TH CLEANROOM 1 "June 2026" "cleanroom 1.18.0" "User Commands"
 .SH NAME
 cleanroom \- safe-by-default macOS storage cleaner
 .SH SYNOPSIS
@@ -229,6 +229,9 @@ cleanroom \- safe-by-default macOS storage cleaner
 .br
 .B cleanroom
 .RI "snapshots [--json]"
+.br
+.B cleanroom
+.RI "history [--json]"
 .br
 .B cleanroom
 .RI "report [--output path] [--redact]"
@@ -748,6 +751,8 @@ cleanroom homebrew-cleanup --apply --yes
 cleanroom toolchains --json
 cleanroom containers --json
 cleanroom snapshots --json
+.P
+cleanroom history --json
 cleanroom report --output cleanroom-report.md
 cleanroom report --redact --output cleanroom-report.md
 cleanroom doctor --json

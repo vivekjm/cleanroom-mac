@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.17.0"
+VERSION="1.18.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -137,6 +137,7 @@ Usage:
   cleanroom toolchains [--json]
   cleanroom containers [--json]
   cleanroom snapshots [--json]
+  cleanroom history [--json]
   cleanroom report [--output PATH] [--redact]
   cleanroom report-fast [--output PATH] [--redact]
   cleanroom clean [options] [--preflight] [--json]
@@ -247,7 +248,7 @@ Options:
                        documents, desktop, screenshots, archives, archives-fast, downloads, downloads-fast, installers, nodes, venvs, apps, uninstallers, appreview, appdata, libraries, cloud, cloudfiles, personal, communications,
                        browsers, leftovers, startup, loginitems,
                        trash, backups, xcode, caches, caches-fast, diagnostics, packages, npm-cache, yarn-cache, pnpm-store, cocoapods-cache, pip-cache, receipts, homebrew, homebrew-cleanup, toolchains,
-                       containers, android, snapshots, clean --preflight, doctor, protect, guard, or rules.
+                       containers, android, snapshots, history, clean --preflight, doctor, protect, guard, or rules.
   --output PATH        Output path for report.
   --redact             Redact home, user, and temporary paths in Markdown reports.
   --preflight          Summarize selected clean options without scanning or deleting.
@@ -1056,10 +1057,49 @@ history() {
   local dir count file
   dir="$(log_dir)"
   if [[ ! -d "$dir" ]]; then
+    if [[ "$JSON" -eq 1 ]]; then
+      printf '[]\n'
+      return 0
+    fi
     warn "No cleanroom history found: $dir"
     return 0
   fi
   count=0
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '['
+    find "$dir" -type f -name '*.log' -exec ls -t {} + 2>/dev/null |
+      while IFS= read -r file; do
+        [[ -f "$file" ]] || continue
+        count=$((count + 1))
+        [[ "$count" -gt "$LIMIT" ]] && break
+        local started mode entries status title summary size
+        started="$(awk -F= '/^started_at=/{print $2; exit}' "$file")"
+        mode="$(awk -F= '/^mode=/{print $2; exit}' "$file")"
+        entries="$(awk -F '\t' '$2 == "trash" && $3 == "ok" {count++} END {print count + 0}' "$file")"
+        if [[ "${mode:-}" == "trash" && "${entries:-0}" -gt 0 ]]; then
+          status="restorable"
+          summary="Items were moved to Trash where possible and may be restorable."
+        else
+          status="record"
+          summary="Cleanup record saved."
+        fi
+        title="Cleanup on ${started:-unknown date}"
+        size="${entries:-0} items"
+        [[ "$count" -gt 1 ]] && printf ','
+        printf '{'
+        printf '"id":"cleanup-history-%s",' "$count"
+        printf '"title":"%s",' "$(printf '%s' "$title" | json_escape)"
+        printf '"status":"%s",' "$(printf '%s' "$status" | json_escape)"
+        printf '"mode":"%s",' "$(printf '%s' "${mode:-unknown}" | json_escape)"
+        printf '"size":"%s",' "$(printf '%s' "$size" | json_escape)"
+        printf '"started":"%s",' "$(printf '%s' "${started:-unknown}" | json_escape)"
+        printf '"summary":"%s",' "$(printf '%s' "$summary" | json_escape)"
+        printf '"record_path":"%s"' "$(printf '%s' "$file" | json_escape)"
+        printf '}'
+      done
+    printf ']\n'
+    return 0
+  fi
   printf '%s\n' "${BOLD}cleanroom history${RESET}"
   find "$dir" -type f -name '*.log' -exec ls -t {} + 2>/dev/null |
     while IFS= read -r file; do
