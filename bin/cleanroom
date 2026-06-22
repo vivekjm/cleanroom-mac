@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.28.0"
+VERSION="1.29.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -90,6 +90,7 @@ Usage:
   cleanroom developer-fast [PATH] [--days N] [--limit N] [--json]
   cleanroom updaters [--json]
   cleanroom browsercaches [--json]
+  cleanroom browsercaches-fast [--json]
   cleanroom duplicates [PATH] [--min-mb N] [--limit N] [--json]
   cleanroom duplicates-fast [PATH] [--min-mb N] [--limit N] [--json]
   cleanroom documents [PATH] [--limit N] [--json]
@@ -186,6 +187,7 @@ Actions:
   projectcaches        Inventory Python/dev project cache folders and files.
   updaters             Inventory app updater cache and staging folders.
   browsercaches        Inventory Chromium and Firefox browser cache folders.
+  browsercaches-fast   Quickly review browser cache locations without deep sizing.
   duplicates           Deep-scan exact duplicate files for review.
   duplicates-fast      Quickly preview duplicate groups using Spotlight size hints.
   documents            Rank top-level user folders/files for review without deleting anything.
@@ -2108,6 +2110,31 @@ browsercache_rows() {
   done < <(browsercache_fixed_roots)
 }
 
+browsercache_fast_rows() {
+  local browser root_template root path name
+  while IFS=$'\t' read -r browser root_template; do
+    [[ -z "${browser:-}" ]] && continue
+    root="$(expand_path "$root_template")"
+    [[ -d "$root" ]] || continue
+    find "$root" -maxdepth 3 -type d \( \
+      -name 'Cache' -o -name 'Code Cache' -o -name 'GPUCache' -o -name 'DawnCache' \
+      -o -name 'ShaderCache' -o -name 'GrShaderCache' -o -name 'CachedData' \
+    \) -prune -print0 2>/dev/null |
+      while IFS= read -r -d '' path; do
+        name="$(basename "$path")"
+        printf '%s\t%s\t%s\t%s\n' "$browser" "chromium-cache" "$name" "$path"
+      done
+  done < <(browsercache_profile_roots)
+
+  local id
+  while IFS=$'\t' read -r browser id root_template; do
+    [[ -z "${browser:-}" ]] && continue
+    path="$(expand_path "$root_template")"
+    [[ -e "$path" ]] || continue
+    printf '%s\t%s\t%s\t%s\n' "$browser" "$id" "$(basename "$path")" "$path"
+  done < <(browsercache_fixed_roots)
+}
+
 browsercache_rows_sorted() {
   browsercache_rows | sort -t $'\t' -k1,1rn -k2,2
 }
@@ -2166,6 +2193,44 @@ browsercaches() {
   done <<<"$rows"
   printf '\nPreview cleanup with: cleanroom clean --include-browser-caches\n'
   printf 'Apply cleanup with: cleanroom clean --apply --trash --include-browser-caches\n'
+}
+
+browsercaches_fast() {
+  local rows
+  rows="$(browsercache_fast_rows | sort -t $'\t' -k1,1 -k3,3 | head -n "$LIMIT")"
+
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '['
+    local first=1 browser kind name path
+    while IFS=$'\t' read -r browser kind name path; do
+      [[ -z "${path:-}" ]] && continue
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '{"title":"%s","browser":"%s","kind":"%s","name":"%s","path":"%s","size":"Review","status":"Review","summary":"%s","mode":"fast"}' \
+        "$(printf '%s Cache' "$browser" | json_escape)" \
+        "$(printf '%s' "$browser" | json_escape)" \
+        "$(printf '%s' "$kind" | json_escape)" \
+        "$(printf '%s' "$name" | json_escape)" \
+        "$(printf '%s' "$path" | json_escape)" \
+        "$(printf 'Rebuildable cache location. Profiles, passwords, cookies, bookmarks, sessions, extensions, and settings stay protected.' | json_escape)"
+    done <<<"$rows"
+    printf ']\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}quick browser caches${RESET}"
+  printf 'Fast presence check. Exact sizing is skipped to keep the desktop app responsive.\n\n'
+  if [[ -z "$rows" ]]; then
+    printf 'No Chromium/Firefox browser cache folders found.\n'
+    return 0
+  fi
+
+  printf '%-18s %-16s %s\n' "browser" "cache" "status"
+  local browser kind name path
+  while IFS=$'\t' read -r browser kind name path; do
+    [[ -z "${path:-}" ]] && continue
+    printf '%-18s %-16s %s\n' "$browser" "$name" "review"
+  done <<<"$rows"
 }
 
 clean_browser_caches() {
@@ -8988,7 +9053,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  dashboard|overview|map|map-fast|mapfast|snapshot|snapshot-fast|snapshotfast|diff|state|permissions|review|scan|system-data|system-data-fast|systemdata-fast|systemdatafast|plan|large|large-fast|largefast|brokenlinks|brokenlinks-fast|brokenlinksfast|broken-links-fast|broken-linksfast|quarantine|quarantine-fast|quarantinefast|metadata|metadata-fast|metadatafast|quicklook|fontcaches|font-caches|webcaches|web-caches|savedstate|saved-state|projectcaches|project-caches|projectcaches-fast|projectcachesfast|project-caches-fast|project-cachesfast|developer-fast|developerfast|updaters|updater-caches|browsercaches|browser-caches|duplicates|duplicates-fast|duplicatesfast|documents|desktop|screenshots|archives|archives-fast|archivesfast|downloads|downloads-fast|downloadsfast|installers|nodes|nodes-fast|nodesfast|venvs|venvs-fast|venvsfast|virtualenvs|virtualenvs-fast|virtualenvsfast|apps|apps-fast|appsfast|uninstallers|appreview|appdata|libraries|cloud|cloudfiles|cloud-files|personal|communications|comms|browsers|leftovers|backups|backups-fast|backupsfast|xcode|xcode-fast|xcodefast|android|startup|loginitems|trash|caches|caches-fast|cachesfast|diagnostics|packages|npm-cache|npmcache|yarn-cache|yarncache|pnpm-store|pnpmstore|cocoapods-cache|pod-cache|podcache|pip-cache|pipcache|receipts|homebrew|homebrew-cleanup|brewcleanup|toolchains|toolchains-fast|toolchainsfast|containers|containers-fast|containersfast|snapshots|report|report-fast|reportfast|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
+  dashboard|overview|map|map-fast|mapfast|snapshot|snapshot-fast|snapshotfast|diff|state|permissions|review|scan|system-data|system-data-fast|systemdata-fast|systemdatafast|plan|large|large-fast|largefast|brokenlinks|brokenlinks-fast|brokenlinksfast|broken-links-fast|broken-linksfast|quarantine|quarantine-fast|quarantinefast|metadata|metadata-fast|metadatafast|quicklook|fontcaches|font-caches|webcaches|web-caches|savedstate|saved-state|projectcaches|project-caches|projectcaches-fast|projectcachesfast|project-caches-fast|project-cachesfast|developer-fast|developerfast|updaters|updater-caches|browsercaches|browser-caches|browsercaches-fast|browsercachesfast|browser-caches-fast|browser-cachesfast|duplicates|duplicates-fast|duplicatesfast|documents|desktop|screenshots|archives|archives-fast|archivesfast|downloads|downloads-fast|downloadsfast|installers|nodes|nodes-fast|nodesfast|venvs|venvs-fast|venvsfast|virtualenvs|virtualenvs-fast|virtualenvsfast|apps|apps-fast|appsfast|uninstallers|appreview|appdata|libraries|cloud|cloudfiles|cloud-files|personal|communications|comms|browsers|leftovers|backups|backups-fast|backupsfast|xcode|xcode-fast|xcodefast|android|startup|loginitems|trash|caches|caches-fast|cachesfast|diagnostics|packages|npm-cache|npmcache|yarn-cache|yarncache|pnpm-store|pnpmstore|cocoapods-cache|pod-cache|podcache|pip-cache|pipcache|receipts|homebrew|homebrew-cleanup|brewcleanup|toolchains|toolchains-fast|toolchainsfast|containers|containers-fast|containersfast|snapshots|report|report-fast|reportfast|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -9128,6 +9193,7 @@ case "$ACTION" in
   developer-fast|developerfast) developer_fast ;;
   updaters|updater-caches) updaters ;;
   browsercaches|browser-caches) browsercaches ;;
+  browsercaches-fast|browsercachesfast|browser-caches-fast|browser-cachesfast) browsercaches_fast ;;
   duplicates) duplicates ;;
   duplicates-fast|duplicatesfast) duplicates_fast ;;
   documents) documents ;;

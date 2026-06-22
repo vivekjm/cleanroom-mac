@@ -818,6 +818,13 @@ test -e "$TEST_HOME/Library/Caches/Sparkle/update.zip"
 test -e "$TEST_HOME/Library/Application Support/com.github.Squirrel.ShipIt/staged-update"
 "$BIN" browsercaches | grep 'Google Chrome' >/dev/null
 "$BIN" browsercaches | grep 'Firefox' >/dev/null
+browsercaches_fast_json="$(mktemp)"
+"$BIN" browsercaches-fast --json > "$browsercaches_fast_json"
+python3 -m json.tool "$browsercaches_fast_json" >/dev/null
+grep '"browser":"Google Chrome"' "$browsercaches_fast_json" >/dev/null
+grep '"size":"Review"' "$browsercaches_fast_json" >/dev/null
+grep '"mode":"fast"' "$browsercaches_fast_json" >/dev/null
+rm -f "$browsercaches_fast_json"
 browsercaches_json="$(mktemp)"
 "$BIN" browsercaches --json > "$browsercaches_json"
 python3 -m json.tool "$browsercaches_json" >/dev/null

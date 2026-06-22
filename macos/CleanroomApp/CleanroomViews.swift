@@ -370,7 +370,7 @@ final class AppState: ObservableObject {
             "developer-fast", "nodes-fast", "venvs-fast", "apps-fast",
             "downloads", "downloads-fast", "archives", "archives-fast", "screenshots", "trash", "cloudfiles", "caches-fast",
             "quicklook", "fontcaches", "webcaches", "savedstate",
-            "projectcaches", "projectcaches-fast", "updaters", "browsercaches",
+            "projectcaches", "projectcaches-fast", "updaters", "browsercaches", "browsercaches-fast",
             "xcode", "xcode-fast", "backups", "backups-fast", "system-data", "system-data-fast", "containers", "containers-fast", "toolchains", "toolchains-fast",
             "loginitems", "startup", "snapshot", "snapshot-fast", "state", "protect", "rules",
             "map", "map-fast", "doctor", "leftovers", "appreview", "history", "report-fast"
@@ -1049,7 +1049,7 @@ struct SidebarView: View {
                             NavRow("rectangle.stack.fill",    "Window State", .run(title: "Window State", args: "savedstate"), state)
                             NavRow("chevron.left.forwardslash.chevron.right", "Project Cache", .run(title: "Project Cache", args: "projectcaches-fast --limit 40"), state)
                             NavRow("arrow.clockwise.circle.fill", "Update Cache", .run(title: "Update Cache", args: "updaters"), state)
-                            NavRow("globe", "Browser Cache", .run(title: "Browser Cache", args: "browsercaches"), state)
+                            NavRow("globe", "Browser Cache", .run(title: "Browser Cache", args: "browsercaches-fast"), state)
                             NavRow("shippingbox.fill",        "JavaScript Packages",.run(title: "JavaScript Packages",args: "nodes-fast --limit 30 --days 30"), state)
                             NavRow("square.stack.3d.up.fill", "Python Environments", .run(title: "Python Environments", args: "venvs-fast --limit 30 --days 30"), state)
                             NavRow("apps.iphone",             "Apps",        .run(title: "Apps",        args: "apps-fast --limit 30"), state)
