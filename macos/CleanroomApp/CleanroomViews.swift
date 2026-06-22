@@ -337,9 +337,9 @@ struct SidebarView: View {
                             NavRow("square.grid.2x2.fill",    "Dashboard",   .dashboard, state)
                             NavRow("heart.text.square.fill",  "Doctor",      .run(title: "Doctor",      args: "doctor"), state)
                             NavRow("chart.bar.fill",          "Storage Map", .run(title: "Map",         args: "map"), state)
-                            NavRow("magnifyingglass",         "Scan",        .run(title: "Scan",        args: "scan"), state)
-                            NavRow("text.badge.checkmark",    "Review",      .run(title: "Review",      args: "review"), state)
-                            NavRow("list.clipboard.fill",     "Plan",        .run(title: "Plan",        args: "plan"), state)
+                            NavRow("magnifyingglass",         "Quick Scan",  .dashboard, state, onTap: { state.refreshStats(force: true) })
+                            NavRow("text.badge.checkmark",    "Review",      .dashboard, state, onTap: { state.filter = "all"; state.refreshStats(force: true) })
+                            NavRow("list.clipboard.fill",     "Clean Plan",  .dashboard, state, onTap: { state.showApplyConfirm = true })
                         }
                         SidebarSection("FIND") {
                             NavRow("doc.fill",                "Large Files", .run(title: "Large Files",  args: "large --limit 30 --min-mb 500"), state)
@@ -535,7 +535,7 @@ struct HeaderStats: View {
                 // Navigation arrows — key visual from reference images 1 & 4
                 HStack(spacing: DS.Sp.sm) {
                     NavArrow(icon: "arrow.left") { state.run("history", title: "History") }
-                    NavArrow(icon: "arrow.right") { state.run("plan", title: "Plan") }
+                    NavArrow(icon: "arrow.right") { state.showApplyConfirm = true }
                 }
             }
             .padding(.horizontal, DS.Sp.xl)
@@ -552,7 +552,7 @@ struct HeaderStats: View {
             // Action strip below stats
             HStack(spacing: DS.Sp.sm) {
                 PillBtn("Refresh", style: .ghost) { state.refreshStats(force: true) }
-                PillBtn("Scan Now", style: .ghost) { state.run("scan", title: "Scan") }
+                PillBtn("Scan Now", style: .ghost) { state.refreshStats(force: true) }
                 Spacer()
                 PillBtn("Clean Safely", style: .primary) {
                     state.showApplyConfirm = true
@@ -646,9 +646,9 @@ struct FilterBar: View {
                 }
             }
             Spacer()
-            Button { state.run("review", title: "Full Review") } label: {
+            Button { state.refreshStats(force: true) } label: {
                 HStack(spacing: 4) {
-                    Text("Full Review").font(DS.T.body)
+                    Text("Refresh Summary").font(DS.T.body)
                     Image(systemName: "arrow.right").font(.system(size: 10, weight: .semibold))
                 }
                 .foregroundColor(DS.C.textSecondary)

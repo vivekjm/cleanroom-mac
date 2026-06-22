@@ -378,7 +378,7 @@ swiftc -O \
 
 ### Populating Stats
 
-Storage measurement is intentionally user-triggered because it can be expensive on large Macs. After refreshing the storage summary, parse the output and update `state.stats`:
+Storage measurement is intentionally user-triggered because deep scans can be expensive on large Macs. Top-level app refreshes use the fast dashboard summary; detailed reports remain deliberate user actions. After refreshing the storage summary, parse the output and update `state.stats`:
 
 ```swift
 // Example: update after overview runs
