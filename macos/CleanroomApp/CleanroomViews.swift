@@ -456,6 +456,12 @@ final class AppState: ObservableObject {
             if let array = object["categories"] as? [[String: Any]] {
                 return appFacingItems(array)
             }
+            if let array = object["buckets"] as? [[String: Any]] {
+                return appFacingItems(array)
+            }
+            if let array = object["cards"] as? [[String: Any]] {
+                return appFacingItems(array)
+            }
             if let doctorItems = doctorReviewItems(from: object) {
                 return appFacingItems(doctorItems)
             }
@@ -474,7 +480,6 @@ final class AppState: ObservableObject {
 
     private func doctorReviewItems(from object: [String: Any]) -> [[String: Any]]? {
         guard object["platform"] is [String: Any] ||
-              object["disk"] is [String: Any] ||
               object["tools"] is [[String: Any]] ||
               object["safety"] is [String: Any] else {
             return nil
@@ -559,7 +564,7 @@ final class AppState: ObservableObject {
     }
 
     private func summaryLine(for item: [String: Any]) -> String {
-        let size = stringValue(item["size"]) ?? stringValue(item["potential_reclaim"]) ?? "Review"
+        let size = stringValue(item["size"]) ?? stringValue(item["value"]) ?? stringValue(item["potential_reclaim"]) ?? "Review"
         let title = stringValue(item["title"]) ?? stringValue(item["name"]) ?? stringValue(item["kind"]) ?? stringValue(item["runtime"]) ?? stringValue(item["id"]) ?? "Item"
         if let location = friendlyLocationHint(from: item) {
             return "\(size)  \(title)  \(location)"
@@ -568,7 +573,7 @@ final class AppState: ObservableObject {
     }
 
     private func reviewItem(from item: [String: Any]) -> ReviewItem {
-        let size = stringValue(item["size"]) ?? stringValue(item["potential_reclaim"]) ?? stringValue(item["total"]) ?? "Review"
+        let size = stringValue(item["size"]) ?? stringValue(item["value"]) ?? stringValue(item["potential_reclaim"]) ?? stringValue(item["total"]) ?? "Review"
         let title = stringValue(item["title"]) ??
             stringValue(item["name"]) ??
             stringValue(item["kind"]) ??
@@ -580,6 +585,7 @@ final class AppState: ObservableObject {
         let detail = stringValue(item["summary"]) ??
             stringValue(item["guidance"]) ??
             stringValue(item["description"]) ??
+            stringValue(item["detail"]) ??
             stringValue(item["reason"]) ??
             stringValue(item["recoverability"]) ??
             stringValue(item["modified"]) ??
