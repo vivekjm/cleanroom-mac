@@ -482,14 +482,8 @@ final class AppState: ObservableObject {
     private func summaryLine(for item: [String: Any]) -> String {
         let size = stringValue(item["size"]) ?? stringValue(item["potential_reclaim"]) ?? "Review"
         let title = stringValue(item["title"]) ?? stringValue(item["name"]) ?? stringValue(item["kind"]) ?? stringValue(item["runtime"]) ?? stringValue(item["id"]) ?? "Item"
-        if let path = stringValue(item["path"]) {
-            return "\(size)  \(title)  \(path)"
-        }
-        if let paths = stringValue(item["paths"]) {
-            return "\(size)  \(title)  \(paths)"
-        }
-        if let paths = item["paths"] as? [String], let first = paths.first {
-            return "\(size)  \(title)  \(first)"
+        if let location = friendlyLocationHint(from: item) {
+            return "\(size)  \(title)  \(location)"
         }
         return "\(size)  \(title)"
     }
@@ -511,7 +505,7 @@ final class AppState: ObservableObject {
             stringValue(item["recoverability"]) ??
             stringValue(item["modified"]) ??
             stringValue(item["last_modified"]) ??
-            path ??
+            friendlyLocationHint(from: item) ??
             "Review before cleaning."
         return ReviewItem(title: title, detail: detail, size: size, badge: badge, path: path)
     }
@@ -534,6 +528,36 @@ final class AppState: ObservableObject {
         if let paths = item["paths"] as? [String], let first = paths.first { return first }
         if let paths = stringValue(item["paths"]) { return paths }
         return nil
+    }
+
+    private func friendlyLocationHint(from item: [String: Any]) -> String? {
+        guard let path = displayPath(from: item) else { return nil }
+        return friendlyLocation(shortPath(path))
+    }
+
+    private func friendlyLocation(_ path: String) -> String {
+        let lower = path.lowercased()
+        if lower.contains("/downloads") || lower.hasPrefix("~/downloads") { return "In Downloads" }
+        if lower.contains("/desktop") || lower.hasPrefix("~/desktop") { return "On Desktop" }
+        if lower.contains("/documents") || lower.hasPrefix("~/documents") { return "In Documents" }
+        if lower.contains("/library/caches") || lower.contains("/.cache") { return "In app caches" }
+        if lower.contains("/library/developer") || lower.contains("/.gradle") || lower.contains("/node_modules") { return "In developer storage" }
+        if lower.contains("/library/cloudstorage") || lower.contains("/mobile documents") { return "In cloud storage" }
+        if lower.contains("/library/containers") || lower.contains("/library/group containers") { return "In app containers" }
+        if lower.contains("/library/application support") { return "In app support data" }
+        if lower.contains("/.trash") { return "In Trash" }
+        if lower.hasPrefix("/applications") || lower.hasPrefix("~/applications") { return "In Applications" }
+        if lower.contains("/library/logs") || lower.contains("/diagnosticreports") { return "In logs and reports" }
+        return "Local storage item"
+    }
+
+    private func shortPath(_ path: String) -> String {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        if path == home { return "~" }
+        if path.hasPrefix(home + "/") {
+            return "~" + path.dropFirst(home.count)
+        }
+        return path
     }
 
     private func stringValue(_ value: Any?) -> String? {
