@@ -84,11 +84,11 @@ final class AppState: ObservableObject {
 
     @Published var categories: [CleanCategory] = [
         CleanCategory(title: "Caches",       tagline: "App & system caches accumulating silently",      icon: "xmark.bin.fill",        color: DS.C.cardForest,   args: "caches-fast"),
-        CleanCategory(title: "Node Modules", tagline: "Orphaned node_modules, stale npm/pnpm caches",   icon: "shippingbox.fill",      color: DS.C.cardViolet,   args: "nodes-fast --limit 30 --days 30"),
+        CleanCategory(title: "JavaScript Packages", tagline: "Old project dependencies and package caches", icon: "shippingbox.fill",      color: DS.C.cardViolet,   args: "nodes-fast --limit 30 --days 30"),
         CleanCategory(title: "Downloads",    tagline: "Old downloads, DMGs, and forgotten installers",  icon: "arrow.down.to.line",    color: DS.C.cardAmber,    args: "downloads-fast --limit 30 --days 30"),
         CleanCategory(title: "Large Files",  tagline: "Files over 500 MB that may no longer be needed", icon: "doc.fill",              color: DS.C.cardSlate,    args: "large-fast --limit 30 --min-mb 500"),
         CleanCategory(title: "Archives",     tagline: "Old zip archives, tar files, and disk images",   icon: "archivebox.fill",       color: DS.C.cardRose,     args: "archives-fast --limit 30 --days 7"),
-        CleanCategory(title: "Developer",    tagline: "Build artifacts, virtualenvs, and toolchains",   icon: "hammer.fill",           color: DS.C.cardTeal,     args: "developer-fast --limit 30 --days 30"),
+        CleanCategory(title: "Developer Files", tagline: "Build artifacts, environments, and SDK caches", icon: "hammer.fill",           color: DS.C.cardTeal,     args: "developer-fast --limit 30 --days 30"),
         CleanCategory(title: "Screenshots",  tagline: "Old screenshots accumulating on Desktop",        icon: "camera.viewfinder",     color: DS.C.cardBark,     args: "screenshots --limit 30 --days 7"),
         CleanCategory(title: "Trash",        tagline: "Files waiting in macOS Trash",                   icon: "trash.fill",            color: DS.C.cardCharcoal, args: "trash"),
     ]
@@ -590,7 +590,7 @@ final class AppState: ObservableObject {
     func filteredCategories() -> [CleanCategory] {
         switch filter {
         case "caches":    return categories.filter { $0.title == "Caches" }
-        case "dev":       return categories.filter { ["Node Modules", "Developer"].contains($0.title) }
+        case "dev":       return categories.filter { ["JavaScript Packages", "Developer Files"].contains($0.title) }
         case "downloads": return categories.filter { ["Downloads", "Archives"].contains($0.title) }
         case "files":     return categories.filter { $0.title == "Large Files" }
         case "archives":  return categories.filter { $0.title == "Archives" }
@@ -819,8 +819,8 @@ struct SidebarView: View {
                     VStack(alignment: .leading, spacing: 0) {
                         SidebarSection("OVERVIEW") {
                             NavRow("square.grid.2x2.fill",    "Dashboard",   .dashboard, state)
-                            NavRow("heart.text.square.fill",  "Doctor",      .run(title: "Doctor",      args: "doctor"), state)
-                            NavRow("chart.bar.fill",          "Storage Map", .run(title: "Storage Map", args: "map-fast"), state)
+                            NavRow("heart.text.square.fill",  "Health Check", .run(title: "Health Check", args: "doctor"), state)
+                            NavRow("chart.bar.fill",          "Storage Overview", .run(title: "Storage Overview", args: "map-fast"), state)
                             NavRow("magnifyingglass",         "Refresh Summary", .dashboard, state, onTap: { state.refreshStats(force: true) })
                             NavRow("text.badge.checkmark",    "Review",      .dashboard, state, onTap: { state.filter = "all"; state.refreshStats(force: true) })
                             NavRow("list.clipboard.fill",     "Clean Plan",  .dashboard, state, onTap: { state.showApplyConfirm = true })
@@ -828,9 +828,9 @@ struct SidebarView: View {
                         SidebarSection("FIND") {
                             NavRow("doc.fill",                "Large Files", .run(title: "Large Files",  args: "large-fast --limit 30 --min-mb 500"), state)
                             NavRow("doc.on.doc.fill",         "Duplicates",  .run(title: "Duplicates",   args: "duplicates-fast --limit 20 --min-mb 100"), state)
-                            NavRow("link.badge.plus",         "Broken Links",.run(title: "Broken Links", args: "brokenlinks-fast ~/Downloads --limit 40"), state)
-                            NavRow("lock.shield.fill",        "Quarantine",  .run(title: "Quarantine",   args: "quarantine-fast --limit 40"), state)
-                            NavRow("sparkle.magnifyingglass", "Metadata",    .run(title: "Metadata",     args: "metadata-fast --limit 40"), state)
+                            NavRow("link.badge.plus",         "Missing Files",.run(title: "Missing Files", args: "brokenlinks-fast ~/Downloads --limit 40"), state)
+                            NavRow("lock.shield.fill",        "Download Warnings", .run(title: "Download Warnings", args: "quarantine-fast --limit 40"), state)
+                            NavRow("sparkle.magnifyingglass", "Finder Clutter", .run(title: "Finder Clutter", args: "metadata-fast --limit 40"), state)
                             NavRow("magnifyingglass.circle.fill","Leftovers", .dashboard, state, onTap: { state.showLeftovers = true })
                         }
                         SidebarSection("CATEGORIES") {
@@ -838,15 +838,15 @@ struct SidebarView: View {
                             NavRow("archivebox.fill",         "Archives",    .run(title: "Archives",    args: "archives-fast --limit 30 --days 7"), state)
                             NavRow("camera.viewfinder",       "Screenshots", .run(title: "Screenshots", args: "screenshots --limit 30 --days 7"), state)
                             NavRow("xmark.bin.fill",          "Caches",      .run(title: "Caches",      args: "caches-fast"), state)
-                            NavRow("eye.fill",                "Quick Look",  .run(title: "Quick Look",  args: "quicklook"), state)
-                            NavRow("textformat",              "Font Caches", .run(title: "Font Caches", args: "fontcaches"), state)
-                            NavRow("safari.fill",             "Web Caches",  .run(title: "Web Caches",  args: "webcaches"), state)
-                            NavRow("rectangle.stack.fill",    "Saved State", .run(title: "Saved State", args: "savedstate"), state)
-                            NavRow("chevron.left.forwardslash.chevron.right", "Project Caches", .run(title: "Project Caches", args: "projectcaches-fast --limit 40"), state)
-                            NavRow("arrow.clockwise.circle.fill", "Updater Caches", .run(title: "Updater Caches", args: "updaters"), state)
-                            NavRow("globe", "Browser Caches", .run(title: "Browser Caches", args: "browsercaches"), state)
-                            NavRow("shippingbox.fill",        "Node Modules",.run(title: "Node Modules",args: "nodes-fast --limit 30 --days 30"), state)
-                            NavRow("square.stack.3d.up.fill", "Virtualenvs", .run(title: "Virtualenvs", args: "venvs-fast --limit 30 --days 30"), state)
+                            NavRow("eye.fill",                "Preview Cache", .run(title: "Preview Cache", args: "quicklook"), state)
+                            NavRow("textformat",              "Font Cache", .run(title: "Font Cache", args: "fontcaches"), state)
+                            NavRow("safari.fill",             "Web Cache",  .run(title: "Web Cache",  args: "webcaches"), state)
+                            NavRow("rectangle.stack.fill",    "Window State", .run(title: "Window State", args: "savedstate"), state)
+                            NavRow("chevron.left.forwardslash.chevron.right", "Project Cache", .run(title: "Project Cache", args: "projectcaches-fast --limit 40"), state)
+                            NavRow("arrow.clockwise.circle.fill", "Update Cache", .run(title: "Update Cache", args: "updaters"), state)
+                            NavRow("globe", "Browser Cache", .run(title: "Browser Cache", args: "browsercaches"), state)
+                            NavRow("shippingbox.fill",        "JavaScript Packages",.run(title: "JavaScript Packages",args: "nodes-fast --limit 30 --days 30"), state)
+                            NavRow("square.stack.3d.up.fill", "Python Environments", .run(title: "Python Environments", args: "venvs-fast --limit 30 --days 30"), state)
                             NavRow("apps.iphone",             "Apps",        .run(title: "Apps",        args: "apps-fast --limit 30"), state)
                             NavRow("app.badge.checkmark.fill","App Review",  .dashboard, state, onTap: { state.showLeftovers = true })
                             NavRow("trash.fill",              "Trash",       .run(title: "Trash",       args: "trash"), state)
@@ -857,18 +857,18 @@ struct SidebarView: View {
                             NavRow("clock.arrow.circlepath",  "Backups",     .run(title: "Backups",     args: "backups"), state)
                             NavRow("externaldrive.fill",      "System Data", .run(title: "System Data", args: "system-data-fast"), state)
                             NavRow("shippingbox.fill",        "Containers",  .run(title: "Containers",  args: "containers"), state)
-                            NavRow("wrench.and.screwdriver",  "Toolchains",  .run(title: "Toolchains",  args: "toolchains"), state)
+                            NavRow("wrench.and.screwdriver",  "Developer Tools", .run(title: "Developer Tools", args: "toolchains"), state)
                             NavRow("person.crop.circle",      "Login Items", .run(title: "Login Items", args: "loginitems"), state)
                             NavRow("bolt.fill",               "Startup",     .run(title: "Startup",     args: "startup"), state)
                         }
                         SidebarSection("SAFETY") {
-                            NavRow("camera.fill",             "Storage Snapshot", .run(title: "Storage Snapshot", args: "snapshot-fast"), state)
-                            NavRow("clock.badge.checkmark.fill", "Recovery",      .run(title: "Recovery", args: "state"), state)
+                            NavRow("camera.fill",             "Storage Record", .run(title: "Storage Record", args: "snapshot-fast"), state)
+                            NavRow("clock.badge.checkmark.fill", "Restore History", .run(title: "Restore History", args: "state"), state)
                             NavRow("checkmark.shield.fill",   "Safety Check",     .run(title: "Safety Check", args: "clean --preset dev --preflight"), state)
                             NavRow("doc.text.fill",           "Privacy Report",   .run(title: "Privacy Report", args: "report-fast --redact"), state)
                             NavRow("clock.fill",              "Past Cleanups",    .run(title: "Past Cleanups", args: "history"), state)
-                            NavRow("shield.fill",             "Protected Data",   .run(title: "Protected Data", args: "protect"), state)
-                            NavRow("flag.fill",               "Safety Rules",     .run(title: "Safety Rules", args: "rules"), state)
+                            NavRow("shield.fill",             "Protected Items", .run(title: "Protected Items", args: "protect"), state)
+                            NavRow("flag.fill",               "Safety Policy", .run(title: "Safety Policy", args: "rules"), state)
                         }
                     }
                     .padding(.bottom, DS.Sp.xxl)
