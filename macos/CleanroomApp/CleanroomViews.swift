@@ -40,6 +40,13 @@ struct ReviewItem: Identifiable {
     var path: String?
 }
 
+struct CleanupPlanItem: Identifiable {
+    let id = UUID()
+    var title: String
+    var safety: String
+    var recovery: String
+}
+
 enum NavDest: Hashable {
     case dashboard
     case run(title: String, args: String)
@@ -64,6 +71,9 @@ final class AppState: ObservableObject {
     @Published var cardOffset:       Int     = 0
     @Published var reviewTitle:      String  = "Review Details"
     @Published var reviewItems:      [ReviewItem] = []
+    @Published var cleanupPlanItems: [CleanupPlanItem] = []
+    @Published var cleanupPlanNotes: [String] = []
+    @Published var cleanupPlanLoading: Bool = false
 
     @Published var stats: [StorageStat] = [
         StorageStat(label: "Disk Used",   value: "—"),
@@ -133,6 +143,23 @@ final class AppState: ObservableObject {
                 self.parseStats(raw.output)
                 self.status = "Storage summary updated"
                 self.activityMessage = "Storage summary updated. No files were changed."
+            }
+        }
+    }
+
+    func refreshCleanupPlan() {
+        guard !cleanupPlanLoading else { return }
+        cleanupPlanLoading = true
+        cleanupPlanItems = []
+        cleanupPlanNotes = []
+        let command = resolvedCommand(["clean", "--preflight", "--json"])
+        Task.detached(priority: .background) {
+            let result = await Self.exec(command.executable, command.arguments)
+            let parsed = Self.parseCleanupPlan(result.output)
+            await MainActor.run {
+                self.cleanupPlanItems = parsed.items
+                self.cleanupPlanNotes = parsed.notes
+                self.cleanupPlanLoading = false
             }
         }
     }
@@ -346,6 +373,9 @@ final class AppState: ObservableObject {
             if let array = object["items"] as? [[String: Any]] {
                 return array
             }
+            if let array = object["categories"] as? [[String: Any]] {
+                return array
+            }
             var grouped: [[String: Any]] = []
             for key in ["apps", "uninstallers", "receipts", "leftovers"] {
                 if let array = object[key] as? [[String: Any]] {
@@ -387,6 +417,7 @@ final class AppState: ObservableObject {
         let detail = stringValue(item["summary"]) ??
             stringValue(item["guidance"]) ??
             stringValue(item["reason"]) ??
+            stringValue(item["recoverability"]) ??
             stringValue(item["modified"]) ??
             stringValue(item["last_modified"]) ??
             path ??
@@ -503,6 +534,72 @@ final class AppState: ObservableObject {
         } catch {
             return CommandResult(output: "Could not start this action: \(error.localizedDescription)\n", status: -1)
         }
+    }
+
+    nonisolated private static func parseCleanupPlan(_ raw: String) -> (items: [CleanupPlanItem], notes: [String]) {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let data = trimmed.data(using: .utf8),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return ([], ["The safety plan could not be loaded. You can still review before cleaning."])
+        }
+        let categories = object["categories"] as? [[String: Any]] ?? []
+        let items = categories.map { item -> CleanupPlanItem in
+            let title = stringField("title", in: item) ?? stringField("id", in: item) ?? "Cleanup area"
+            let safety = friendlySafety(stringField("safety", in: item))
+            let recovery = friendlyRecovery(stringField("recoverability", in: item))
+            return CleanupPlanItem(title: title, safety: safety, recovery: recovery)
+        }
+        let rawWarnings = object["warnings"] as? [String] ?? []
+        let notes = rawWarnings.map(friendlyCleanupNote)
+        return (items, notes)
+    }
+
+    nonisolated private static func stringField(_ key: String, in object: [String: Any]) -> String? {
+        guard let value = object[key] as? String, !value.isEmpty else { return nil }
+        return value
+    }
+
+    nonisolated private static func friendlySafety(_ raw: String?) -> String {
+        switch raw?.lowercased() {
+        case "rebuildable":
+            return "Rebuildable"
+        case "low-risk":
+            return "Low risk"
+        case "opt-in":
+            return "Optional"
+        case "high-impact":
+            return "High impact"
+        case "irreversible":
+            return "Irreversible"
+        default:
+            return "Protected"
+        }
+    }
+
+    nonisolated private static func friendlyRecovery(_ raw: String?) -> String {
+        guard let raw else { return "Moved to Trash where possible." }
+        if raw.localizedCaseInsensitiveContains("Trash mode can recover") {
+            return "Moved to Trash where possible."
+        }
+        return raw
+            .replacingOccurrences(of: "--trash", with: "Trash recovery")
+            .replacingOccurrences(of: "--apply", with: "cleaning")
+    }
+
+    nonisolated private static func friendlyCleanupNote(_ raw: String) -> String {
+        if raw.localizedCaseInsensitiveContains("Dry-run mode") {
+            return "This is only a review until you choose Clean Now."
+        }
+        if raw.localizedCaseInsensitiveContains("Protected browser profiles") {
+            return "Passwords, browser profiles, Photos, Mail, Messages, and cloud folders stay protected."
+        }
+        if raw.localizedCaseInsensitiveContains("User Trash cleanup is irreversible") {
+            return "Emptying the current Trash cannot be restored."
+        }
+        if raw.localizedCaseInsensitiveContains("Container cleanup") {
+            return "Container cleanup can remove local containers, images, and volumes."
+        }
+        return raw
     }
 
     private static func sanitizeForApp(_ text: String) -> String {
@@ -1347,15 +1444,36 @@ struct ApplyConfirmSheet: View {
             Rectangle().fill(DS.C.divider).frame(height: 1)
 
             VStack(alignment: .leading, spacing: DS.Sp.sm) {
-                Text("WHAT WILL HAPPEN")
+                HStack {
+                    Text("READY TO CLEAN")
+                        .font(DS.T.tag).kerning(0.6)
+                        .foregroundColor(DS.C.textMuted)
+                    Spacer()
+                    if state.cleanupPlanLoading {
+                        ProgressView()
+                            .progressViewStyle(.circular)
+                            .scaleEffect(0.55)
+                    }
+                }
+                if state.cleanupPlanItems.isEmpty && !state.cleanupPlanLoading {
+                    HStack(spacing: DS.Sp.sm) {
+                        Circle().fill(DS.C.positive).frame(width: 5, height: 5)
+                        Text("Rebuildable clutter and old logs are selected by default.")
+                            .font(DS.T.body)
+                            .foregroundColor(DS.C.textSecondary)
+                    }
+                } else {
+                    ForEach(state.cleanupPlanItems) { item in
+                        CleanupPlanRow(item: item)
+                    }
+                }
+            }
+
+            VStack(alignment: .leading, spacing: DS.Sp.sm) {
+                Text("PROTECTED")
                     .font(DS.T.tag).kerning(0.6)
                     .foregroundColor(DS.C.textMuted)
-                ForEach([
-                    "Rebuildable clutter is selected automatically",
-                    "Removed items are placed in Trash",
-                    "Passwords, browser profiles, Mail, Photos, and cloud folders stay protected",
-                    "A restore record is written for the cleanup session",
-                ], id: \.self) { item in
+                ForEach(cleanupNotes, id: \.self) { item in
                     HStack(spacing: DS.Sp.sm) {
                         Circle().fill(DS.C.positive).frame(width: 5, height: 5)
                         Text(item).font(DS.T.body).foregroundColor(DS.C.textSecondary)
@@ -1371,7 +1489,7 @@ struct ApplyConfirmSheet: View {
                     .foregroundColor(DS.C.textSecondary)
                 Spacer()
                 PillBtn("Review First", style: .ghost) {
-                    state.run("clean --preflight", title: "Safety Check")
+                    state.run("clean --preflight", title: "Safety Plan")
                     dismiss()
                 }
                 PillBtn("Clean Now", style: .primary) {
@@ -1381,8 +1499,78 @@ struct ApplyConfirmSheet: View {
             }
         }
         .padding(DS.Sp.xxl)
-        .frame(width: 480, height: 380)
+        .frame(width: 540, height: 460)
         .background(DS.C.canvas)
+        .onAppear {
+            if state.cleanupPlanItems.isEmpty {
+                state.refreshCleanupPlan()
+            }
+        }
+    }
+
+    private var cleanupNotes: [String] {
+        if state.cleanupPlanNotes.isEmpty {
+            return [
+                "Items are moved to Trash where possible.",
+                "Passwords, browser profiles, Photos, Mail, Messages, and cloud folders stay protected.",
+                "A restore record is written for the cleanup session.",
+            ]
+        }
+        return state.cleanupPlanNotes
+    }
+}
+
+struct CleanupPlanRow: View {
+    let item: CleanupPlanItem
+
+    var body: some View {
+        HStack(alignment: .top, spacing: DS.Sp.md) {
+            Image(systemName: icon)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(color)
+                .frame(width: 20, height: 20)
+                .background(Circle().fill(color.opacity(0.12)))
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(item.title)
+                        .font(DS.T.body.weight(.semibold))
+                        .foregroundColor(DS.C.textPrimary)
+                    Spacer()
+                    Text(item.safety)
+                        .font(DS.T.tag)
+                        .foregroundColor(color)
+                }
+                Text(item.recovery)
+                    .font(DS.T.bodySm)
+                    .foregroundColor(DS.C.textSecondary)
+                    .lineLimit(2)
+            }
+        }
+        .padding(DS.Sp.md)
+        .background(RoundedRectangle(cornerRadius: DS.R.sm).fill(Color.white.opacity(0.55)))
+        .overlay(RoundedRectangle(cornerRadius: DS.R.sm).stroke(DS.C.divider, lineWidth: 1))
+    }
+
+    private var color: Color {
+        switch item.safety {
+        case "High impact", "Irreversible":
+            return DS.C.negative
+        case "Optional":
+            return DS.C.caution
+        default:
+            return DS.C.positive
+        }
+    }
+
+    private var icon: String {
+        switch item.safety {
+        case "High impact", "Irreversible":
+            return "exclamationmark.triangle.fill"
+        case "Optional":
+            return "questionmark.circle.fill"
+        default:
+            return "checkmark.circle.fill"
+        }
     }
 }
 
