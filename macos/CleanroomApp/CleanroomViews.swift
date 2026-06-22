@@ -456,6 +456,9 @@ final class AppState: ObservableObject {
             if let array = object["categories"] as? [[String: Any]] {
                 return appFacingItems(array)
             }
+            if let doctorItems = doctorReviewItems(from: object) {
+                return appFacingItems(doctorItems)
+            }
             var grouped: [[String: Any]] = []
             for key in ["apps", "uninstallers", "receipts", "leftovers"] {
                 if let array = object[key] as? [[String: Any]] {
@@ -467,6 +470,82 @@ final class AppState: ObservableObject {
             }
         }
         return nil
+    }
+
+    private func doctorReviewItems(from object: [String: Any]) -> [[String: Any]]? {
+        guard object["platform"] is [String: Any] ||
+              object["disk"] is [String: Any] ||
+              object["tools"] is [[String: Any]] ||
+              object["safety"] is [String: Any] else {
+            return nil
+        }
+
+        var items: [[String: Any]] = []
+
+        if let disk = object["disk"] as? [String: Any] {
+            let capacity = stringValue(disk["capacity"]) ?? "Review"
+            let available = numberValue(disk["available_kb"]).map { formatKBString(String($0)) } ?? "available space"
+            let used = numberValue(disk["used_kb"]).map { formatKBString(String($0)) } ?? "current usage"
+            items.append([
+                "title": "Disk Space",
+                "size": capacity,
+                "status": "Review",
+                "summary": "\(available) available, \(used) used."
+            ])
+        }
+
+        if let safety = object["safety"] as? [String: Any] {
+            let protected = numberValue(safety["protected_present"]) ?? 0
+            let rulesReady = (safety["rules_catalog"] as? Bool) == true
+            let protectedReady = (safety["protected_catalog"] as? Bool) == true
+            let status = rulesReady && protectedReady ? "Protected" : "Needs Attention"
+            items.append([
+                "title": "Safety Catalogs",
+                "size": "\(protected) protected",
+                "status": status,
+                "summary": rulesReady && protectedReady
+                    ? "Cleanup rules and protected personal-data catalogs are available."
+                    : "One or more safety catalogs could not be loaded."
+            ])
+        }
+
+        if let tools = object["tools"] as? [[String: Any]] {
+            let required = tools.filter { ($0["required"] as? Bool) == true }
+            let missingRequired = required.filter { stringValue($0["status"]) != "ok" }
+            items.append([
+                "title": "Required Tools",
+                "size": missingRequired.isEmpty ? "Ready" : "\(missingRequired.count) missing",
+                "status": missingRequired.isEmpty ? "Ready" : "Needs Attention",
+                "summary": missingRequired.isEmpty
+                    ? "All required system tools are available."
+                    : "Some required system tools are missing or unavailable."
+            ])
+
+            for tool in tools.prefix(12) {
+                let name = stringValue(tool["name"]) ?? "Tool"
+                let requiredFlag = (tool["required"] as? Bool) == true
+                let status = stringValue(tool["status"]) ?? "review"
+                items.append([
+                    "title": name,
+                    "size": status == "ok" ? "Ready" : "Check",
+                    "status": status == "ok" ? "Ready" : "Needs Attention",
+                    "summary": requiredFlag ? "Required system capability." : "Optional capability for deeper reviews."
+                ])
+            }
+        }
+
+        if let platform = object["platform"] as? [String: Any] {
+            let macOS = stringValue(platform["macos"]) ?? "macOS"
+            let architecture = stringValue(platform["architecture"]) ?? "Mac"
+            items.append([
+                "title": "Mac Compatibility",
+                "size": "Ready",
+                "status": "Ready",
+                "summary": "Running on macOS \(macOS) for \(architecture)."
+            ])
+        }
+
+        return items.isEmpty ? nil : items
     }
 
     private func appFacingItems(_ items: [[String: Any]]) -> [[String: Any]] {
