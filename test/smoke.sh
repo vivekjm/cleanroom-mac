@@ -1318,12 +1318,21 @@ report_stdout="$("$BIN" report)"
 grep '# cleanroom report' <<<"$report_stdout" >/dev/null
 grep 'Cleanup Candidates' <<<"$report_stdout" >/dev/null
 grep 'Protected Personal Data' <<<"$report_stdout" >/dev/null
+report_fast_stdout="$("$BIN" report-fast)"
+grep '# cleanroom quick privacy report' <<<"$report_fast_stdout" >/dev/null
+grep 'Summary Buckets' <<<"$report_fast_stdout" >/dev/null
+grep 'Protected locations present' <<<"$report_fast_stdout" >/dev/null
 
 report_file="$(mktemp)"
 "$BIN" report --output "$report_file" >/dev/null
 grep '# cleanroom report' "$report_file" >/dev/null
 grep 'chrome-login-data' "$report_file" >/dev/null
 rm -f "$report_file"
+report_fast_file="$(mktemp)"
+"$BIN" report-fast --output "$report_fast_file" >/dev/null
+grep '# cleanroom quick privacy report' "$report_fast_file" >/dev/null
+grep 'Browser profiles' "$report_fast_file" >/dev/null
+rm -f "$report_fast_file"
 redacted_report="$(mktemp)"
 "$BIN" report --redact --output "$redacted_report" >/dev/null
 grep '# cleanroom report' "$redacted_report" >/dev/null
@@ -1334,6 +1343,14 @@ if grep -F "$TEST_HOME" "$redacted_report" >/dev/null; then
   exit 1
 fi
 rm -f "$redacted_report"
+redacted_report_fast="$(mktemp)"
+"$BIN" report-fast --redact --output "$redacted_report_fast" >/dev/null
+grep '# cleanroom quick privacy report' "$redacted_report_fast" >/dev/null
+if grep -F "$TEST_HOME" "$redacted_report_fast" >/dev/null; then
+  echo "redacted fast report leaked TEST_HOME" >&2
+  exit 1
+fi
+rm -f "$redacted_report_fast"
 
 json_file="$(mktemp)"
 "$BIN" scan --json > "$json_file"

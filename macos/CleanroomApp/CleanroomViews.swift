@@ -855,7 +855,7 @@ struct SidebarView: View {
                             NavRow("camera.fill",             "Storage Snapshot", .run(title: "Storage Snapshot", args: "snapshot-fast"), state)
                             NavRow("clock.badge.checkmark.fill", "Recovery",      .run(title: "Recovery", args: "state"), state)
                             NavRow("checkmark.shield.fill",   "Safety Check",     .run(title: "Safety Check", args: "clean --preset dev --preflight"), state)
-                            NavRow("doc.text.fill",           "Privacy Report",   .run(title: "Privacy Report", args: "report --redact"), state)
+                            NavRow("doc.text.fill",           "Privacy Report",   .run(title: "Privacy Report", args: "report-fast --redact"), state)
                             NavRow("clock.fill",              "Past Cleanups",    .run(title: "Past Cleanups", args: "history"), state)
                             NavRow("shield.fill",             "Protected Data",   .run(title: "Protected Data", args: "protect"), state)
                             NavRow("flag.fill",               "Safety Rules",     .run(title: "Safety Rules", args: "rules"), state)

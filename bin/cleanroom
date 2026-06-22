@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.10.0"
+VERSION="1.11.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -136,6 +136,7 @@ Usage:
   cleanroom containers [--json]
   cleanroom snapshots [--json]
   cleanroom report [--output PATH] [--redact]
+  cleanroom report-fast [--output PATH] [--redact]
   cleanroom clean [options] [--preflight] [--json]
   cleanroom history [--limit N]
   cleanroom restore [--log PATH] [--apply]
@@ -221,6 +222,7 @@ Actions:
   containers           Inventory local container VM disks and image stores.
   snapshots            List local Time Machine snapshots for review.
   report               Write a Markdown cleanup report. Prints to stdout by default.
+  report-fast          Write a quick desktop-app privacy report.
   clean                Clean safe rebuildable caches. Dry-run unless --apply is passed.
   history              List recent apply logs.
   restore              Restore files moved by --trash from an apply log. Dry-run unless --apply.
@@ -448,6 +450,7 @@ Examples:
   cleanroom snapshots
   cleanroom snapshots --json
   cleanroom report --output cleanroom-report.md
+  cleanroom report-fast --redact --output cleanroom-report.md
   cleanroom report --redact --output cleanroom-report.md
   cleanroom doctor
   cleanroom doctor --json
@@ -7787,6 +7790,44 @@ report() {
   fi
 }
 
+report_fast_body() {
+  local now protected_count
+  now="$(date '+%Y-%m-%d %H:%M:%S %Z')"
+  protected_count="$(protected_present_count)"
+
+  printf '# cleanroom quick privacy report\n\n'
+  printf '%s\n' "- Generated: $now"
+  printf '%s\n' "- Version: $VERSION"
+  printf '%s\n\n' "- Mode: fast desktop summary"
+
+  printf '## Disk\n\n```text\n'
+  disk_line
+  printf '```\n\n'
+
+  printf '## Summary Buckets\n\n'
+  printf '| Size | Area | Summary |\n| ---: | --- | --- |\n'
+  local kb id title value detail
+  while IFS=$'\t' read -r kb id title value detail; do
+    [[ -z "${id:-}" ]] && continue
+    printf '| %s | %s | %s |\n' "$value" "$title" "$detail"
+  done < <(dashboard_card_rows)
+
+  printf '\n## Safety\n\n'
+  printf '%s\n' "- Protected locations present: $protected_count"
+  printf '%s\n' "- Browser profiles, saved passwords, cookies, bookmarks, sessions, Keychains, Photos, Mail, Messages, and cloud-sync roots stay protected by default."
+  printf '%s\n' "- This quick report skips deep path sizing to keep the desktop app responsive."
+  printf '%s\n' "- Use the full report only when you need a detailed support artifact."
+}
+
+report_fast() {
+  if [[ -n "$OUTPUT_FILE" ]]; then
+    report_fast_body | redact_stream >"$(expand_path "$OUTPUT_FILE")"
+    ok "Wrote quick report: $(redact_string "$(expand_path "$OUTPUT_FILE")")"
+  else
+    report_fast_body | redact_stream
+  fi
+}
+
 rules() {
   local file id category safety default opt_in paths description
   file="$(rules_file)"
@@ -8407,7 +8448,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  dashboard|overview|map|map-fast|mapfast|snapshot|snapshot-fast|snapshotfast|diff|state|permissions|review|scan|system-data|system-data-fast|systemdata-fast|systemdatafast|plan|large|large-fast|largefast|brokenlinks|brokenlinks-fast|brokenlinksfast|broken-links-fast|broken-linksfast|quarantine|quarantine-fast|quarantinefast|metadata|metadata-fast|metadatafast|quicklook|fontcaches|font-caches|webcaches|web-caches|savedstate|saved-state|projectcaches|project-caches|projectcaches-fast|projectcachesfast|project-caches-fast|project-cachesfast|developer-fast|developerfast|updaters|updater-caches|browsercaches|browser-caches|duplicates|duplicates-fast|duplicatesfast|documents|desktop|screenshots|archives|downloads|installers|nodes|nodes-fast|nodesfast|venvs|venvs-fast|venvsfast|virtualenvs|virtualenvs-fast|virtualenvsfast|apps|apps-fast|appsfast|uninstallers|appreview|appdata|libraries|cloud|cloudfiles|cloud-files|personal|communications|comms|browsers|leftovers|backups|xcode|android|startup|loginitems|trash|caches|caches-fast|cachesfast|diagnostics|packages|npm-cache|npmcache|yarn-cache|yarncache|pnpm-store|pnpmstore|cocoapods-cache|pod-cache|podcache|pip-cache|pipcache|receipts|homebrew|homebrew-cleanup|brewcleanup|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
+  dashboard|overview|map|map-fast|mapfast|snapshot|snapshot-fast|snapshotfast|diff|state|permissions|review|scan|system-data|system-data-fast|systemdata-fast|systemdatafast|plan|large|large-fast|largefast|brokenlinks|brokenlinks-fast|brokenlinksfast|broken-links-fast|broken-linksfast|quarantine|quarantine-fast|quarantinefast|metadata|metadata-fast|metadatafast|quicklook|fontcaches|font-caches|webcaches|web-caches|savedstate|saved-state|projectcaches|project-caches|projectcaches-fast|projectcachesfast|project-caches-fast|project-cachesfast|developer-fast|developerfast|updaters|updater-caches|browsercaches|browser-caches|duplicates|duplicates-fast|duplicatesfast|documents|desktop|screenshots|archives|downloads|installers|nodes|nodes-fast|nodesfast|venvs|venvs-fast|venvsfast|virtualenvs|virtualenvs-fast|virtualenvsfast|apps|apps-fast|appsfast|uninstallers|appreview|appdata|libraries|cloud|cloudfiles|cloud-files|personal|communications|comms|browsers|leftovers|backups|xcode|android|startup|loginitems|trash|caches|caches-fast|cachesfast|diagnostics|packages|npm-cache|npmcache|yarn-cache|yarncache|pnpm-store|pnpmstore|cocoapods-cache|pod-cache|podcache|pip-cache|pipcache|receipts|homebrew|homebrew-cleanup|brewcleanup|toolchains|containers|snapshots|report|report-fast|reportfast|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -8593,6 +8634,7 @@ case "$ACTION" in
   containers) containers ;;
   snapshots) snapshots ;;
   report) report ;;
+  report-fast|reportfast) report_fast ;;
   clean) clean ;;
   history) history ;;
   restore) restore ;;

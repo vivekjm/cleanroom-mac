@@ -1,4 +1,4 @@
-.TH CLEANROOM 1 "June 2026" "cleanroom 1.10.0" "User Commands"
+.TH CLEANROOM 1 "June 2026" "cleanroom 1.11.0" "User Commands"
 .SH NAME
 cleanroom \- safe-by-default macOS storage cleaner
 .SH SYNOPSIS
@@ -226,6 +226,9 @@ cleanroom \- safe-by-default macOS storage cleaner
 .br
 .B cleanroom
 .RI "report [--output path] [--redact]"
+.br
+.B cleanroom
+.RI "report-fast [--output path] [--redact]"
 .br
 .B cleanroom
 .RI "clean [options] [--preflight] [--json]"
@@ -513,6 +516,9 @@ List local Time Machine snapshots for review.
 Generate a Markdown cleanup report. Use
 .B --redact
 before sharing publicly to mask home, user, and temporary paths.
+.TP
+.B report-fast
+Generate a quick desktop-app privacy report without deep path sizing.
 .TP
 .B clean
 Preview or apply cleanup. Use
