@@ -1,4 +1,4 @@
-.TH CLEANROOM 1 "June 2026" "cleanroom 1.29.0" "User Commands"
+.TH CLEANROOM 1 "June 2026" "cleanroom 1.30.0" "User Commands"
 .SH NAME
 cleanroom \- safe-by-default macOS storage cleaner
 .SH SYNOPSIS
@@ -157,6 +157,9 @@ cleanroom \- safe-by-default macOS storage cleaner
 .br
 .B cleanroom
 .RI "cloudfiles [path] [--min-mb n] [--limit n] [--json]"
+.br
+.B cleanroom
+.RI "cloudfiles-fast [path] [--min-mb n] [--limit n] [--json]"
 .br
 .B cleanroom
 .RI "personal [--json]"
@@ -451,6 +454,10 @@ Dropbox, Google Drive, OneDrive, Box, and Sync without deleting anything.
 List large local files inside cloud-sync roots for review without deleting files
 or evicting local copies. Local deletes can sync remotely.
 .TP
+.B cloudfiles-fast
+Quickly list large local files inside cloud-sync roots using Spotlight. It is
+review-only and returns an empty result when Spotlight has no indexed matches.
+.TP
 .B personal
 Inventory protected Mail, Messages, Contacts, Calendars, Notes, Reminders,
 Voice Memos, and call-history data without deleting anything.
@@ -722,7 +729,7 @@ cleanroom appreview adobe --limit 50
 cleanroom appdata --limit 30
 cleanroom libraries --json
 cleanroom cloud --json
-cleanroom cloudfiles --min-mb 250 --limit 50
+cleanroom cloudfiles-fast --min-mb 250 --limit 50
 cleanroom personal --json
 cleanroom communications --json
 cleanroom browsers --json

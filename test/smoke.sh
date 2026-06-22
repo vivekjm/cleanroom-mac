@@ -1017,6 +1017,11 @@ grep 'big-cloud.bin' "$cloudfiles_json" >/dev/null
 grep '"provider":"Dropbox-Test"' "$cloudfiles_json" >/dev/null
 grep 'open -R' "$cloudfiles_json" >/dev/null
 rm -f "$cloudfiles_json"
+cloudfiles_fast_json="$(mktemp)"
+"$BIN" cloudfiles-fast --json "$HOME/Library/CloudStorage" --min-mb 1 --limit 10 > "$cloudfiles_fast_json"
+python3 -m json.tool "$cloudfiles_fast_json" >/dev/null
+grep '"items":' "$cloudfiles_fast_json" >/dev/null
+rm -f "$cloudfiles_fast_json"
 "$BIN" personal | grep 'Messages' >/dev/null
 personal_json="$(mktemp)"
 "$BIN" personal --json > "$personal_json"

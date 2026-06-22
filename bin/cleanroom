@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.29.0"
+VERSION="1.30.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -113,6 +113,7 @@ Usage:
   cleanroom libraries [--json]
   cleanroom cloud [--json]
   cleanroom cloudfiles [PATH] [--min-mb N] [--limit N] [--json]
+  cleanroom cloudfiles-fast [PATH] [--min-mb N] [--limit N] [--json]
   cleanroom personal [--json]
   cleanroom communications [--json]
   cleanroom browsers [--json]
@@ -207,6 +208,7 @@ Actions:
   libraries            Inventory protected media and creative libraries.
   cloud                Inventory protected cloud-sync storage locations.
   cloudfiles           List large local cloud-sync files for review.
+  cloudfiles-fast      Quickly review large cloud-sync files using Spotlight.
   personal             Inventory protected Mail, Messages, Notes, and contacts data.
   communications       Inventory protected Mail and Messages storage in detail.
   browsers             Inventory browser profile and cache footprint.
@@ -2593,7 +2595,7 @@ map_rows() {
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "app-support" "Application Support" "$HOME/Library/Application Support" "review" "cleanroom appdata --limit 50" "Large app support folders. Use app-specific review before removing anything."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "containers" "App Containers" "$HOME/Library/Containers; $HOME/Library/Group Containers" "review" "cleanroom appdata --limit 50" "Sandbox and shared app containers can contain account data."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "cloud" "Cloud Storage" "$HOME/Library/Mobile Documents; $HOME/Library/CloudStorage; $HOME/Dropbox; $HOME/Google Drive; $HOME/OneDrive; $HOME/Box; $HOME/Sync" "protected" "cleanroom cloud" "Cloud-synced files can change remote data if changed locally."
-  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "cloud-files" "Large Cloud Files" "$HOME/Library/Mobile Documents; $HOME/Library/CloudStorage; $HOME/Dropbox; $HOME/Google Drive; $HOME/OneDrive; $HOME/Box; $HOME/Sync" "protected" "cleanroom cloudfiles --min-mb 250 --limit 50" "Large local copies inside cloud-sync roots. Review through Finder or provider UI."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "cloud-files" "Large Cloud Files" "$HOME/Library/Mobile Documents; $HOME/Library/CloudStorage; $HOME/Dropbox; $HOME/Google Drive; $HOME/OneDrive; $HOME/Box; $HOME/Sync" "protected" "cleanroom cloudfiles-fast --min-mb 250 --limit 50" "Large local copies inside cloud-sync roots. Review through Finder or provider UI."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "media" "Media Libraries" "$HOME/Pictures; $HOME/Music; $HOME/Movies" "protected" "cleanroom libraries" "Photos, music, videos, and creative projects."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "communications" "Mail and Messages" "$HOME/Library/Mail; $HOME/Library/Mail Downloads; $HOME/Library/Containers/com.apple.mail/Data/Library/Mail Downloads; $HOME/Library/Messages" "protected" "cleanroom communications" "Mail, chats, and communication attachments are protected."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "developer" "Developer Data" "$HOME/Library/Developer; $HOME/Library/Android; $HOME/.android" "mixed" "cleanroom system-data" "Xcode, simulators, Android SDKs, and emulator data."
@@ -5783,6 +5785,34 @@ cloudfiles_rows() {
   done < <(cloudfiles_roots) | sort -t $'\t' -k1,1rn -k2,2rn | head -n "$LIMIT"
 }
 
+cloudfiles_fast_rows() {
+  command -v mdfind >/dev/null 2>&1 || return 2
+  local root path bytes kb epoch provider min_bytes root_candidate
+  min_bytes=$((MIN_MB * 1024 * 1024))
+  while IFS= read -r root; do
+    [[ -d "$root" ]] || continue
+    mdfind -onlyin "$root" "kMDItemFSSize > $min_bytes" 2>/dev/null || true
+  done < <(cloudfiles_roots) |
+    sort -u |
+    while IFS= read -r path; do
+      [[ -f "$path" ]] || continue
+      bytes="$(stat -f '%z' "$path" 2>/dev/null || stat -c '%s' "$path" 2>/dev/null || true)"
+      [[ "$bytes" =~ ^[0-9]+$ ]] || bytes=0
+      kb=$(((bytes + 1023) / 1024))
+      epoch="$(path_mtime_epoch "$path")"
+      provider="Cloud Storage"
+      while IFS= read -r root_candidate; do
+        [[ -d "$root_candidate" ]] || continue
+        case "$path" in
+          "$root_candidate"/*|"$root_candidate") provider="$(cloudfile_provider "$root_candidate" "$path")"; break ;;
+        esac
+      done < <(cloudfiles_roots)
+      printf '%012d\t%012d\t%s\t%s\n' "$kb" "$epoch" "$provider" "$path"
+    done |
+    sort -t $'\t' -k1,1rn -k2,2rn |
+    head -n "$LIMIT"
+}
+
 cloudfiles() {
   local rows
   rows="$(cloudfiles_rows)"
@@ -5827,6 +5857,57 @@ cloudfiles() {
     printf '  reveal: open -R %s\n' "$(shell_quote "$path")"
   done <<<"$rows"
   printf '\nReview these through Finder or the cloud provider UI. Local deletes can sync remotely.\n'
+}
+
+cloudfiles_fast() {
+  local rows available=1
+  rows="$(cloudfiles_fast_rows)" || available=0
+
+  if [[ "$JSON" -eq 1 ]]; then
+    if [[ "$available" -eq 0 ]]; then
+      printf '{"available":false,"reason":"spotlight_unavailable","items":[]}\n'
+      return 0
+    fi
+    printf '{"available":true,"items":['
+    local first=1 kb epoch provider path kb_num epoch_num
+    while IFS=$'\t' read -r kb epoch provider path; do
+      [[ -z "${path:-}" ]] && continue
+      kb_num="$(printf '%s\n' "${kb:-0}" | sed 's/^0*//; s/^$/0/')"
+      epoch_num="$(printf '%s\n' "${epoch:-0}" | sed 's/^0*//; s/^$/0/')"
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '{"path":"%s","name":"%s","provider":"%s","size_kb":%s,"size":"%s","modified_epoch":%s,"modified":"%s","mode":"fast","guidance":"%s"}' \
+        "$(printf '%s' "$path" | json_escape)" \
+        "$(printf '%s' "$(basename "$path")" | json_escape)" \
+        "$(printf '%s' "$provider" | json_escape)" \
+        "$kb_num" \
+        "$(human_kb "${kb:-0}" | json_escape)" \
+        "${epoch_num:-0}" \
+        "$(file_mtime_iso "${epoch_num:-0}" | json_escape)" \
+        "$(printf '%s' "Review in Finder or the provider app. Deleting local cloud files may sync deletes remotely." | json_escape)"
+    done <<<"$rows"
+    printf ']}\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}quick local cloud files${RESET}"
+  printf 'Fast Spotlight-backed review. cleanroom does not delete cloud files or evict local copies.\n'
+  printf 'Minimum: %sMB  Limit: %s\n\n' "$MIN_MB" "$LIMIT"
+  if [[ "$available" -eq 0 ]]; then
+    printf 'Spotlight search is not available. Use Cloud Files when you want a deeper review.\n'
+    return 0
+  fi
+  if [[ -z "$rows" ]]; then
+    printf 'No large local cloud-sync files found in the Spotlight index.\n'
+    return 0
+  fi
+  printf '%-10s %-12s %-18s %s\n' "size" "modified" "provider" "file"
+  local kb epoch provider path epoch_num
+  while IFS=$'\t' read -r kb epoch provider path; do
+    [[ -z "${path:-}" ]] && continue
+    epoch_num="$(printf '%s\n' "${epoch:-0}" | sed 's/^0*//; s/^$/0/')"
+    printf '%-10s %-12s %-18s %s\n' "$(human_kb "$kb")" "$(file_mtime_iso "${epoch_num:-0}")" "$provider" "$(basename "$path")"
+  done <<<"$rows"
 }
 
 personal_rows() {
@@ -8062,7 +8143,7 @@ overview() {
   printf 'cleanroom updaters\n'
   printf 'cleanroom containers\n'
   printf 'cleanroom cloud\n'
-  printf 'cleanroom cloudfiles --min-mb 250 --limit 50\n'
+  printf 'cleanroom cloudfiles-fast --min-mb 250 --limit 50\n'
   printf 'cleanroom personal\n'
   printf 'cleanroom communications\n'
   printf 'cleanroom browsercaches\n'
@@ -9053,7 +9134,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  dashboard|overview|map|map-fast|mapfast|snapshot|snapshot-fast|snapshotfast|diff|state|permissions|review|scan|system-data|system-data-fast|systemdata-fast|systemdatafast|plan|large|large-fast|largefast|brokenlinks|brokenlinks-fast|brokenlinksfast|broken-links-fast|broken-linksfast|quarantine|quarantine-fast|quarantinefast|metadata|metadata-fast|metadatafast|quicklook|fontcaches|font-caches|webcaches|web-caches|savedstate|saved-state|projectcaches|project-caches|projectcaches-fast|projectcachesfast|project-caches-fast|project-cachesfast|developer-fast|developerfast|updaters|updater-caches|browsercaches|browser-caches|browsercaches-fast|browsercachesfast|browser-caches-fast|browser-cachesfast|duplicates|duplicates-fast|duplicatesfast|documents|desktop|screenshots|archives|archives-fast|archivesfast|downloads|downloads-fast|downloadsfast|installers|nodes|nodes-fast|nodesfast|venvs|venvs-fast|venvsfast|virtualenvs|virtualenvs-fast|virtualenvsfast|apps|apps-fast|appsfast|uninstallers|appreview|appdata|libraries|cloud|cloudfiles|cloud-files|personal|communications|comms|browsers|leftovers|backups|backups-fast|backupsfast|xcode|xcode-fast|xcodefast|android|startup|loginitems|trash|caches|caches-fast|cachesfast|diagnostics|packages|npm-cache|npmcache|yarn-cache|yarncache|pnpm-store|pnpmstore|cocoapods-cache|pod-cache|podcache|pip-cache|pipcache|receipts|homebrew|homebrew-cleanup|brewcleanup|toolchains|toolchains-fast|toolchainsfast|containers|containers-fast|containersfast|snapshots|report|report-fast|reportfast|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
+  dashboard|overview|map|map-fast|mapfast|snapshot|snapshot-fast|snapshotfast|diff|state|permissions|review|scan|system-data|system-data-fast|systemdata-fast|systemdatafast|plan|large|large-fast|largefast|brokenlinks|brokenlinks-fast|brokenlinksfast|broken-links-fast|broken-linksfast|quarantine|quarantine-fast|quarantinefast|metadata|metadata-fast|metadatafast|quicklook|fontcaches|font-caches|webcaches|web-caches|savedstate|saved-state|projectcaches|project-caches|projectcaches-fast|projectcachesfast|project-caches-fast|project-cachesfast|developer-fast|developerfast|updaters|updater-caches|browsercaches|browser-caches|browsercaches-fast|browsercachesfast|browser-caches-fast|browser-cachesfast|duplicates|duplicates-fast|duplicatesfast|documents|desktop|screenshots|archives|archives-fast|archivesfast|downloads|downloads-fast|downloadsfast|installers|nodes|nodes-fast|nodesfast|venvs|venvs-fast|venvsfast|virtualenvs|virtualenvs-fast|virtualenvsfast|apps|apps-fast|appsfast|uninstallers|appreview|appdata|libraries|cloud|cloudfiles|cloudfiles-fast|cloudfilesfast|cloud-files|cloud-files-fast|cloud-filesfast|personal|communications|comms|browsers|leftovers|backups|backups-fast|backupsfast|xcode|xcode-fast|xcodefast|android|startup|loginitems|trash|caches|caches-fast|cachesfast|diagnostics|packages|npm-cache|npmcache|yarn-cache|yarncache|pnpm-store|pnpmstore|cocoapods-cache|pod-cache|podcache|pip-cache|pipcache|receipts|homebrew|homebrew-cleanup|brewcleanup|toolchains|toolchains-fast|toolchainsfast|containers|containers-fast|containersfast|snapshots|report|report-fast|reportfast|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -9151,7 +9232,7 @@ while [[ "$#" -gt 0 ]]; do
     -h|--help) usage; exit 0 ;;
     -v|--version) echo "$VERSION"; exit 0 ;;
     *)
-      if [[ "$ACTION" == "guard" || "$ACTION" == "diff" || "$ACTION" == "large" || "$ACTION" == "large-fast" || "$ACTION" == "largefast" || "$ACTION" == "brokenlinks" || "$ACTION" == "brokenlinks-fast" || "$ACTION" == "brokenlinksfast" || "$ACTION" == "broken-links-fast" || "$ACTION" == "broken-linksfast" || "$ACTION" == "quarantine" || "$ACTION" == "quarantine-fast" || "$ACTION" == "quarantinefast" || "$ACTION" == "metadata" || "$ACTION" == "metadata-fast" || "$ACTION" == "metadatafast" || "$ACTION" == "projectcaches" || "$ACTION" == "project-caches" || "$ACTION" == "projectcaches-fast" || "$ACTION" == "projectcachesfast" || "$ACTION" == "project-caches-fast" || "$ACTION" == "project-cachesfast" || "$ACTION" == "developer-fast" || "$ACTION" == "developerfast" || "$ACTION" == "duplicates" || "$ACTION" == "duplicates-fast" || "$ACTION" == "duplicatesfast" || "$ACTION" == "documents" || "$ACTION" == "screenshots" || "$ACTION" == "archives" || "$ACTION" == "archives-fast" || "$ACTION" == "archivesfast" || "$ACTION" == "nodes" || "$ACTION" == "nodes-fast" || "$ACTION" == "nodesfast" || "$ACTION" == "venvs" || "$ACTION" == "venvs-fast" || "$ACTION" == "venvsfast" || "$ACTION" == "virtualenvs" || "$ACTION" == "virtualenvs-fast" || "$ACTION" == "virtualenvsfast" || "$ACTION" == "apps" || "$ACTION" == "apps-fast" || "$ACTION" == "appsfast" || "$ACTION" == "uninstallers" || "$ACTION" == "appreview" || "$ACTION" == "cloudfiles" || "$ACTION" == "cloud-files" || "$ACTION" == "leftovers" ]]; then
+      if [[ "$ACTION" == "guard" || "$ACTION" == "diff" || "$ACTION" == "large" || "$ACTION" == "large-fast" || "$ACTION" == "largefast" || "$ACTION" == "brokenlinks" || "$ACTION" == "brokenlinks-fast" || "$ACTION" == "brokenlinksfast" || "$ACTION" == "broken-links-fast" || "$ACTION" == "broken-linksfast" || "$ACTION" == "quarantine" || "$ACTION" == "quarantine-fast" || "$ACTION" == "quarantinefast" || "$ACTION" == "metadata" || "$ACTION" == "metadata-fast" || "$ACTION" == "metadatafast" || "$ACTION" == "projectcaches" || "$ACTION" == "project-caches" || "$ACTION" == "projectcaches-fast" || "$ACTION" == "projectcachesfast" || "$ACTION" == "project-caches-fast" || "$ACTION" == "project-cachesfast" || "$ACTION" == "developer-fast" || "$ACTION" == "developerfast" || "$ACTION" == "duplicates" || "$ACTION" == "duplicates-fast" || "$ACTION" == "duplicatesfast" || "$ACTION" == "documents" || "$ACTION" == "screenshots" || "$ACTION" == "archives" || "$ACTION" == "archives-fast" || "$ACTION" == "archivesfast" || "$ACTION" == "nodes" || "$ACTION" == "nodes-fast" || "$ACTION" == "nodesfast" || "$ACTION" == "venvs" || "$ACTION" == "venvs-fast" || "$ACTION" == "venvsfast" || "$ACTION" == "virtualenvs" || "$ACTION" == "virtualenvs-fast" || "$ACTION" == "virtualenvsfast" || "$ACTION" == "apps" || "$ACTION" == "apps-fast" || "$ACTION" == "appsfast" || "$ACTION" == "uninstallers" || "$ACTION" == "appreview" || "$ACTION" == "cloudfiles" || "$ACTION" == "cloudfiles-fast" || "$ACTION" == "cloudfilesfast" || "$ACTION" == "cloud-files" || "$ACTION" == "cloud-files-fast" || "$ACTION" == "cloud-filesfast" || "$ACTION" == "leftovers" ]]; then
         PATH_ARGS+=("$1")
       else
         die "Unknown option: $1"
@@ -9216,6 +9297,7 @@ case "$ACTION" in
   libraries) libraries ;;
   cloud) cloud ;;
   cloudfiles|cloud-files) cloudfiles ;;
+  cloudfiles-fast|cloudfilesfast|cloud-files-fast|cloud-filesfast) cloudfiles_fast ;;
   personal) personal ;;
   communications|comms) communications ;;
   browsers) browsers ;;

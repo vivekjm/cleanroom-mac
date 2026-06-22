@@ -368,7 +368,7 @@ final class AppState: ObservableObject {
         let jsonActions: Set<String> = [
             "large-fast", "duplicates-fast", "brokenlinks", "brokenlinks-fast", "quarantine-fast", "metadata-fast",
             "developer-fast", "nodes-fast", "venvs-fast", "apps-fast",
-            "downloads", "downloads-fast", "archives", "archives-fast", "screenshots", "trash", "cloudfiles", "caches-fast",
+            "downloads", "downloads-fast", "archives", "archives-fast", "screenshots", "trash", "cloudfiles", "cloudfiles-fast", "caches-fast",
             "quicklook", "fontcaches", "webcaches", "savedstate",
             "projectcaches", "projectcaches-fast", "updaters", "browsercaches", "browsercaches-fast",
             "xcode", "xcode-fast", "backups", "backups-fast", "system-data", "system-data-fast", "containers", "containers-fast", "toolchains", "toolchains-fast",
@@ -1055,7 +1055,7 @@ struct SidebarView: View {
                             NavRow("apps.iphone",             "Apps",        .run(title: "Apps",        args: "apps-fast --limit 30"), state)
                             NavRow("app.badge.checkmark.fill","App Review",  .dashboard, state, onTap: { state.showLeftovers = true })
                             NavRow("trash.fill",              "Trash",       .run(title: "Trash",       args: "trash"), state)
-                            NavRow("icloud.fill",             "Cloud Files", .run(title: "Cloud Files", args: "cloudfiles --min-mb 250 --limit 40"), state)
+                            NavRow("icloud.fill",             "Cloud Files", .run(title: "Cloud Files", args: "cloudfiles-fast --min-mb 250 --limit 40"), state)
                         }
                         SidebarSection("SYSTEM") {
                             NavRow("hammer.fill",             "Xcode",       .run(title: "Xcode",       args: "xcode-fast"), state)
