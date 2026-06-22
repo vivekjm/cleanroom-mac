@@ -83,6 +83,7 @@ final class AppState: ObservableObject {
     var enginePath = ""
     private var lastStatsRefresh: Date? = nil
     private var currentProcess: Process? = nil
+    private var currentRunID = UUID()
 
     func resolveEngine() {
         if let r = Bundle.main.resourceURL {
@@ -164,15 +165,23 @@ final class AppState: ObservableObject {
 
     func run(_ args: String, title: String) {
         guard !running else { return }
+        let runID = UUID()
+        currentRunID = runID
+        currentProcess = nil
         running    = true
         status     = "\(title) in progress..."
         output    += "\n\(title) started\n"
         let command = resolvedCommand(splitArgs(args))
         Task.detached(priority: .userInitiated) {
             let result = await Self.exec(command.executable, command.arguments) { process in
-                Task { @MainActor in self.currentProcess = process }
+                Task { @MainActor in
+                    if self.currentRunID == runID && self.running && process.isRunning {
+                        self.currentProcess = process
+                    }
+                }
             }
             await MainActor.run {
+                guard self.currentRunID == runID else { return }
                 self.currentProcess = nil
                 self.output += result.output
                 if result.status == 15 {
@@ -199,6 +208,7 @@ final class AppState: ObservableObject {
         status = "Stopping..."
         output += "Stopping current action...\n"
         outputOpen = true
+        currentProcess = nil
         process.terminate()
     }
 
