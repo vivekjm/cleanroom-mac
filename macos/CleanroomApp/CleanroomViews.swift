@@ -45,10 +45,10 @@ final class AppState: ObservableObject {
 
     @Published var dest:             NavDest = .dashboard
     @Published var filter:           String  = "all"
-    @Published var output:           String  = "Ready.\n"
+    @Published var output:           String  = "No activity yet.\n"
     @Published var running:          Bool    = false
     @Published var status:           String  = "Ready"
-    @Published var activityMessage:  String  = "Choose a scan or cleanup to begin."
+    @Published var activityMessage:  String  = "Choose a review or cleanup to begin."
     @Published var outputOpen:       Bool    = false
     @Published var showLeftovers:    Bool    = false
     @Published var showApplyConfirm: Bool    = false
@@ -175,7 +175,7 @@ final class AppState: ObservableObject {
         running    = true
         status     = "\(title) in progress..."
         activityMessage = "\(title) is running. You can stop it anytime."
-        output    += "\n\(title) started\n"
+        output    += "\nReviewing \(title)...\n"
         let commandArgs = appFacingArgs(splitArgs(args))
         let command = resolvedCommand(commandArgs)
         Task.detached(priority: .userInitiated) {
@@ -194,7 +194,7 @@ final class AppState: ObservableObject {
                 if result.status == 15 {
                     self.status = "\(title) stopped"
                     self.activityMessage = "\(title) stopped. Open details to see where it paused."
-                    self.output += "Stopped.\n"
+                    self.output += "Review stopped.\n"
                     self.outputOpen = true
                 } else if result.status == 0 {
                     self.status = "\(title) complete"
@@ -231,7 +231,7 @@ final class AppState: ObservableObject {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(output, forType: .string)
         status = "Details copied"
-        activityMessage = "Activity details copied."
+        activityMessage = "Review details copied."
     }
 
     private func resolvedCommand(_ args: [String]) -> (executable: String, arguments: [String]) {
@@ -943,7 +943,7 @@ struct CategoryCardView: View {
                     state.run(category.args, title: category.title)
                 } label: {
                     HStack(spacing: 5) {
-                        Text("Inspect")
+                        Text("Review")
                             .font(.system(size: 13, weight: .medium))
                         Image(systemName: "arrow.right")
                             .font(.system(size: 11, weight: .semibold))
@@ -1030,7 +1030,7 @@ struct OutputPanel: View {
                     IconBtn(icon: "doc.on.clipboard", dark: true) {
                         state.copyDetails()
                     }
-                    IconBtn(icon: "trash", dark: true) { state.output = "" }
+                    IconBtn(icon: "trash", dark: true) { state.output = "No activity yet.\n" }
                 }
                 IconBtn(icon: state.outputOpen ? "chevron.down" : "chevron.up", dark: true) {
                     withAnimation(DS.Ani.std) { state.outputOpen.toggle() }
@@ -1044,7 +1044,8 @@ struct OutputPanel: View {
                 ScrollViewReader { proxy in
                     ScrollView(showsIndicators: true) {
                         Text(state.output)
-                            .font(DS.T.mono)
+                            .font(DS.T.bodySm)
+                            .lineSpacing(3)
                             .foregroundColor(DS.C.textOnDark.opacity(0.88))
                             .textSelection(.enabled)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -1052,7 +1053,7 @@ struct OutputPanel: View {
                             .id("bottom")
                     }
                     .frame(height: DS.Layout.outputH)
-                    .background(DS.C.terminalBg)
+                    .background(DS.C.sidebarBg.opacity(0.98))
                     .onReceive(state.$output) { _ in
                         withAnimation(DS.Ani.snap) { proxy.scrollTo("bottom", anchor: .bottom) }
                     }
