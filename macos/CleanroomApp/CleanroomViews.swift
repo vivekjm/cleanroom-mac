@@ -77,7 +77,7 @@ final class AppState: ObservableObject {
 
     @Published var stats: [StorageStat] = [
         StorageStat(label: "Disk Used",   value: "—"),
-        StorageStat(label: "Reclaimable", value: "Run Scan"),
+        StorageStat(label: "Reclaimable", value: "Checking"),
         StorageStat(label: "Protected",   value: "On"),
         StorageStat(label: "Last Scan",   value: "Not yet"),
     ]
@@ -759,6 +759,7 @@ struct RootView: View {
         .onAppear {
             state.resolveEngine()
             state.status = "Ready"
+            state.refreshStats(force: true)
         }
     }
 }
@@ -796,7 +797,7 @@ struct SidebarView: View {
                             NavRow("square.grid.2x2.fill",    "Dashboard",   .dashboard, state)
                             NavRow("heart.text.square.fill",  "Doctor",      .run(title: "Doctor",      args: "doctor"), state)
                             NavRow("chart.bar.fill",          "Storage Map", .run(title: "Map",         args: "map"), state)
-                            NavRow("magnifyingglass",         "Quick Scan",  .dashboard, state, onTap: { state.refreshStats(force: true) })
+                            NavRow("magnifyingglass",         "Refresh Summary", .dashboard, state, onTap: { state.refreshStats(force: true) })
                             NavRow("text.badge.checkmark",    "Review",      .dashboard, state, onTap: { state.filter = "all"; state.refreshStats(force: true) })
                             NavRow("list.clipboard.fill",     "Clean Plan",  .dashboard, state, onTap: { state.showApplyConfirm = true })
                         }
@@ -1011,7 +1012,7 @@ struct HeaderStats: View {
             // Action strip below stats
             HStack(spacing: DS.Sp.sm) {
                 PillBtn("Refresh", style: .ghost) { state.refreshStats(force: true) }
-                PillBtn("Scan Now", style: .ghost) { state.refreshStats(force: true) }
+                PillBtn("Update Summary", style: .ghost) { state.refreshStats(force: true) }
                 Spacer()
                 PillBtn("Clean Safely", style: .primary) {
                     state.showApplyConfirm = true

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.3.0"
+VERSION="1.4.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -7272,10 +7272,10 @@ dashboard() {
 
 dashboard_card_rows() {
   local cache downloads large archives developer screenshots trash node
-  cache="$(sum_existing_kb "~/Library/Caches" "~/.cache" "~/Library/Logs")"
-  downloads="$(download_artifact_total_kb)"
-  archives="$(archive_rows | tab_rows_total_kb)"
-  screenshots="$(screenshot_total_kb)"
+  cache="$(sum_existing_kb "~/.cache" "~/Library/Logs" "~/.npm/_cacache" "~/.yarn/cache" "~/Library/pnpm/store")"
+  downloads=0
+  archives=0
+  screenshots=0
   trash="$(trash_total_kb)"
   large=0
   node=0
@@ -7288,11 +7288,11 @@ dashboard_card_rows() {
 
   printf '%s\t%s\t%s\t%s\t%s\n' "$cache" "caches" "Caches" "$(human_kb "$cache")" "App and system caches"
   printf '%s\t%s\t%s\t%s\t%s\n' "$node" "node-modules" "Node Modules" "$(human_kb "$node")" "Stale dependency folders"
-  printf '%s\t%s\t%s\t%s\t%s\n' "$downloads" "downloads" "Downloads" "$(human_kb "$downloads")" "Old downloadable artifacts"
+  printf '%s\t%s\t%s\t%s\t%s\n' "$downloads" "downloads" "Downloads" "Review" "Old downloadable artifacts"
   printf '%s\t%s\t%s\t%s\t%s\n' "$large" "large-files" "Large Files" "$(human_kb "$large")" "Large files found quickly"
-  printf '%s\t%s\t%s\t%s\t%s\n' "$archives" "archives" "Archives" "$(human_kb "$archives")" "Old archives and disk images"
+  printf '%s\t%s\t%s\t%s\t%s\n' "$archives" "archives" "Archives" "Review" "Old archives and disk images"
   printf '%s\t%s\t%s\t%s\t%s\n' "$developer" "developer" "Developer" "$(human_kb "$developer")" "Stale developer dependency folders"
-  printf '%s\t%s\t%s\t%s\t%s\n' "$screenshots" "screenshots" "Screenshots" "$(human_kb "$screenshots")" "Old screenshots and recordings"
+  printf '%s\t%s\t%s\t%s\t%s\n' "$screenshots" "screenshots" "Screenshots" "Review" "Old screenshots and recordings"
   printf '%s\t%s\t%s\t%s\t%s\n' "$trash" "trash" "Trash" "$(human_kb "$trash")" "Current Trash contents"
 }
 
