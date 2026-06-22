@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.91.0"
+VERSION="0.92.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -93,7 +93,9 @@ Usage:
   cleanroom downloads [--days N] [--limit N] [--json]
   cleanroom installers [--days N] [--limit N] [--json]
   cleanroom nodes [PATH] [--days N] [--limit N] [--json]
+  cleanroom nodes-fast [PATH] [--days N] [--limit N] [--json]
   cleanroom venvs [PATH] [--days N] [--limit N] [--json]
+  cleanroom venvs-fast [PATH] [--days N] [--limit N] [--json]
   cleanroom apps [PATH] [--limit N] [--json]
   cleanroom uninstallers [PATH] [--limit N] [--json]
   cleanroom appreview QUERY... [--limit N] [--json]
@@ -3654,28 +3656,63 @@ node_rows() {
   done < <(node_roots) | sort -rn | head -n "$LIMIT"
 }
 
+node_fast_rows() {
+  command -v mdfind >/dev/null 2>&1 || return 2
+  local now root path epoch age_days kb
+  now="$(date '+%s')"
+  while IFS= read -r root; do
+    [[ -d "$root" ]] || continue
+    mdfind -onlyin "$root" 'kMDItemFSName == "node_modules"' 2>/dev/null || true
+  done < <(node_roots) |
+    sort -u |
+    while IFS= read -r path; do
+      [[ -d "$path" && "$(basename "$path")" == "node_modules" ]] || continue
+      epoch="$(path_mtime_epoch "$path")"
+      if [[ "$epoch" -gt 0 && "$now" -ge "$epoch" ]]; then
+        age_days=$(((now - epoch) / 86400))
+      else
+        age_days=0
+      fi
+      [[ "$age_days" -gt "$DAYS" ]] || continue
+      printf '%012d\t%s\t%s\n' "$epoch" "$age_days" "$path"
+    done |
+    sort -rn |
+    head -n "$LIMIT" |
+    while IFS=$'\t' read -r epoch age_days path; do
+      [[ -n "${path:-}" ]] || continue
+      kb="$(size_kb "$path")"
+      printf '%012d\t%s\t%s\t%s\n' "$kb" "$epoch" "$age_days" "$path"
+    done |
+    sort -rn
+}
+
+nodes_json_rows() {
+  local rows="$1"
+  printf '['
+  local first=1 kb epoch age_days path kb_num
+  while IFS=$'\t' read -r kb epoch age_days path; do
+    [[ -z "${path:-}" ]] && continue
+    kb_num="$(printf '%s\n' "$kb" | sed 's/^0*//; s/^$/0/')"
+    [[ "$first" -eq 0 ]] && printf ','
+    first=0
+    printf '{"path":"%s","size_kb":%s,"size":"%s","modified_epoch":%s,"age_days":%s,"preview_command":"%s","apply_command":"%s"}' \
+      "$(printf '%s' "$path" | json_escape)" \
+      "$kb_num" \
+      "$(human_kb "${kb:-0}" | json_escape)" \
+      "${epoch:-0}" \
+      "${age_days:-0}" \
+      "$(printf 'cleanroom clean --include-node-stale --days %s' "$DAYS" | json_escape)" \
+      "$(printf 'cleanroom clean --apply --trash --include-node-stale --days %s' "$DAYS" | json_escape)"
+  done <<<"$rows"
+  printf ']\n'
+}
+
 nodes() {
   local rows
   rows="$(node_rows)"
 
   if [[ "$JSON" -eq 1 ]]; then
-    printf '['
-    local first=1 kb epoch age_days path kb_num
-    while IFS=$'\t' read -r kb epoch age_days path; do
-      [[ -z "${path:-}" ]] && continue
-      kb_num="$(printf '%s\n' "$kb" | sed 's/^0*//; s/^$/0/')"
-      [[ "$first" -eq 0 ]] && printf ','
-      first=0
-      printf '{"path":"%s","size_kb":%s,"size":"%s","modified_epoch":%s,"age_days":%s,"preview_command":"%s","apply_command":"%s"}' \
-        "$(printf '%s' "$path" | json_escape)" \
-        "$kb_num" \
-        "$(human_kb "${kb:-0}" | json_escape)" \
-        "${epoch:-0}" \
-        "${age_days:-0}" \
-        "$(printf 'cleanroom clean --include-node-stale --days %s' "$DAYS" | json_escape)" \
-        "$(printf 'cleanroom clean --apply --trash --include-node-stale --days %s' "$DAYS" | json_escape)"
-    done <<<"$rows"
-    printf ']\n'
+    nodes_json_rows "$rows"
     return 0
   fi
 
@@ -3699,6 +3736,45 @@ nodes() {
   done <<<"$rows"
   printf '\nPreview cleanup with: cleanroom clean --include-node-stale --days %s\n' "$DAYS"
   printf 'Apply cleanup with: cleanroom clean --apply --trash --include-node-stale --days %s\n' "$DAYS"
+}
+
+nodes_fast() {
+  local rows available=1
+  rows="$(node_fast_rows)" || available=0
+
+  if [[ "$JSON" -eq 1 ]]; then
+    if [[ "$available" -eq 0 ]]; then
+      printf '{"available":false,"reason":"spotlight_unavailable","items":[]}\n'
+      return 0
+    fi
+    printf '{"available":true,"items":'
+    nodes_json_rows "$rows"
+    printf '}\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}cleanroom quick stale node_modules${RESET}"
+  printf 'Preview from Spotlight metadata. No files are deleted.\n'
+  if [[ "${#PATH_ARGS[@]}" -gt 0 ]]; then
+    printf 'Path: %s\n' "$(expand_path "${PATH_ARGS[0]}")"
+  else
+    printf 'Paths: ~/Documents, ~/Desktop, ~/Downloads\n'
+  fi
+  printf 'Older than: %s days  Limit: %s\n\n' "$DAYS" "$LIMIT"
+  if [[ "$available" -eq 0 ]]; then
+    printf 'Spotlight search is not available. Use the deeper Node Modules scan when you want an exhaustive review.\n'
+    return 0
+  fi
+  if [[ -z "$rows" ]]; then
+    printf 'No stale node_modules folders found in the Spotlight index.\n'
+    return 0
+  fi
+  printf '%-10s %-9s %s\n' "size" "age" "path"
+  local kb epoch age_days path
+  while IFS=$'\t' read -r kb epoch age_days path; do
+    [[ -z "${path:-}" ]] && continue
+    printf '%-10s %4sd     %s\n' "$(human_kb "$kb")" "${age_days:-0}" "$path"
+  done <<<"$rows"
 }
 
 venv_roots() {
@@ -3732,29 +3808,65 @@ venv_rows() {
   done < <(venv_roots) | sort -rn | head -n "$LIMIT"
 }
 
+venv_fast_rows() {
+  command -v mdfind >/dev/null 2>&1 || return 2
+  local now root marker path kb epoch age_days
+  now="$(date '+%s')"
+  while IFS= read -r root; do
+    [[ -d "$root" ]] || continue
+    mdfind -onlyin "$root" 'kMDItemFSName == "pyvenv.cfg"' 2>/dev/null || true
+  done < <(venv_roots) |
+    sort -u |
+    while IFS= read -r marker; do
+      [[ -f "$marker" && "$(basename "$marker")" == "pyvenv.cfg" ]] || continue
+      path="$(dirname "$marker")"
+      epoch="$(path_mtime_epoch "$marker")"
+      if [[ "$epoch" -gt 0 && "$now" -ge "$epoch" ]]; then
+        age_days=$(((now - epoch) / 86400))
+      else
+        age_days=0
+      fi
+      [[ "$age_days" -gt "$DAYS" ]] || continue
+      printf '%012d\t%s\t%s\t%s\n' "$epoch" "$age_days" "$path" "$marker"
+    done |
+    sort -rn |
+    head -n "$LIMIT" |
+    while IFS=$'\t' read -r epoch age_days path marker; do
+      [[ -n "${path:-}" ]] || continue
+      kb="$(size_kb "$path")"
+      printf '%012d\t%s\t%s\t%s\t%s\n' "$kb" "$epoch" "$age_days" "$path" "$marker"
+    done |
+    sort -rn
+}
+
+venvs_json_rows() {
+  local rows="$1"
+  printf '['
+  local first=1 kb epoch age_days path marker kb_num
+  while IFS=$'\t' read -r kb epoch age_days path marker; do
+    [[ -z "${path:-}" ]] && continue
+    kb_num="$(printf '%s\n' "$kb" | sed 's/^0*//; s/^$/0/')"
+    [[ "$first" -eq 0 ]] && printf ','
+    first=0
+    printf '{"path":"%s","marker":"%s","size_kb":%s,"size":"%s","modified_epoch":%s,"age_days":%s,"preview_command":"%s","apply_command":"%s"}' \
+      "$(printf '%s' "$path" | json_escape)" \
+      "$(printf '%s' "$marker" | json_escape)" \
+      "$kb_num" \
+      "$(human_kb "${kb:-0}" | json_escape)" \
+      "${epoch:-0}" \
+      "${age_days:-0}" \
+      "$(printf 'cleanroom clean --include-venv-stale --days %s' "$DAYS" | json_escape)" \
+      "$(printf 'cleanroom clean --apply --trash --include-venv-stale --days %s' "$DAYS" | json_escape)"
+  done <<<"$rows"
+  printf ']\n'
+}
+
 venvs() {
   local rows
   rows="$(venv_rows)"
 
   if [[ "$JSON" -eq 1 ]]; then
-    printf '['
-    local first=1 kb epoch age_days path marker kb_num
-    while IFS=$'\t' read -r kb epoch age_days path marker; do
-      [[ -z "${path:-}" ]] && continue
-      kb_num="$(printf '%s\n' "$kb" | sed 's/^0*//; s/^$/0/')"
-      [[ "$first" -eq 0 ]] && printf ','
-      first=0
-      printf '{"path":"%s","marker":"%s","size_kb":%s,"size":"%s","modified_epoch":%s,"age_days":%s,"preview_command":"%s","apply_command":"%s"}' \
-        "$(printf '%s' "$path" | json_escape)" \
-        "$(printf '%s' "$marker" | json_escape)" \
-        "$kb_num" \
-        "$(human_kb "${kb:-0}" | json_escape)" \
-        "${epoch:-0}" \
-        "${age_days:-0}" \
-        "$(printf 'cleanroom clean --include-venv-stale --days %s' "$DAYS" | json_escape)" \
-        "$(printf 'cleanroom clean --apply --trash --include-venv-stale --days %s' "$DAYS" | json_escape)"
-    done <<<"$rows"
-    printf ']\n'
+    venvs_json_rows "$rows"
     return 0
   fi
 
@@ -3779,6 +3891,45 @@ venvs() {
   done <<<"$rows"
   printf '\nPreview cleanup with: cleanroom clean --include-venv-stale --days %s\n' "$DAYS"
   printf 'Apply cleanup with: cleanroom clean --apply --trash --include-venv-stale --days %s\n' "$DAYS"
+}
+
+venvs_fast() {
+  local rows available=1
+  rows="$(venv_fast_rows)" || available=0
+
+  if [[ "$JSON" -eq 1 ]]; then
+    if [[ "$available" -eq 0 ]]; then
+      printf '{"available":false,"reason":"spotlight_unavailable","items":[]}\n'
+      return 0
+    fi
+    printf '{"available":true,"items":'
+    venvs_json_rows "$rows"
+    printf '}\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}cleanroom quick stale Python virtualenvs${RESET}"
+  printf 'Preview from Spotlight metadata. No files are deleted.\n'
+  if [[ "${#PATH_ARGS[@]}" -gt 0 ]]; then
+    printf 'Path: %s\n' "$(expand_path "${PATH_ARGS[0]}")"
+  else
+    printf 'Paths: ~/Documents, ~/Desktop, ~/Downloads\n'
+  fi
+  printf 'Older than: %s days  Limit: %s\n\n' "$DAYS" "$LIMIT"
+  if [[ "$available" -eq 0 ]]; then
+    printf 'Spotlight search is not available. Use the deeper Virtualenvs scan when you want an exhaustive review.\n'
+    return 0
+  fi
+  if [[ -z "$rows" ]]; then
+    printf 'No stale Python virtualenv folders found in the Spotlight index.\n'
+    return 0
+  fi
+  printf '%-10s %-9s %s\n' "size" "age" "path"
+  local kb epoch age_days path marker
+  while IFS=$'\t' read -r kb epoch age_days path marker; do
+    [[ -z "${path:-}" ]] && continue
+    printf '%-10s %4sd     %s\n' "$(human_kb "$kb")" "${age_days:-0}" "$path"
+  done <<<"$rows"
 }
 
 duplicate_candidates() {
@@ -7720,7 +7871,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  dashboard|overview|map|snapshot|diff|state|permissions|review|scan|system-data|plan|large|large-fast|largefast|brokenlinks|quarantine|quarantine-fast|quarantinefast|metadata|metadata-fast|metadatafast|quicklook|fontcaches|font-caches|webcaches|web-caches|savedstate|saved-state|projectcaches|project-caches|updaters|updater-caches|browsercaches|browser-caches|duplicates|duplicates-fast|duplicatesfast|documents|desktop|screenshots|archives|downloads|installers|nodes|venvs|virtualenvs|apps|uninstallers|appreview|appdata|libraries|cloud|cloudfiles|cloud-files|personal|communications|comms|browsers|leftovers|backups|xcode|android|startup|loginitems|trash|caches|diagnostics|packages|npm-cache|npmcache|yarn-cache|yarncache|pnpm-store|pnpmstore|cocoapods-cache|pod-cache|podcache|pip-cache|pipcache|receipts|homebrew|homebrew-cleanup|brewcleanup|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
+  dashboard|overview|map|snapshot|diff|state|permissions|review|scan|system-data|plan|large|large-fast|largefast|brokenlinks|quarantine|quarantine-fast|quarantinefast|metadata|metadata-fast|metadatafast|quicklook|fontcaches|font-caches|webcaches|web-caches|savedstate|saved-state|projectcaches|project-caches|updaters|updater-caches|browsercaches|browser-caches|duplicates|duplicates-fast|duplicatesfast|documents|desktop|screenshots|archives|downloads|installers|nodes|nodes-fast|nodesfast|venvs|venvs-fast|venvsfast|virtualenvs|virtualenvs-fast|virtualenvsfast|apps|uninstallers|appreview|appdata|libraries|cloud|cloudfiles|cloud-files|personal|communications|comms|browsers|leftovers|backups|xcode|android|startup|loginitems|trash|caches|diagnostics|packages|npm-cache|npmcache|yarn-cache|yarncache|pnpm-store|pnpmstore|cocoapods-cache|pod-cache|podcache|pip-cache|pipcache|receipts|homebrew|homebrew-cleanup|brewcleanup|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -7818,7 +7969,7 @@ while [[ "$#" -gt 0 ]]; do
     -h|--help) usage; exit 0 ;;
     -v|--version) echo "$VERSION"; exit 0 ;;
     *)
-      if [[ "$ACTION" == "guard" || "$ACTION" == "diff" || "$ACTION" == "large" || "$ACTION" == "large-fast" || "$ACTION" == "largefast" || "$ACTION" == "brokenlinks" || "$ACTION" == "quarantine" || "$ACTION" == "quarantine-fast" || "$ACTION" == "quarantinefast" || "$ACTION" == "metadata" || "$ACTION" == "metadata-fast" || "$ACTION" == "metadatafast" || "$ACTION" == "projectcaches" || "$ACTION" == "project-caches" || "$ACTION" == "duplicates" || "$ACTION" == "duplicates-fast" || "$ACTION" == "duplicatesfast" || "$ACTION" == "documents" || "$ACTION" == "screenshots" || "$ACTION" == "archives" || "$ACTION" == "nodes" || "$ACTION" == "venvs" || "$ACTION" == "virtualenvs" || "$ACTION" == "apps" || "$ACTION" == "uninstallers" || "$ACTION" == "appreview" || "$ACTION" == "cloudfiles" || "$ACTION" == "cloud-files" || "$ACTION" == "leftovers" ]]; then
+      if [[ "$ACTION" == "guard" || "$ACTION" == "diff" || "$ACTION" == "large" || "$ACTION" == "large-fast" || "$ACTION" == "largefast" || "$ACTION" == "brokenlinks" || "$ACTION" == "quarantine" || "$ACTION" == "quarantine-fast" || "$ACTION" == "quarantinefast" || "$ACTION" == "metadata" || "$ACTION" == "metadata-fast" || "$ACTION" == "metadatafast" || "$ACTION" == "projectcaches" || "$ACTION" == "project-caches" || "$ACTION" == "duplicates" || "$ACTION" == "duplicates-fast" || "$ACTION" == "duplicatesfast" || "$ACTION" == "documents" || "$ACTION" == "screenshots" || "$ACTION" == "archives" || "$ACTION" == "nodes" || "$ACTION" == "nodes-fast" || "$ACTION" == "nodesfast" || "$ACTION" == "venvs" || "$ACTION" == "venvs-fast" || "$ACTION" == "venvsfast" || "$ACTION" == "virtualenvs" || "$ACTION" == "virtualenvs-fast" || "$ACTION" == "virtualenvsfast" || "$ACTION" == "apps" || "$ACTION" == "uninstallers" || "$ACTION" == "appreview" || "$ACTION" == "cloudfiles" || "$ACTION" == "cloud-files" || "$ACTION" == "leftovers" ]]; then
         PATH_ARGS+=("$1")
       else
         die "Unknown option: $1"
@@ -7863,7 +8014,9 @@ case "$ACTION" in
   downloads) downloads ;;
   installers) installers ;;
   nodes) nodes ;;
+  nodes-fast|nodesfast) nodes_fast ;;
   venvs|virtualenvs) venvs ;;
+  venvs-fast|venvsfast|virtualenvs-fast|virtualenvsfast) venvs_fast ;;
   apps) apps ;;
   uninstallers) uninstallers ;;
   appreview) appreview ;;

@@ -863,6 +863,11 @@ python3 -m json.tool "$nodes_json" >/dev/null
 grep 'node_modules' "$nodes_json" >/dev/null
 grep 'cleanroom clean --apply --trash --include-node-stale --days 30' "$nodes_json" >/dev/null
 rm -f "$nodes_json"
+nodes_fast_json="$(mktemp)"
+"$BIN" nodes-fast --json "$HOME/Documents" --days 30 --limit 5 > "$nodes_fast_json"
+python3 -m json.tool "$nodes_fast_json" >/dev/null
+grep '"available":' "$nodes_fast_json" >/dev/null
+rm -f "$nodes_fast_json"
 "$BIN" venvs "$HOME/Documents" --days 30 --limit 5 | grep '.venv' >/dev/null
 venvs_json="$(mktemp)"
 "$BIN" venvs --json "$HOME/Documents" --days 30 --limit 5 > "$venvs_json"
@@ -870,6 +875,11 @@ python3 -m json.tool "$venvs_json" >/dev/null
 grep 'pyvenv.cfg' "$venvs_json" >/dev/null
 grep 'cleanroom clean --apply --trash --include-venv-stale --days 30' "$venvs_json" >/dev/null
 rm -f "$venvs_json"
+venvs_fast_json="$(mktemp)"
+"$BIN" venvs-fast --json "$HOME/Documents" --days 30 --limit 5 > "$venvs_fast_json"
+python3 -m json.tool "$venvs_fast_json" >/dev/null
+grep '"available":' "$venvs_fast_json" >/dev/null
+rm -f "$venvs_fast_json"
 "$BIN" apps "$HOME/Applications" --limit 5 | grep 'FakeBig' >/dev/null
 apps_json="$(mktemp)"
 "$BIN" apps --json "$HOME/Applications" --limit 5 > "$apps_json"
