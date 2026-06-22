@@ -531,6 +531,15 @@ grep 'saved-state' "$system_data_json" >/dev/null
 grep '"category":"protected"' "$system_data_json" >/dev/null
 grep 'cleanroom containers' "$system_data_json" >/dev/null
 rm -f "$system_data_json"
+"$BIN" system-data-fast | grep 'quick System Data' >/dev/null
+system_data_fast_json="$(mktemp)"
+"$BIN" system-data-fast --json > "$system_data_fast_json"
+python3 -m json.tool "$system_data_fast_json" >/dev/null
+grep '"id":"caches"' "$system_data_fast_json" >/dev/null
+grep '"id":"protected-personal"' "$system_data_fast_json" >/dev/null
+grep '"category":"protected"' "$system_data_fast_json" >/dev/null
+grep 'cleanroom system-data' "$system_data_fast_json" >/dev/null
+rm -f "$system_data_fast_json"
 "$BIN" rules | grep 'safe-app-caches' >/dev/null
 rules_json="$(mktemp)"
 "$BIN" rules --json > "$rules_json"

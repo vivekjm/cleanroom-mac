@@ -356,7 +356,7 @@ final class AppState: ObservableObject {
             "downloads", "archives", "screenshots", "trash", "cloudfiles",
             "quicklook", "fontcaches", "webcaches", "savedstate",
             "projectcaches", "projectcaches-fast", "updaters", "browsercaches",
-            "xcode", "backups", "system-data", "containers", "toolchains",
+            "xcode", "backups", "system-data", "system-data-fast", "containers", "toolchains",
             "loginitems", "startup", "snapshot", "state", "protect", "rules",
             "map", "map-fast", "doctor", "leftovers", "appreview"
         ]
@@ -480,6 +480,7 @@ final class AppState: ObservableObject {
         let path = displayPath(from: item)
         let detail = stringValue(item["summary"]) ??
             stringValue(item["guidance"]) ??
+            stringValue(item["description"]) ??
             stringValue(item["reason"]) ??
             stringValue(item["recoverability"]) ??
             stringValue(item["modified"]) ??
@@ -831,7 +832,7 @@ struct SidebarView: View {
                         SidebarSection("SYSTEM") {
                             NavRow("hammer.fill",             "Xcode",       .run(title: "Xcode",       args: "xcode"), state)
                             NavRow("clock.arrow.circlepath",  "Backups",     .run(title: "Backups",     args: "backups"), state)
-                            NavRow("externaldrive.fill",      "System Data", .run(title: "System Data", args: "system-data"), state)
+                            NavRow("externaldrive.fill",      "System Data", .run(title: "System Data", args: "system-data-fast"), state)
                             NavRow("shippingbox.fill",        "Containers",  .run(title: "Containers",  args: "containers"), state)
                             NavRow("wrench.and.screwdriver",  "Toolchains",  .run(title: "Toolchains",  args: "toolchains"), state)
                             NavRow("person.crop.circle",      "Login Items", .run(title: "Login Items", args: "loginitems"), state)

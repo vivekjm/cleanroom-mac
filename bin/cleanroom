@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.5.0"
+VERSION="1.6.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -70,6 +70,7 @@ Usage:
   cleanroom review [--json]
   cleanroom scan [options]
   cleanroom system-data [--json]
+  cleanroom system-data-fast [--json]
   cleanroom plan [--json]
   cleanroom large [PATH] [--min-mb N] [--limit N] [--json]
   cleanroom large-fast [PATH] [--min-mb N] [--limit N] [--json]
@@ -156,6 +157,7 @@ Actions:
   review               Show a read-only personal storage review checklist.
   scan                 Show disk usage and likely cleanup candidates.
   system-data          Break down common macOS System Data buckets.
+  system-data-fast     Show a quick desktop-app System Data summary.
   plan                 Rank safe cleanup opportunities and show copyable commands.
   large                List largest files for review without deleting anything.
   large-fast           Quickly list large files using Spotlight metadata.
@@ -229,7 +231,7 @@ Options:
   --trash              Move deleted files to ~/.Trash/cleanroom-* instead of rm -rf.
   --yes                Do not prompt before --apply cleanup.
   --verbose            Print every path touched.
-  --json               Emit JSON for dashboard, overview, map, map-fast, snapshot, diff, state, permissions, review, scan, system-data, plan, large, brokenlinks, quarantine, metadata, quicklook, fontcaches, webcaches, savedstate, projectcaches, updaters, browsercaches, duplicates,
+  --json               Emit JSON for dashboard, overview, map, map-fast, snapshot, diff, state, permissions, review, scan, system-data, system-data-fast, plan, large, brokenlinks, quarantine, metadata, quicklook, fontcaches, webcaches, savedstate, projectcaches, updaters, browsercaches, duplicates,
                        documents, desktop, screenshots, archives, downloads, installers, nodes, venvs, apps, uninstallers, appreview, appdata, libraries, cloud, cloudfiles, personal, communications,
                        browsers, leftovers, startup, loginitems,
                        trash, backups, xcode, caches, diagnostics, packages, npm-cache, yarn-cache, pnpm-store, cocoapods-cache, pip-cache, receipts, homebrew, homebrew-cleanup, toolchains,
@@ -328,6 +330,8 @@ Examples:
   cleanroom scan --json
   cleanroom system-data
   cleanroom system-data --json
+  cleanroom system-data-fast
+  cleanroom system-data-fast --json
   cleanroom plan
   cleanroom plan --json
   cleanroom large ~/Documents --min-mb 250 --limit 30
@@ -2369,6 +2373,62 @@ system_data() {
     printf '  apply: %s\n' "$apply"
     printf '  paths: %s\n' "$paths"
     printf '  %s\n' "$description"
+  done <<<"$rows"
+}
+
+system_data_fast_rows() {
+  local cache developer containers backups diagnostics protected_count
+  cache="$(sum_existing_kb "~/.cache" "~/Library/Caches" "~/Library/Logs" "~/.npm/_cacache" "~/.yarn/cache" "~/Library/pnpm/store")"
+  developer=0
+  if command -v mdfind >/dev/null 2>&1; then
+    developer="$(developer_fast_rows | tab_rows_total_kb)"
+  fi
+  containers="$(container_total_kb)"
+  backups="$(backup_cleanup_rows | tab_rows_total_kb)"
+  diagnostics="$(diagnostic_total_kb)"
+  protected_count="$(protected_present_count)"
+
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$cache" "caches" "Caches" "rebuildable" "cleanroom caches" "Fast estimate from rebuildable cache locations. Browser profiles, passwords, cookies, bookmarks, and account data stay protected."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$developer" "developer" "Developer Data" "review" "cleanroom xcode" "Fast Spotlight-backed estimate for stale developer dependency folders. Use Xcode, Android, and Toolchains for focused reviews."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$containers" "containers" "Container Storage" "high-impact" "cleanroom containers" "Docker, Colima, Lima, and Podman storage can be large and high-impact. Review before cleaning."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$backups" "device-backups" "Device Backups" "protected" "cleanroom backups" "Local iPhone and iPad backups are protected because they may be the only copy of device data."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$diagnostics" "diagnostics" "Logs and Diagnostics" "low-risk" "cleanroom diagnostics" "User logs, diagnostic reports, and crash reports are usually low-risk review targets."
+  printf '0\t%s\t%s\t%s\t%s\t%s\n' "protected-personal" "Protected Personal Data" "protected" "cleanroom protect" "Cleanroom keeps Photos, Mail, Messages, cloud-sync roots, Keychains, and browser profiles protected by default. ${protected_count} protected locations are present."
+  printf '0\t%s\t%s\t%s\t%s\t%s\n' "deep-system-data" "Deep System Data Review" "review" "cleanroom system-data" "Run the deep System Data breakdown when you need exhaustive Library and Application Support sizing."
+}
+
+system_data_fast() {
+  local rows
+  rows="$(system_data_fast_rows | sort -rn)"
+
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '['
+    local first=1 kb id title category command guidance
+    while IFS=$'\t' read -r kb id title category command guidance; do
+      [[ -z "${id:-}" ]] && continue
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '{"id":"%s","title":"%s","category":"%s","size_kb":%s,"size":"%s","command":"%s","guidance":"%s"}' \
+        "$(printf '%s' "$id" | json_escape)" \
+        "$(printf '%s' "$title" | json_escape)" \
+        "$(printf '%s' "$category" | json_escape)" \
+        "${kb:-0}" \
+        "$(human_kb "${kb:-0}" | json_escape)" \
+        "$(printf '%s' "$command" | json_escape)" \
+        "$(printf '%s' "$guidance" | json_escape)"
+    done <<<"$rows"
+    printf ']\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}cleanroom quick System Data${RESET}"
+  printf 'Fast read-only summary for the desktop app. Deep Library sizing is skipped.\n\n'
+  printf '%-10s %-18s %-12s %s\n' "size" "id" "category" "next command"
+  local kb id title category command guidance
+  while IFS=$'\t' read -r kb id title category command guidance; do
+    [[ -z "${id:-}" ]] && continue
+    printf '%-10s %-18s %-12s %s\n' "$(human_kb "${kb:-0}")" "$id" "$category" "$command"
+    printf '  %s\n' "$guidance"
   done <<<"$rows"
 }
 
@@ -8160,7 +8220,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  dashboard|overview|map|map-fast|mapfast|snapshot|diff|state|permissions|review|scan|system-data|plan|large|large-fast|largefast|brokenlinks|quarantine|quarantine-fast|quarantinefast|metadata|metadata-fast|metadatafast|quicklook|fontcaches|font-caches|webcaches|web-caches|savedstate|saved-state|projectcaches|project-caches|projectcaches-fast|projectcachesfast|project-caches-fast|project-cachesfast|developer-fast|developerfast|updaters|updater-caches|browsercaches|browser-caches|duplicates|duplicates-fast|duplicatesfast|documents|desktop|screenshots|archives|downloads|installers|nodes|nodes-fast|nodesfast|venvs|venvs-fast|venvsfast|virtualenvs|virtualenvs-fast|virtualenvsfast|apps|apps-fast|appsfast|uninstallers|appreview|appdata|libraries|cloud|cloudfiles|cloud-files|personal|communications|comms|browsers|leftovers|backups|xcode|android|startup|loginitems|trash|caches|diagnostics|packages|npm-cache|npmcache|yarn-cache|yarncache|pnpm-store|pnpmstore|cocoapods-cache|pod-cache|podcache|pip-cache|pipcache|receipts|homebrew|homebrew-cleanup|brewcleanup|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
+  dashboard|overview|map|map-fast|mapfast|snapshot|diff|state|permissions|review|scan|system-data|system-data-fast|systemdata-fast|systemdatafast|plan|large|large-fast|largefast|brokenlinks|quarantine|quarantine-fast|quarantinefast|metadata|metadata-fast|metadatafast|quicklook|fontcaches|font-caches|webcaches|web-caches|savedstate|saved-state|projectcaches|project-caches|projectcaches-fast|projectcachesfast|project-caches-fast|project-cachesfast|developer-fast|developerfast|updaters|updater-caches|browsercaches|browser-caches|duplicates|duplicates-fast|duplicatesfast|documents|desktop|screenshots|archives|downloads|installers|nodes|nodes-fast|nodesfast|venvs|venvs-fast|venvsfast|virtualenvs|virtualenvs-fast|virtualenvsfast|apps|apps-fast|appsfast|uninstallers|appreview|appdata|libraries|cloud|cloudfiles|cloud-files|personal|communications|comms|browsers|leftovers|backups|xcode|android|startup|loginitems|trash|caches|diagnostics|packages|npm-cache|npmcache|yarn-cache|yarncache|pnpm-store|pnpmstore|cocoapods-cache|pod-cache|podcache|pip-cache|pipcache|receipts|homebrew|homebrew-cleanup|brewcleanup|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -8280,6 +8340,7 @@ case "$ACTION" in
   review) review ;;
   scan) scan ;;
   system-data) system_data ;;
+  system-data-fast|systemdata-fast|systemdatafast) system_data_fast ;;
   plan) plan ;;
   large) large ;;
   large-fast|largefast) large_fast ;;
