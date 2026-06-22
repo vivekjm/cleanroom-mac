@@ -69,7 +69,7 @@ final class AppState: ObservableObject {
     @Published var showLeftovers:    Bool    = false
     @Published var showApplyConfirm: Bool    = false
     @Published var cardOffset:       Int     = 0
-    @Published var reviewTitle:      String  = "Review Details"
+    @Published var reviewTitle:      String  = "Review Summary"
     @Published var reviewItems:      [ReviewItem] = []
     @Published var cleanupPlanItems: [CleanupPlanItem] = []
     @Published var cleanupPlanNotes: [String] = []
@@ -299,7 +299,7 @@ final class AppState: ObservableObject {
                 self.output += displayOutput
                 if result.status == 15 {
                     self.status = "\(title) stopped"
-                    self.activityMessage = "\(title) stopped. Open details to see where it paused."
+                    self.activityMessage = "\(title) stopped. Open the summary to see where it paused."
                     self.output += "Review stopped.\n"
                     self.outputOpen = true
                 } else if result.status == 0 {
@@ -308,7 +308,7 @@ final class AppState: ObservableObject {
                     self.outputOpen = false
                 } else {
                     self.status = "\(title) needs attention"
-                    self.activityMessage = "\(title) needs attention. Open details for what happened."
+                    self.activityMessage = "\(title) needs attention. Open the summary for what happened."
                     self.outputOpen = true
                 }
                 self.running = false
@@ -336,9 +336,21 @@ final class AppState: ObservableObject {
 
     func copyDetails() {
         NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(output, forType: .string)
-        status = "Details copied"
-        activityMessage = "Review details copied."
+        NSPasteboard.general.setString(appFacingSummaryText(), forType: .string)
+        status = "Summary copied"
+        activityMessage = "Review summary copied."
+    }
+
+    private func appFacingSummaryText() -> String {
+        guard !reviewItems.isEmpty else { return output }
+        var lines = ["\(reviewTitle) — \(reviewItems.count) \(reviewItems.count == 1 ? "item" : "items")"]
+        for item in reviewItems {
+            lines.append("\(item.size)  \(item.title)  \(item.badge)")
+            if !item.detail.isEmpty {
+                lines.append("  \(item.detail)")
+            }
+        }
+        return lines.joined(separator: "\n") + "\n"
     }
 
     private func resolvedCommand(_ args: [String]) -> (executable: String, arguments: [String]) {
@@ -394,7 +406,7 @@ final class AppState: ObservableObject {
         if rows.count > 0 {
             return "\(title) found \(rows.count) review items. No files were changed."
         }
-        return "\(title) finished. Details are available if you need them."
+        return "\(title) finished. A summary is available if you need it."
     }
 
     private func presentableDetails(title: String, args: String, details: String) -> String {
@@ -711,7 +723,8 @@ final class AppState: ObservableObject {
                 if lowerTrimmed.contains("next command") ||
                     lowerTrimmed.contains("preview command") ||
                     lowerTrimmed.contains("apply command") ||
-                    lowerTrimmed.contains("review command") {
+                    lowerTrimmed.contains("review command") ||
+                    lowerTrimmed.contains("next steps") {
                     return nil
                 }
                 if hiddenFragments.contains(where: { line.localizedCaseInsensitiveContains($0) }) {
@@ -1245,7 +1258,7 @@ struct EmptyFilterState: View {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// MARK: – Activity Details Panel
+// MARK: – Activity Summary Panel
 // ═══════════════════════════════════════════════════════════════
 
 struct OutputPanel: View {
@@ -1359,8 +1372,8 @@ struct ReviewResultRow: View {
                     .foregroundColor(DS.C.textOnDark.opacity(0.66))
                     .lineLimit(2)
                     .truncationMode(.middle)
-                if let path = item.path, path != item.detail {
-                    Text(shortPath(path))
+                if let hint = locationHint(for: item) {
+                    Text(hint)
                         .font(DS.T.bodySm)
                         .foregroundColor(DS.C.textOnDark.opacity(0.46))
                         .lineLimit(1)
@@ -1378,6 +1391,30 @@ struct ReviewResultRow: View {
             RoundedRectangle(cornerRadius: DS.R.sm)
                 .stroke(DS.C.dividerOnDark, lineWidth: 1)
         )
+    }
+
+    private func locationHint(for item: ReviewItem) -> String? {
+        if item.badge.localizedCaseInsensitiveContains("protected") {
+            return "Protected by default"
+        }
+        guard let path = item.path, path != item.detail else { return nil }
+        return friendlyLocation(shortPath(path))
+    }
+
+    private func friendlyLocation(_ path: String) -> String {
+        let lower = path.lowercased()
+        if lower.contains("/downloads") || lower.hasPrefix("~/downloads") { return "In Downloads" }
+        if lower.contains("/desktop") || lower.hasPrefix("~/desktop") { return "On Desktop" }
+        if lower.contains("/documents") || lower.hasPrefix("~/documents") { return "In Documents" }
+        if lower.contains("/library/caches") || lower.contains("/.cache") { return "In app caches" }
+        if lower.contains("/library/developer") || lower.contains("/.gradle") || lower.contains("/node_modules") { return "In developer storage" }
+        if lower.contains("/library/cloudstorage") || lower.contains("/mobile documents") { return "In cloud storage" }
+        if lower.contains("/library/containers") || lower.contains("/library/group containers") { return "In app containers" }
+        if lower.contains("/library/application support") { return "In app support data" }
+        if lower.contains("/.trash") { return "In Trash" }
+        if lower.hasPrefix("/applications") || lower.hasPrefix("~/applications") { return "In Applications" }
+        if lower.contains("/library/logs") || lower.contains("/diagnosticreports") { return "In logs and reports" }
+        return "Local storage item"
     }
 
     private func shortPath(_ path: String) -> String {
