@@ -248,7 +248,7 @@ final class AppState: ObservableObject {
             "developer-fast", "nodes-fast", "venvs-fast", "apps-fast",
             "downloads", "archives", "screenshots", "trash", "cloudfiles",
             "quicklook", "fontcaches", "webcaches", "savedstate",
-            "projectcaches", "updaters", "browsercaches",
+            "projectcaches", "projectcaches-fast", "updaters", "browsercaches",
             "xcode", "backups", "system-data", "containers", "toolchains",
             "loginitems", "startup", "snapshot", "state", "protect", "rules",
             "map", "doctor", "leftovers", "appreview"
@@ -590,7 +590,7 @@ struct SidebarView: View {
                             NavRow("textformat",              "Font Caches", .run(title: "Font Caches", args: "fontcaches"), state)
                             NavRow("safari.fill",             "Web Caches",  .run(title: "Web Caches",  args: "webcaches"), state)
                             NavRow("rectangle.stack.fill",    "Saved State", .run(title: "Saved State", args: "savedstate"), state)
-                            NavRow("chevron.left.forwardslash.chevron.right", "Project Caches", .run(title: "Project Caches", args: "projectcaches --limit 40"), state)
+                            NavRow("chevron.left.forwardslash.chevron.right", "Project Caches", .run(title: "Project Caches", args: "projectcaches-fast --limit 40"), state)
                             NavRow("arrow.clockwise.circle.fill", "Updater Caches", .run(title: "Updater Caches", args: "updaters"), state)
                             NavRow("globe", "Browser Caches", .run(title: "Browser Caches", args: "browsercaches"), state)
                             NavRow("shippingbox.fill",        "Node Modules",.run(title: "Node Modules",args: "nodes-fast --limit 30 --days 30"), state)

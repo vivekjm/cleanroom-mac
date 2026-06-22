@@ -742,6 +742,11 @@ grep '"kind":"python-bytecode"' "$projectcaches_json" >/dev/null
 grep '"kind":"pytest-cache"' "$projectcaches_json" >/dev/null
 grep 'cleanroom clean --apply --trash --include-project-caches' "$projectcaches_json" >/dev/null
 rm -f "$projectcaches_json"
+projectcaches_fast_json="$(mktemp)"
+"$BIN" projectcaches-fast --json "$HOME/Documents" --limit 20 > "$projectcaches_fast_json"
+python3 -m json.tool "$projectcaches_fast_json" >/dev/null
+grep '"available":' "$projectcaches_fast_json" >/dev/null
+rm -f "$projectcaches_fast_json"
 projectcaches_log="$TEST_HOME/projectcaches-apply.log"
 "$BIN" clean --include-project-caches --apply --trash --yes --log "$projectcaches_log" >/dev/null
 test ! -e "$TEST_HOME/Documents/python-cache-project/pkg/__pycache__"
