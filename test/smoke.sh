@@ -550,6 +550,7 @@ python3 -m json.tool "$system_data_fast_json" >/dev/null
 grep '"id":"caches"' "$system_data_fast_json" >/dev/null
 grep '"id":"protected-personal"' "$system_data_fast_json" >/dev/null
 grep '"category":"protected"' "$system_data_fast_json" >/dev/null
+grep '"size":"Deep review"' "$system_data_fast_json" >/dev/null
 grep 'cleanroom system-data' "$system_data_fast_json" >/dev/null
 rm -f "$system_data_fast_json"
 "$BIN" rules | grep 'safe-app-caches' >/dev/null

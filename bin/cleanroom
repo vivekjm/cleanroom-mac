@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.24.0"
+VERSION="1.25.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -2448,24 +2448,39 @@ system_data() {
 }
 
 system_data_fast_rows() {
-  local cache developer containers backups diagnostics protected_count
+  local cache developer containers backups diagnostics protected_count developer_display containers_display backups_display
   cache="$(caches_fast_rows | tab_rows_total_kb)"
   developer=0
   if command -v mdfind >/dev/null 2>&1; then
     developer="$(developer_fast_rows | tab_rows_total_kb)"
   fi
-  containers="$(container_total_kb)"
-  backups="$(backup_cleanup_rows | tab_rows_total_kb)"
+  if [[ "${developer:-0}" -gt 0 ]]; then
+    developer_display="$(human_kb "$developer")"
+  else
+    developer_display="Clear"
+  fi
+  containers=0
+  if [[ "$(container_present_count)" -gt 0 ]]; then
+    containers_display="Review"
+  else
+    containers_display="Clear"
+  fi
+  backups=0
+  if [[ -n "$(backup_fast_rows)" ]]; then
+    backups_display="Protected"
+  else
+    backups_display="Clear"
+  fi
   diagnostics="$(diagnostic_total_kb)"
   protected_count="$(protected_present_count)"
 
-  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$cache" "caches" "Caches" "rebuildable" "cleanroom caches-fast" "Fast bounded estimate from rebuildable cache locations. Deep cache sizing stays in the focused Caches review."
-  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$developer" "developer" "Developer Data" "review" "cleanroom xcode" "Fast Spotlight-backed estimate for stale developer dependency folders. Use Xcode, Android, and Toolchains for focused reviews."
-  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$containers" "containers" "Container Storage" "high-impact" "cleanroom containers" "Docker, Colima, Lima, and Podman storage can be large and high-impact. Review before cleaning."
-  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$backups" "device-backups" "Device Backups" "protected" "cleanroom backups" "Local iPhone and iPad backups are protected because they may be the only copy of device data."
-  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$diagnostics" "diagnostics" "Logs and Diagnostics" "low-risk" "cleanroom diagnostics" "User logs, diagnostic reports, and crash reports are usually low-risk review targets."
-  printf '0\t%s\t%s\t%s\t%s\t%s\n' "protected-personal" "Protected Personal Data" "protected" "cleanroom protect" "Cleanroom keeps Photos, Mail, Messages, cloud-sync roots, Keychains, and browser profiles protected by default. ${protected_count} protected locations are present."
-  printf '0\t%s\t%s\t%s\t%s\t%s\n' "deep-system-data" "Deep System Data Review" "review" "cleanroom system-data" "Run the deep System Data breakdown when you need exhaustive Library and Application Support sizing."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$cache" "caches" "Caches" "rebuildable" "cleanroom caches-fast" "Fast bounded estimate from rebuildable cache locations. Deep cache sizing stays in the focused Caches review." "$(human_kb "$cache")"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$developer" "developer" "Developer Data" "review" "cleanroom xcode" "Fast Spotlight-backed estimate for stale developer dependency folders. Use Xcode, Android, and Toolchains for focused reviews." "$developer_display"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$containers" "containers" "Container Storage" "high-impact" "cleanroom containers" "Docker, Colima, Lima, and Podman storage can be large and high-impact. Review before cleaning." "$containers_display"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$backups" "device-backups" "Device Backups" "protected" "cleanroom backups" "Local iPhone and iPad backups are protected because they may be the only copy of device data." "$backups_display"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$diagnostics" "diagnostics" "Logs and Diagnostics" "low-risk" "cleanroom diagnostics" "User logs, diagnostic reports, and crash reports are usually low-risk review targets." "$(human_kb "$diagnostics")"
+  printf '0\t%s\t%s\t%s\t%s\t%s\t%s\n' "protected-personal" "Protected Personal Data" "protected" "cleanroom protect" "Cleanroom keeps Photos, Mail, Messages, cloud-sync roots, Keychains, and browser profiles protected by default. ${protected_count} protected locations are present." "Protected"
+  printf '0\t%s\t%s\t%s\t%s\t%s\t%s\n' "deep-system-data" "Deep System Data Review" "review" "cleanroom system-data" "Run the deep System Data breakdown when you need exhaustive Library and Application Support sizing." "Deep review"
 }
 
 system_data_fast() {
@@ -2474,8 +2489,8 @@ system_data_fast() {
 
   if [[ "$JSON" -eq 1 ]]; then
     printf '['
-    local first=1 kb id title category command guidance
-    while IFS=$'\t' read -r kb id title category command guidance; do
+    local first=1 kb id title category command guidance display
+    while IFS=$'\t' read -r kb id title category command guidance display; do
       [[ -z "${id:-}" ]] && continue
       [[ "$first" -eq 0 ]] && printf ','
       first=0
@@ -2484,7 +2499,7 @@ system_data_fast() {
         "$(printf '%s' "$title" | json_escape)" \
         "$(printf '%s' "$category" | json_escape)" \
         "${kb:-0}" \
-        "$(human_kb "${kb:-0}" | json_escape)" \
+        "$(printf '%s' "${display:-$(human_kb "${kb:-0}")}" | json_escape)" \
         "$(printf '%s' "$command" | json_escape)" \
         "$(printf '%s' "$guidance" | json_escape)"
     done <<<"$rows"
@@ -2495,10 +2510,10 @@ system_data_fast() {
   printf '%s\n' "${BOLD}cleanroom quick System Data${RESET}"
   printf 'Fast read-only summary for the desktop app. Deep Library sizing is skipped.\n\n'
   printf '%-10s %-18s %-12s %s\n' "size" "id" "category" "next command"
-  local kb id title category command guidance
-  while IFS=$'\t' read -r kb id title category command guidance; do
+  local kb id title category command guidance display
+  while IFS=$'\t' read -r kb id title category command guidance display; do
     [[ -z "${id:-}" ]] && continue
-    printf '%-10s %-18s %-12s %s\n' "$(human_kb "${kb:-0}")" "$id" "$category" "$command"
+    printf '%-10s %-18s %-12s %s\n' "${display:-$(human_kb "${kb:-0}")}" "$id" "$category" "$command"
     printf '  %s\n' "$guidance"
   done <<<"$rows"
 }
@@ -7724,6 +7739,15 @@ container_total_kb() {
     total=$((total + kb))
   done < <(container_rows)
   printf '%s\n' "$total"
+}
+
+container_present_count() {
+  local id runtime paths safety preview apply description count=0
+  while IFS=$'\t' read -r id runtime paths safety preview apply description; do
+    [[ -z "${id:-}" ]] && continue
+    paths_field_present "$paths" && count=$((count + 1))
+  done < <(container_rows)
+  printf '%s\n' "$count"
 }
 
 package_total_kb() {
