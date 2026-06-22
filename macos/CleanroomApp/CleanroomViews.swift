@@ -67,7 +67,7 @@ final class AppState: ObservableObject {
         CleanCategory(title: "Downloads",    tagline: "Old downloads, DMGs, and forgotten installers",  icon: "arrow.down.to.line",    color: DS.C.cardAmber,    args: "downloads --limit 30 --days 30"),
         CleanCategory(title: "Large Files",  tagline: "Files over 500 MB that may no longer be needed", icon: "doc.fill",              color: DS.C.cardSlate,    args: "large-fast --limit 30 --min-mb 500"),
         CleanCategory(title: "Archives",     tagline: "Old zip archives, tar files, and disk images",   icon: "archivebox.fill",       color: DS.C.cardRose,     args: "archives --limit 30 --days 7"),
-        CleanCategory(title: "Developer",    tagline: "Build artifacts, virtualenvs, and toolchains",   icon: "hammer.fill",           color: DS.C.cardTeal,     args: "clean --preset dev --preflight"),
+        CleanCategory(title: "Developer",    tagline: "Build artifacts, virtualenvs, and toolchains",   icon: "hammer.fill",           color: DS.C.cardTeal,     args: "developer-fast --limit 30 --days 30"),
         CleanCategory(title: "Screenshots",  tagline: "Old screenshots accumulating on Desktop",        icon: "camera.viewfinder",     color: DS.C.cardBark,     args: "screenshots --limit 30 --days 7"),
         CleanCategory(title: "Trash",        tagline: "Files waiting in macOS Trash",                   icon: "trash.fill",            color: DS.C.cardCharcoal, args: "trash"),
     ]

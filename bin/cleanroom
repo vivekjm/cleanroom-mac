@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.93.0"
+VERSION="0.94.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -82,6 +82,7 @@ Usage:
   cleanroom webcaches [--json]
   cleanroom savedstate [--json]
   cleanroom projectcaches [PATH] [--limit N] [--json]
+  cleanroom developer-fast [PATH] [--days N] [--limit N] [--json]
   cleanroom updaters [--json]
   cleanroom browsercaches [--json]
   cleanroom duplicates [PATH] [--min-mb N] [--limit N] [--json]
@@ -3930,6 +3931,75 @@ venvs_fast() {
   while IFS=$'\t' read -r kb epoch age_days path marker; do
     [[ -z "${path:-}" ]] && continue
     printf '%-10s %4sd     %s\n' "$(human_kb "$kb")" "${age_days:-0}" "$path"
+  done <<<"$rows"
+}
+
+developer_fast_rows() {
+  local emitted=0 kb epoch age path marker
+  while IFS=$'\t' read -r kb epoch age path; do
+    [[ -z "${path:-}" ]] && continue
+    printf '%012d\t%s\t%s\t%s\t%s\t%s\n' "$kb" "node-modules" "Node Modules" "$path" "${age:-0} days old" "Large dependency folder that can usually be reinstalled from package manifests."
+    emitted=$((emitted + 1))
+    [[ "$emitted" -ge "$LIMIT" ]] && return 0
+  done < <(node_fast_rows || true)
+  while IFS=$'\t' read -r kb epoch age path marker; do
+    [[ -z "${path:-}" ]] && continue
+    printf '%012d\t%s\t%s\t%s\t%s\t%s\n' "$kb" "virtualenv" "Python Virtualenv" "$path" "${age:-0} days old" "Python environment folder that can usually be recreated from project dependency files."
+    emitted=$((emitted + 1))
+    [[ "$emitted" -ge "$LIMIT" ]] && return 0
+  done < <(venv_fast_rows || true)
+}
+
+developer_fast() {
+  local spotlight_available=1 rows
+  command -v mdfind >/dev/null 2>&1 || spotlight_available=0
+  rows="$(developer_fast_rows)"
+
+  if [[ "$JSON" -eq 1 ]]; then
+    if [[ "$spotlight_available" -eq 0 ]]; then
+      printf '{"available":false,"reason":"spotlight_unavailable","items":[]}\n'
+      return 0
+    fi
+    printf '{"available":true,"items":['
+    local first=1 kb kind title path age guidance kb_num
+    while IFS=$'\t' read -r kb kind title path age guidance; do
+      [[ -z "${path:-}" ]] && continue
+      kb_num="$(printf '%s\n' "${kb:-0}" | sed 's/^0*//; s/^$/0/')"
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '{"kind":"%s","title":"%s","path":"%s","size_kb":%s,"size":"%s","age":"%s","guidance":"%s"}' \
+        "$(printf '%s' "$kind" | json_escape)" \
+        "$(printf '%s' "$title" | json_escape)" \
+        "$(printf '%s' "$path" | json_escape)" \
+        "$kb_num" \
+        "$(human_kb "${kb:-0}" | json_escape)" \
+        "$(printf '%s' "$age" | json_escape)" \
+        "$(printf '%s' "$guidance" | json_escape)"
+    done <<<"$rows"
+    printf ']}\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}cleanroom quick developer storage${RESET}"
+  printf 'Fast review of stale dependency folders. No files are deleted.\n'
+  if [[ "${#PATH_ARGS[@]}" -gt 0 ]]; then
+    printf 'Path: %s\n' "$(expand_path "${PATH_ARGS[0]}")"
+  else
+    printf 'Paths: ~/Documents, ~/Desktop, ~/Downloads\n'
+  fi
+  printf 'Older than: %s days  Limit: %s\n\n' "$DAYS" "$LIMIT"
+  if [[ "$spotlight_available" -eq 0 ]]; then
+    printf 'Spotlight search is not available.\n'
+    return 0
+  fi
+  if [[ -z "$rows" ]]; then
+    printf 'No stale developer dependency folders found in the Spotlight index.\n'
+    return 0
+  fi
+  local kb kind title path age guidance
+  while IFS=$'\t' read -r kb kind title path age guidance; do
+    [[ -z "${path:-}" ]] && continue
+    printf '%-10s %-18s %-12s %s\n' "$(human_kb "$kb")" "$title" "$age" "$path"
   done <<<"$rows"
 }
 
@@ -7941,7 +8011,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  dashboard|overview|map|snapshot|diff|state|permissions|review|scan|system-data|plan|large|large-fast|largefast|brokenlinks|quarantine|quarantine-fast|quarantinefast|metadata|metadata-fast|metadatafast|quicklook|fontcaches|font-caches|webcaches|web-caches|savedstate|saved-state|projectcaches|project-caches|updaters|updater-caches|browsercaches|browser-caches|duplicates|duplicates-fast|duplicatesfast|documents|desktop|screenshots|archives|downloads|installers|nodes|nodes-fast|nodesfast|venvs|venvs-fast|venvsfast|virtualenvs|virtualenvs-fast|virtualenvsfast|apps|apps-fast|appsfast|uninstallers|appreview|appdata|libraries|cloud|cloudfiles|cloud-files|personal|communications|comms|browsers|leftovers|backups|xcode|android|startup|loginitems|trash|caches|diagnostics|packages|npm-cache|npmcache|yarn-cache|yarncache|pnpm-store|pnpmstore|cocoapods-cache|pod-cache|podcache|pip-cache|pipcache|receipts|homebrew|homebrew-cleanup|brewcleanup|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
+  dashboard|overview|map|snapshot|diff|state|permissions|review|scan|system-data|plan|large|large-fast|largefast|brokenlinks|quarantine|quarantine-fast|quarantinefast|metadata|metadata-fast|metadatafast|quicklook|fontcaches|font-caches|webcaches|web-caches|savedstate|saved-state|projectcaches|project-caches|developer-fast|developerfast|updaters|updater-caches|browsercaches|browser-caches|duplicates|duplicates-fast|duplicatesfast|documents|desktop|screenshots|archives|downloads|installers|nodes|nodes-fast|nodesfast|venvs|venvs-fast|venvsfast|virtualenvs|virtualenvs-fast|virtualenvsfast|apps|apps-fast|appsfast|uninstallers|appreview|appdata|libraries|cloud|cloudfiles|cloud-files|personal|communications|comms|browsers|leftovers|backups|xcode|android|startup|loginitems|trash|caches|diagnostics|packages|npm-cache|npmcache|yarn-cache|yarncache|pnpm-store|pnpmstore|cocoapods-cache|pod-cache|podcache|pip-cache|pipcache|receipts|homebrew|homebrew-cleanup|brewcleanup|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -8039,7 +8109,7 @@ while [[ "$#" -gt 0 ]]; do
     -h|--help) usage; exit 0 ;;
     -v|--version) echo "$VERSION"; exit 0 ;;
     *)
-      if [[ "$ACTION" == "guard" || "$ACTION" == "diff" || "$ACTION" == "large" || "$ACTION" == "large-fast" || "$ACTION" == "largefast" || "$ACTION" == "brokenlinks" || "$ACTION" == "quarantine" || "$ACTION" == "quarantine-fast" || "$ACTION" == "quarantinefast" || "$ACTION" == "metadata" || "$ACTION" == "metadata-fast" || "$ACTION" == "metadatafast" || "$ACTION" == "projectcaches" || "$ACTION" == "project-caches" || "$ACTION" == "duplicates" || "$ACTION" == "duplicates-fast" || "$ACTION" == "duplicatesfast" || "$ACTION" == "documents" || "$ACTION" == "screenshots" || "$ACTION" == "archives" || "$ACTION" == "nodes" || "$ACTION" == "nodes-fast" || "$ACTION" == "nodesfast" || "$ACTION" == "venvs" || "$ACTION" == "venvs-fast" || "$ACTION" == "venvsfast" || "$ACTION" == "virtualenvs" || "$ACTION" == "virtualenvs-fast" || "$ACTION" == "virtualenvsfast" || "$ACTION" == "apps" || "$ACTION" == "apps-fast" || "$ACTION" == "appsfast" || "$ACTION" == "uninstallers" || "$ACTION" == "appreview" || "$ACTION" == "cloudfiles" || "$ACTION" == "cloud-files" || "$ACTION" == "leftovers" ]]; then
+      if [[ "$ACTION" == "guard" || "$ACTION" == "diff" || "$ACTION" == "large" || "$ACTION" == "large-fast" || "$ACTION" == "largefast" || "$ACTION" == "brokenlinks" || "$ACTION" == "quarantine" || "$ACTION" == "quarantine-fast" || "$ACTION" == "quarantinefast" || "$ACTION" == "metadata" || "$ACTION" == "metadata-fast" || "$ACTION" == "metadatafast" || "$ACTION" == "projectcaches" || "$ACTION" == "project-caches" || "$ACTION" == "developer-fast" || "$ACTION" == "developerfast" || "$ACTION" == "duplicates" || "$ACTION" == "duplicates-fast" || "$ACTION" == "duplicatesfast" || "$ACTION" == "documents" || "$ACTION" == "screenshots" || "$ACTION" == "archives" || "$ACTION" == "nodes" || "$ACTION" == "nodes-fast" || "$ACTION" == "nodesfast" || "$ACTION" == "venvs" || "$ACTION" == "venvs-fast" || "$ACTION" == "venvsfast" || "$ACTION" == "virtualenvs" || "$ACTION" == "virtualenvs-fast" || "$ACTION" == "virtualenvsfast" || "$ACTION" == "apps" || "$ACTION" == "apps-fast" || "$ACTION" == "appsfast" || "$ACTION" == "uninstallers" || "$ACTION" == "appreview" || "$ACTION" == "cloudfiles" || "$ACTION" == "cloud-files" || "$ACTION" == "leftovers" ]]; then
         PATH_ARGS+=("$1")
       else
         die "Unknown option: $1"
@@ -8073,6 +8143,7 @@ case "$ACTION" in
   webcaches|web-caches) webcaches ;;
   savedstate|saved-state) savedstate ;;
   projectcaches|project-caches) projectcaches ;;
+  developer-fast|developerfast) developer_fast ;;
   updaters|updater-caches) updaters ;;
   browsercaches|browser-caches) browsercaches ;;
   duplicates) duplicates ;;

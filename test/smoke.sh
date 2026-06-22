@@ -880,6 +880,11 @@ venvs_fast_json="$(mktemp)"
 python3 -m json.tool "$venvs_fast_json" >/dev/null
 grep '"available":' "$venvs_fast_json" >/dev/null
 rm -f "$venvs_fast_json"
+developer_fast_json="$(mktemp)"
+"$BIN" developer-fast --json "$HOME/Documents" --days 30 --limit 5 > "$developer_fast_json"
+python3 -m json.tool "$developer_fast_json" >/dev/null
+grep '"available":' "$developer_fast_json" >/dev/null
+rm -f "$developer_fast_json"
 "$BIN" apps "$HOME/Applications" --limit 5 | grep 'FakeBig' >/dev/null
 apps_json="$(mktemp)"
 "$BIN" apps --json "$HOME/Applications" --limit 5 > "$apps_json"
