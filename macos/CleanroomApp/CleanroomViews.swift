@@ -31,6 +31,15 @@ struct CommandResult {
     var status: Int32
 }
 
+struct ReviewItem: Identifiable {
+    let id = UUID()
+    var title: String
+    var detail: String
+    var size: String
+    var badge: String
+    var path: String?
+}
+
 enum NavDest: Hashable {
     case dashboard
     case run(title: String, args: String)
@@ -53,6 +62,8 @@ final class AppState: ObservableObject {
     @Published var showLeftovers:    Bool    = false
     @Published var showApplyConfirm: Bool    = false
     @Published var cardOffset:       Int     = 0
+    @Published var reviewTitle:      String  = "Review Details"
+    @Published var reviewItems:      [ReviewItem] = []
 
     @Published var stats: [StorageStat] = [
         StorageStat(label: "Disk Used",   value: "—"),
@@ -176,6 +187,8 @@ final class AppState: ObservableObject {
         status     = "\(title) in progress..."
         activityMessage = "\(title) is running. You can stop it anytime."
         output    += "\nReviewing \(title)...\n"
+        reviewTitle = title
+        reviewItems = []
         let commandArgs = appFacingArgs(splitArgs(args))
         let command = resolvedCommand(commandArgs)
         Task.detached(priority: .userInitiated) {
@@ -190,6 +203,8 @@ final class AppState: ObservableObject {
                 guard self.currentRunID == runID else { return }
                 self.currentProcess = nil
                 let displayOutput = self.presentableDetails(title: title, args: args, details: result.output)
+                self.reviewTitle = title
+                self.reviewItems = self.presentableReviewItems(title: title, args: args, details: result.output)
                 self.output += displayOutput
                 if result.status == 15 {
                     self.status = "\(title) stopped"
@@ -220,6 +235,7 @@ final class AppState: ObservableObject {
         output += "Stopping current action...\n"
         outputOpen = true
         currentProcess = nil
+        reviewItems = []
         process.terminate()
     }
 
@@ -309,6 +325,16 @@ final class AppState: ObservableObject {
         return lines.joined(separator: "\n") + "\n"
     }
 
+    private func presentableReviewItems(title: String, args: String, details: String) -> [ReviewItem] {
+        let trimmed = details.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let data = trimmed.data(using: .utf8),
+              let parsed = try? JSONSerialization.jsonObject(with: data),
+              let items = jsonItems(from: parsed) else {
+            return []
+        }
+        return items.prefix(80).map { reviewItem(from: $0) }
+    }
+
     private func jsonItems(from parsed: Any) -> [[String: Any]]? {
         if let array = parsed as? [[String: Any]] {
             return array
@@ -346,6 +372,46 @@ final class AppState: ObservableObject {
             return "\(size)  \(title)  \(first)"
         }
         return "\(size)  \(title)"
+    }
+
+    private func reviewItem(from item: [String: Any]) -> ReviewItem {
+        let size = stringValue(item["size"]) ?? stringValue(item["potential_reclaim"]) ?? stringValue(item["total"]) ?? "Review"
+        let title = stringValue(item["title"]) ??
+            stringValue(item["name"]) ??
+            stringValue(item["kind"]) ??
+            stringValue(item["runtime"]) ??
+            stringValue(item["id"]) ??
+            "Review item"
+        let badge = friendlyBadge(from: item)
+        let path = displayPath(from: item)
+        let detail = stringValue(item["summary"]) ??
+            stringValue(item["guidance"]) ??
+            stringValue(item["reason"]) ??
+            stringValue(item["modified"]) ??
+            stringValue(item["last_modified"]) ??
+            path ??
+            "Review before cleaning."
+        return ReviewItem(title: title, detail: detail, size: size, badge: badge, path: path)
+    }
+
+    private func friendlyBadge(from item: [String: Any]) -> String {
+        let raw = stringValue(item["safety"]) ??
+            stringValue(item["category"]) ??
+            stringValue(item["kind"]) ??
+            stringValue(item["type"]) ??
+            stringValue(item["status"]) ??
+            "Review"
+        return raw
+            .replacingOccurrences(of: "-", with: " ")
+            .replacingOccurrences(of: "_", with: " ")
+            .capitalized
+    }
+
+    private func displayPath(from item: [String: Any]) -> String? {
+        if let path = stringValue(item["path"]) { return path }
+        if let paths = item["paths"] as? [String], let first = paths.first { return first }
+        if let paths = stringValue(item["paths"]) { return paths }
+        return nil
     }
 
     private func stringValue(_ value: Any?) -> String? {
@@ -1048,7 +1114,10 @@ struct OutputPanel: View {
                     IconBtn(icon: "doc.on.clipboard", dark: true) {
                         state.copyDetails()
                     }
-                    IconBtn(icon: "trash", dark: true) { state.output = "No activity yet.\n" }
+                    IconBtn(icon: "trash", dark: true) {
+                        state.output = "No activity yet.\n"
+                        state.reviewItems = []
+                    }
                 }
                 IconBtn(icon: state.outputOpen ? "chevron.down" : "chevron.up", dark: true) {
                     withAnimation(DS.Ani.std) { state.outputOpen.toggle() }
@@ -1061,14 +1130,31 @@ struct OutputPanel: View {
             if state.outputOpen {
                 ScrollViewReader { proxy in
                     ScrollView(showsIndicators: true) {
-                        Text(state.output)
-                            .font(DS.T.bodySm)
-                            .lineSpacing(3)
-                            .foregroundColor(DS.C.textOnDark.opacity(0.88))
-                            .textSelection(.enabled)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(DS.Sp.lg)
-                            .id("bottom")
+                        VStack(alignment: .leading, spacing: DS.Sp.md) {
+                            if state.reviewItems.isEmpty {
+                                Text(state.output)
+                                    .font(DS.T.bodySm)
+                                    .lineSpacing(3)
+                                    .foregroundColor(DS.C.textOnDark.opacity(0.88))
+                                    .textSelection(.enabled)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            } else {
+                                HStack(alignment: .firstTextBaseline) {
+                                    Text(state.reviewTitle)
+                                        .font(DS.T.h3)
+                                        .foregroundColor(DS.C.textOnDark)
+                                    Spacer()
+                                    Text("\(state.reviewItems.count) items")
+                                        .font(DS.T.tag)
+                                        .foregroundColor(DS.C.textOnDark.opacity(0.52))
+                                }
+                                ForEach(state.reviewItems) { item in
+                                    ReviewResultRow(item: item)
+                                }
+                            }
+                        }
+                        .padding(DS.Sp.lg)
+                        .id("bottom")
                     }
                     .frame(height: DS.Layout.outputH)
                     .background(DS.C.sidebarBg.opacity(0.98))
@@ -1078,6 +1164,66 @@ struct OutputPanel: View {
                 }
             }
         }
+    }
+}
+
+struct ReviewResultRow: View {
+    let item: ReviewItem
+
+    var body: some View {
+        HStack(alignment: .top, spacing: DS.Sp.md) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(item.size)
+                    .font(DS.T.h3)
+                    .foregroundColor(DS.C.textOnDark)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                Text(item.badge)
+                    .font(DS.T.tag)
+                    .foregroundColor(DS.C.ctaOrangeSoft.opacity(0.88))
+                    .lineLimit(1)
+            }
+            .frame(width: 86, alignment: .leading)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(item.title)
+                    .font(DS.T.bodySm.weight(.semibold))
+                    .foregroundColor(DS.C.textOnDark.opacity(0.92))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Text(item.detail)
+                    .font(DS.T.bodySm)
+                    .foregroundColor(DS.C.textOnDark.opacity(0.66))
+                    .lineLimit(2)
+                    .truncationMode(.middle)
+                if let path = item.path, path != item.detail {
+                    Text(shortPath(path))
+                        .font(DS.T.bodySm)
+                        .foregroundColor(DS.C.textOnDark.opacity(0.46))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(DS.Sp.md)
+        .background(
+            RoundedRectangle(cornerRadius: DS.R.sm)
+                .fill(Color.white.opacity(0.055))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: DS.R.sm)
+                .stroke(DS.C.dividerOnDark, lineWidth: 1)
+        )
+    }
+
+    private func shortPath(_ path: String) -> String {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        if path == home { return "~" }
+        if path.hasPrefix(home + "/") {
+            return "~" + path.dropFirst(home.count)
+        }
+        return path
     }
 }
 
