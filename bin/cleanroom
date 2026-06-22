@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.92.0"
+VERSION="0.93.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -97,6 +97,7 @@ Usage:
   cleanroom venvs [PATH] [--days N] [--limit N] [--json]
   cleanroom venvs-fast [PATH] [--days N] [--limit N] [--json]
   cleanroom apps [PATH] [--limit N] [--json]
+  cleanroom apps-fast [PATH] [--limit N] [--json]
   cleanroom uninstallers [PATH] [--limit N] [--json]
   cleanroom appreview QUERY... [--limit N] [--json]
   cleanroom appdata [--limit N] [--json]
@@ -4194,29 +4195,65 @@ app_rows() {
     done
 }
 
+app_fast_rows() {
+  command -v mdfind >/dev/null 2>&1 || return 2
+  local root path name bytes kb epoch
+  while IFS= read -r root; do
+    [[ -d "$root" ]] || continue
+    mdfind -onlyin "$root" 'kMDItemContentTypeTree == "com.apple.application-bundle" || kMDItemFSName == "*.app"cd' 2>/dev/null || true
+  done < <(app_roots) |
+    sort -u |
+    while IFS= read -r path; do
+      [[ -d "$path" && "$path" == *.app ]] || continue
+      name="$(basename "$path" .app)"
+      bytes="$(mdls -raw -name kMDItemFSSize "$path" 2>/dev/null | awk 'NR == 1 && $1 ~ /^[0-9]+$/ {print $1}' || true)"
+      if [[ -n "$bytes" ]]; then
+        kb="$(((bytes + 1023) / 1024))"
+      else
+        kb=0
+      fi
+      epoch="$(path_mtime_epoch "$path")"
+      printf '%012d\t%012d\t%s\t%s\n' "$kb" "$epoch" "$name" "$path"
+    done |
+    sort -rn |
+    head -n "$LIMIT"
+}
+
+apps_json_rows() {
+  local rows="$1"
+  printf '['
+  local first=1 kb epoch name path kb_num epoch_num
+  while IFS=$'\t' read -r kb epoch name path; do
+    [[ -z "${path:-}" ]] && continue
+    kb_num="$(printf '%s\n' "$kb" | sed 's/^0*//; s/^$/0/')"
+    epoch_num="$(printf '%s\n' "${epoch:-0}" | sed 's/^0*//; s/^$/0/')"
+    [[ "$first" -eq 0 ]] && printf ','
+    first=0
+    printf '{"name":"%s","path":"%s","size_kb":%s,"size":"%s","modified_epoch":%s,"modified":"%s"}' \
+      "$(printf '%s' "$name" | json_escape)" \
+      "$(printf '%s' "$path" | json_escape)" \
+      "$kb_num" \
+      "$(human_kb "${kb:-0}" | json_escape)" \
+      "${epoch_num:-0}" \
+      "$(file_mtime_iso "${epoch_num:-0}" | json_escape)"
+  done <<<"$rows"
+  printf ']\n'
+}
+
 apps() {
   local rows
   rows="$(
     while IFS= read -r root; do
-      app_rows "$root"
+      app_rows "$root" |
+        while IFS=$'\t' read -r kb name path; do
+          [[ -z "${path:-}" ]] && continue
+          printf '%s\t%012d\t%s\t%s\n' "$kb" "$(path_mtime_epoch "$path")" "$name" "$path"
+        done
     done < <(app_roots) | sort -rn | head -n "$LIMIT"
   )"
 
   if [[ "$JSON" -eq 1 ]]; then
-    printf '['
-    local first=1 kb kb_num name path
-    while IFS=$'\t' read -r kb name path; do
-      [[ -z "${path:-}" ]] && continue
-      kb_num="$(printf '%s\n' "$kb" | sed 's/^0*//; s/^$/0/')"
-      [[ "$first" -eq 0 ]] && printf ','
-      first=0
-      printf '{"name":"%s","path":"%s","size_kb":%s,"size":"%s"}' \
-        "$(printf '%s' "$name" | json_escape)" \
-        "$(printf '%s' "$path" | json_escape)" \
-        "$kb_num" \
-        "$(human_kb "${kb:-0}" | json_escape)"
-    done <<<"$rows"
-    printf ']\n'
+    apps_json_rows "$rows"
     return 0
   fi
 
@@ -4227,8 +4264,41 @@ apps() {
     printf 'No app bundles found.\n'
     return 0
   fi
-  local kb name path
-  while IFS=$'\t' read -r kb name path; do
+  local kb epoch name path
+  while IFS=$'\t' read -r kb epoch name path; do
+    [[ -z "${path:-}" ]] && continue
+    printf '%8s  %s\n  %s\n' "$(human_kb "$kb")" "$name" "$path"
+  done <<<"$rows"
+}
+
+apps_fast() {
+  local rows available=1
+  rows="$(app_fast_rows)" || available=0
+
+  if [[ "$JSON" -eq 1 ]]; then
+    if [[ "$available" -eq 0 ]]; then
+      printf '{"available":false,"reason":"spotlight_unavailable","items":[]}\n'
+      return 0
+    fi
+    printf '{"available":true,"items":'
+    apps_json_rows "$rows"
+    printf '}\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}cleanroom quick app bundles${RESET}"
+  printf 'Fast review from Spotlight metadata. cleanroom does not uninstall apps.\n'
+  printf 'Limit: %s\n\n' "$LIMIT"
+  if [[ "$available" -eq 0 ]]; then
+    printf 'Spotlight search is not available. Use Apps when you want the full app bundle review.\n'
+    return 0
+  fi
+  if [[ -z "$rows" ]]; then
+    printf 'No app bundles found in the Spotlight index.\n'
+    return 0
+  fi
+  local kb epoch name path
+  while IFS=$'\t' read -r kb epoch name path; do
     [[ -z "${path:-}" ]] && continue
     printf '%8s  %s\n  %s\n' "$(human_kb "$kb")" "$name" "$path"
   done <<<"$rows"
@@ -7871,7 +7941,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  dashboard|overview|map|snapshot|diff|state|permissions|review|scan|system-data|plan|large|large-fast|largefast|brokenlinks|quarantine|quarantine-fast|quarantinefast|metadata|metadata-fast|metadatafast|quicklook|fontcaches|font-caches|webcaches|web-caches|savedstate|saved-state|projectcaches|project-caches|updaters|updater-caches|browsercaches|browser-caches|duplicates|duplicates-fast|duplicatesfast|documents|desktop|screenshots|archives|downloads|installers|nodes|nodes-fast|nodesfast|venvs|venvs-fast|venvsfast|virtualenvs|virtualenvs-fast|virtualenvsfast|apps|uninstallers|appreview|appdata|libraries|cloud|cloudfiles|cloud-files|personal|communications|comms|browsers|leftovers|backups|xcode|android|startup|loginitems|trash|caches|diagnostics|packages|npm-cache|npmcache|yarn-cache|yarncache|pnpm-store|pnpmstore|cocoapods-cache|pod-cache|podcache|pip-cache|pipcache|receipts|homebrew|homebrew-cleanup|brewcleanup|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
+  dashboard|overview|map|snapshot|diff|state|permissions|review|scan|system-data|plan|large|large-fast|largefast|brokenlinks|quarantine|quarantine-fast|quarantinefast|metadata|metadata-fast|metadatafast|quicklook|fontcaches|font-caches|webcaches|web-caches|savedstate|saved-state|projectcaches|project-caches|updaters|updater-caches|browsercaches|browser-caches|duplicates|duplicates-fast|duplicatesfast|documents|desktop|screenshots|archives|downloads|installers|nodes|nodes-fast|nodesfast|venvs|venvs-fast|venvsfast|virtualenvs|virtualenvs-fast|virtualenvsfast|apps|apps-fast|appsfast|uninstallers|appreview|appdata|libraries|cloud|cloudfiles|cloud-files|personal|communications|comms|browsers|leftovers|backups|xcode|android|startup|loginitems|trash|caches|diagnostics|packages|npm-cache|npmcache|yarn-cache|yarncache|pnpm-store|pnpmstore|cocoapods-cache|pod-cache|podcache|pip-cache|pipcache|receipts|homebrew|homebrew-cleanup|brewcleanup|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -7969,7 +8039,7 @@ while [[ "$#" -gt 0 ]]; do
     -h|--help) usage; exit 0 ;;
     -v|--version) echo "$VERSION"; exit 0 ;;
     *)
-      if [[ "$ACTION" == "guard" || "$ACTION" == "diff" || "$ACTION" == "large" || "$ACTION" == "large-fast" || "$ACTION" == "largefast" || "$ACTION" == "brokenlinks" || "$ACTION" == "quarantine" || "$ACTION" == "quarantine-fast" || "$ACTION" == "quarantinefast" || "$ACTION" == "metadata" || "$ACTION" == "metadata-fast" || "$ACTION" == "metadatafast" || "$ACTION" == "projectcaches" || "$ACTION" == "project-caches" || "$ACTION" == "duplicates" || "$ACTION" == "duplicates-fast" || "$ACTION" == "duplicatesfast" || "$ACTION" == "documents" || "$ACTION" == "screenshots" || "$ACTION" == "archives" || "$ACTION" == "nodes" || "$ACTION" == "nodes-fast" || "$ACTION" == "nodesfast" || "$ACTION" == "venvs" || "$ACTION" == "venvs-fast" || "$ACTION" == "venvsfast" || "$ACTION" == "virtualenvs" || "$ACTION" == "virtualenvs-fast" || "$ACTION" == "virtualenvsfast" || "$ACTION" == "apps" || "$ACTION" == "uninstallers" || "$ACTION" == "appreview" || "$ACTION" == "cloudfiles" || "$ACTION" == "cloud-files" || "$ACTION" == "leftovers" ]]; then
+      if [[ "$ACTION" == "guard" || "$ACTION" == "diff" || "$ACTION" == "large" || "$ACTION" == "large-fast" || "$ACTION" == "largefast" || "$ACTION" == "brokenlinks" || "$ACTION" == "quarantine" || "$ACTION" == "quarantine-fast" || "$ACTION" == "quarantinefast" || "$ACTION" == "metadata" || "$ACTION" == "metadata-fast" || "$ACTION" == "metadatafast" || "$ACTION" == "projectcaches" || "$ACTION" == "project-caches" || "$ACTION" == "duplicates" || "$ACTION" == "duplicates-fast" || "$ACTION" == "duplicatesfast" || "$ACTION" == "documents" || "$ACTION" == "screenshots" || "$ACTION" == "archives" || "$ACTION" == "nodes" || "$ACTION" == "nodes-fast" || "$ACTION" == "nodesfast" || "$ACTION" == "venvs" || "$ACTION" == "venvs-fast" || "$ACTION" == "venvsfast" || "$ACTION" == "virtualenvs" || "$ACTION" == "virtualenvs-fast" || "$ACTION" == "virtualenvsfast" || "$ACTION" == "apps" || "$ACTION" == "apps-fast" || "$ACTION" == "appsfast" || "$ACTION" == "uninstallers" || "$ACTION" == "appreview" || "$ACTION" == "cloudfiles" || "$ACTION" == "cloud-files" || "$ACTION" == "leftovers" ]]; then
         PATH_ARGS+=("$1")
       else
         die "Unknown option: $1"
@@ -8018,6 +8088,7 @@ case "$ACTION" in
   venvs|virtualenvs) venvs ;;
   venvs-fast|venvsfast|virtualenvs-fast|virtualenvsfast) venvs_fast ;;
   apps) apps ;;
+  apps-fast|appsfast) apps_fast ;;
   uninstallers) uninstallers ;;
   appreview) appreview ;;
   appdata) appdata ;;

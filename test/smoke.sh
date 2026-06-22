@@ -886,6 +886,11 @@ apps_json="$(mktemp)"
 python3 -m json.tool "$apps_json" >/dev/null
 grep 'FakeBig' "$apps_json" >/dev/null
 rm -f "$apps_json"
+apps_fast_json="$(mktemp)"
+"$BIN" apps-fast --json "$HOME/Applications" --limit 5 > "$apps_fast_json"
+python3 -m json.tool "$apps_fast_json" >/dev/null
+grep '"available":' "$apps_fast_json" >/dev/null
+rm -f "$apps_fast_json"
 "$BIN" uninstallers "$HOME/Applications" --limit 10 | grep 'Cleanroom Test Uninstaller' >/dev/null
 uninstallers_json="$(mktemp)"
 "$BIN" uninstallers --json "$HOME/Applications" --limit 10 > "$uninstallers_json"

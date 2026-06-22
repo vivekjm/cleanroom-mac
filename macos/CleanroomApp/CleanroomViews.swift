@@ -367,6 +367,7 @@ final class AppState: ObservableObject {
             "Dry-run mode.",
             "Pass --apply",
             "Use the deeper",
+            "Use Apps when",
         ]
         let hiddenPrefixes = [
             "reveal:",
@@ -502,7 +503,7 @@ struct SidebarView: View {
                             NavRow("globe", "Browser Caches", .run(title: "Browser Caches", args: "browsercaches"), state)
                             NavRow("shippingbox.fill",        "Node Modules",.run(title: "Node Modules",args: "nodes-fast --limit 30 --days 30"), state)
                             NavRow("square.stack.3d.up.fill", "Virtualenvs", .run(title: "Virtualenvs", args: "venvs-fast --limit 30 --days 30"), state)
-                            NavRow("apps.iphone",             "Apps",        .run(title: "Apps",        args: "apps --limit 30"), state)
+                            NavRow("apps.iphone",             "Apps",        .run(title: "Apps",        args: "apps-fast --limit 30"), state)
                             NavRow("app.badge.checkmark.fill","App Review",  .dashboard, state, onTap: { state.showLeftovers = true })
                             NavRow("trash.fill",              "Trash",       .run(title: "Trash",       args: "trash"), state)
                             NavRow("icloud.fill",             "Cloud Files", .run(title: "Cloud Files", args: "cloudfiles --min-mb 250 --limit 40"), state)
