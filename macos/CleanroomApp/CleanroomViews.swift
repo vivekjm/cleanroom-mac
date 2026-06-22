@@ -65,7 +65,7 @@ final class AppState: ObservableObject {
         CleanCategory(title: "Caches",       tagline: "App & system caches accumulating silently",      icon: "xmark.bin.fill",        color: DS.C.cardForest,   args: "caches"),
         CleanCategory(title: "Node Modules", tagline: "Orphaned node_modules, stale npm/pnpm caches",   icon: "shippingbox.fill",      color: DS.C.cardViolet,   args: "nodes --limit 30 --days 30"),
         CleanCategory(title: "Downloads",    tagline: "Old downloads, DMGs, and forgotten installers",  icon: "arrow.down.to.line",    color: DS.C.cardAmber,    args: "downloads --limit 30 --days 30"),
-        CleanCategory(title: "Large Files",  tagline: "Files over 500 MB that may no longer be needed", icon: "doc.fill",              color: DS.C.cardSlate,    args: "large --limit 30 --min-mb 500"),
+        CleanCategory(title: "Large Files",  tagline: "Files over 500 MB that may no longer be needed", icon: "doc.fill",              color: DS.C.cardSlate,    args: "large-fast --limit 30 --min-mb 500"),
         CleanCategory(title: "Archives",     tagline: "Old zip archives, tar files, and disk images",   icon: "archivebox.fill",       color: DS.C.cardRose,     args: "archives --limit 30 --days 7"),
         CleanCategory(title: "Developer",    tagline: "Build artifacts, virtualenvs, and toolchains",   icon: "hammer.fill",           color: DS.C.cardTeal,     args: "clean --preset dev --preflight"),
         CleanCategory(title: "Screenshots",  tagline: "Old screenshots accumulating on Desktop",        icon: "camera.viewfinder",     color: DS.C.cardBark,     args: "screenshots --limit 30 --days 7"),
@@ -461,7 +461,7 @@ struct SidebarView: View {
                             NavRow("list.clipboard.fill",     "Clean Plan",  .dashboard, state, onTap: { state.showApplyConfirm = true })
                         }
                         SidebarSection("FIND") {
-                            NavRow("doc.fill",                "Large Files", .run(title: "Large Files",  args: "large --limit 30 --min-mb 500"), state)
+                            NavRow("doc.fill",                "Large Files", .run(title: "Large Files",  args: "large-fast --limit 30 --min-mb 500"), state)
                             NavRow("doc.on.doc.fill",         "Duplicates",  .run(title: "Duplicates",   args: "duplicates --limit 20 --min-mb 100"), state)
                             NavRow("link.badge.plus",         "Broken Links",.run(title: "Broken Links", args: "brokenlinks --limit 40"), state)
                             NavRow("lock.shield.fill",        "Quarantine",  .run(title: "Quarantine",   args: "quarantine --limit 40"), state)

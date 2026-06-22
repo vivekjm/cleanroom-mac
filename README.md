@@ -188,6 +188,7 @@ cleanroom plan --json
 Find large files for manual review:
 
 ```sh
+cleanroom large-fast
 cleanroom large
 cleanroom large ~/Documents --min-mb 250 --limit 30
 cleanroom large --json ~/Downloads

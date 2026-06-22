@@ -299,6 +299,17 @@ fi
 exit 1
 SH
 chmod +x "$TEST_HOME/bin/xattr"
+cat >"$TEST_HOME/bin/mdfind" <<'SH'
+#!/usr/bin/env bash
+if [[ "${1:-}" == "-onlyin" ]]; then
+  root="${2:-}"
+  [[ -f "$root/Downloads/big-test.bin" ]] && printf '%s\n' "$root/Downloads/big-test.bin"
+  [[ -f "$root/Downloads/old-installer.dmg" ]] && printf '%s\n' "$root/Downloads/old-installer.dmg"
+  exit 0
+fi
+exit 2
+SH
+chmod +x "$TEST_HOME/bin/mdfind"
 cat >"$TEST_HOME/bin/brew" <<'SH'
 #!/usr/bin/env bash
 case "${1:-}" in
@@ -581,6 +592,13 @@ large_json="$(mktemp)"
 python3 -m json.tool "$large_json" >/dev/null
 grep 'big-test.bin' "$large_json" >/dev/null
 rm -f "$large_json"
+"$BIN" large-fast "$HOME" --min-mb 1 --limit 5 | grep 'big-test.bin' >/dev/null
+large_fast_json="$(mktemp)"
+"$BIN" large-fast --json "$HOME" --min-mb 1 --limit 5 > "$large_fast_json"
+python3 -m json.tool "$large_fast_json" >/dev/null
+grep '"available":true' "$large_fast_json" >/dev/null
+grep 'big-test.bin' "$large_fast_json" >/dev/null
+rm -f "$large_fast_json"
 "$BIN" brokenlinks "$HOME/Documents" --limit 10 | grep 'broken-link' >/dev/null
 brokenlinks_json="$(mktemp)"
 "$BIN" brokenlinks --json "$HOME/Documents" --limit 10 > "$brokenlinks_json"

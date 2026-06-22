@@ -1,4 +1,4 @@
-.TH CLEANROOM 1 "June 2026" "cleanroom 0.86.0" "User Commands"
+.TH CLEANROOM 1 "June 2026" "cleanroom 0.87.0" "User Commands"
 .SH NAME
 cleanroom \- safe-by-default macOS storage cleaner
 .SH SYNOPSIS
@@ -267,7 +267,10 @@ Break common macOS System Data locations into review-only buckets with next comm
 Rank safe cleanup opportunities and show copyable commands.
 .TP
 .B large
-List large files for review without deleting anything.
+Deep-scan large files for review without deleting anything.
+.TP
+.B large-fast
+Quickly list large files using Spotlight metadata without deleting anything.
 .TP
 .B brokenlinks
 List dangling symlinks for review without deleting anything.
