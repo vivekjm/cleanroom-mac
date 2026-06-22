@@ -367,21 +367,40 @@ final class AppState: ObservableObject {
             "Dry-run mode.",
             "Pass --apply",
         ]
+        let hiddenPrefixes = [
+            "reveal:",
+            "inspect:",
+            "apply:",
+            "preview:",
+            "hash:",
+            "paths:",
+            "quarantine:",
+            "restore with:",
+        ]
         let lines = plainText.split(separator: "\n", omittingEmptySubsequences: false)
         let cleaned = lines
             .compactMap { rawLine -> String? in
                 var line = String(rawLine)
                 let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
-                if trimmed.localizedCaseInsensitiveContains("apply:") ||
-                    trimmed.localizedCaseInsensitiveContains("preview:") {
+                let lowerTrimmed = trimmed.lowercased()
+                if hiddenPrefixes.contains(where: { lowerTrimmed.hasPrefix($0) }) {
+                    return nil
+                }
+                if lowerTrimmed.contains("next command") ||
+                    lowerTrimmed.contains("preview command") ||
+                    lowerTrimmed.contains("apply command") ||
+                    lowerTrimmed.contains("review command") {
                     return nil
                 }
                 if hiddenFragments.contains(where: { line.localizedCaseInsensitiveContains($0) }) {
                     return nil
                 }
-                line = line.replacingOccurrences(of: "preview command", with: "notes", options: .caseInsensitive)
+                line = line.replacingOccurrences(of: "^\\s*cleanroom\\s+", with: "", options: [.regularExpression, .caseInsensitive])
                 if let commandRange = line.range(of: "\\s+cleanroom\\b.*$", options: [.regularExpression, .caseInsensitive]) {
                     line.removeSubrange(commandRange)
+                }
+                if line.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    return nil
                 }
                 return line
             }
