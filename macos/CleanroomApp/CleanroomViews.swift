@@ -26,6 +26,11 @@ struct CleanCategory: Identifiable {
     var result:  String? = nil
 }
 
+struct CommandResult {
+    var output: String
+    var status: Int32
+}
+
 enum NavDest: Hashable {
     case dashboard
     case run(title: String, args: String)
@@ -77,6 +82,7 @@ final class AppState: ObservableObject {
 
     var enginePath = ""
     private var lastStatsRefresh: Date? = nil
+    private var currentProcess: Process? = nil
 
     func resolveEngine() {
         if let r = Bundle.main.resourceURL {
@@ -109,7 +115,7 @@ final class AppState: ObservableObject {
         Task.detached(priority: .background) {
             let raw = await Self.exec(command.executable, command.arguments)
             await MainActor.run {
-                self.parseStats(raw)
+                self.parseStats(raw.output)
                 self.status = "Storage summary updated"
             }
         }
@@ -163,17 +169,37 @@ final class AppState: ObservableObject {
         output    += "\n\(title) started\n"
         let command = resolvedCommand(splitArgs(args))
         Task.detached(priority: .userInitiated) {
-            let result = await Self.exec(command.executable, command.arguments)
+            let result = await Self.exec(command.executable, command.arguments) { process in
+                Task { @MainActor in self.currentProcess = process }
+            }
             await MainActor.run {
-                self.output    += result
-                self.status     = "\(title) complete"
-                self.running    = false
-                self.outputOpen = false
+                self.currentProcess = nil
+                self.output += result.output
+                if result.status == 15 {
+                    self.status = "\(title) stopped"
+                    self.output += "Stopped.\n"
+                    self.outputOpen = true
+                } else if result.status == 0 {
+                    self.status = "\(title) complete"
+                    self.outputOpen = false
+                } else {
+                    self.status = "\(title) needs attention"
+                    self.outputOpen = true
+                }
+                self.running = false
                 if title == "Safe Cleanup" {
                     self.refreshStats(force: true)
                 }
             }
         }
+    }
+
+    func cancelRun() {
+        guard let process = currentProcess, process.isRunning else { return }
+        status = "Stopping..."
+        output += "Stopping current action...\n"
+        outputOpen = true
+        process.terminate()
     }
 
     func runLeftovers(_ query: String) {
@@ -228,7 +254,7 @@ final class AppState: ObservableObject {
         }
     }
 
-    private static func exec(_ executable: String, _ arguments: [String]) async -> String {
+    private static func exec(_ executable: String, _ arguments: [String], onStart: ((Process) -> Void)? = nil) async -> CommandResult {
         let p = Process()
         p.executableURL = URL(fileURLWithPath: executable)
         p.arguments = arguments
@@ -236,15 +262,21 @@ final class AppState: ObservableObject {
         p.standardOutput = pipe; p.standardError = pipe
         do {
             try p.run()
+            onStart?(p)
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
             p.waitUntilExit()
             let text = String(data: data, encoding: .utf8) ?? ""
             let visibleText = sanitizeForApp(text)
             if p.terminationStatus == 0 {
-                return visibleText.isEmpty ? "Completed.\n" : visibleText
+                return CommandResult(output: visibleText.isEmpty ? "Completed.\n" : visibleText, status: p.terminationStatus)
             }
-            return visibleText + "\nThe action could not finish. Status \(p.terminationStatus).\n"
-        } catch { return "Could not start this action: \(error.localizedDescription)\n" }
+            if p.terminationStatus == 15 {
+                return CommandResult(output: visibleText, status: p.terminationStatus)
+            }
+            return CommandResult(output: visibleText + "\nThe action could not finish. Status \(p.terminationStatus).\n", status: p.terminationStatus)
+        } catch {
+            return CommandResult(output: "Could not start this action: \(error.localizedDescription)\n", status: -1)
+        }
     }
 
     private static func sanitizeForApp(_ text: String) -> String {
@@ -801,10 +833,16 @@ struct OutputPanel: View {
                     .font(DS.T.bodySm)
                     .foregroundColor(DS.C.textOnDark.opacity(0.72))
                 Spacer()
-                IconBtn(icon: "doc.on.clipboard", dark: true) {
-                    state.copyDetails()
+                if state.running {
+                    IconBtn(icon: "xmark.circle.fill", dark: true) {
+                        state.cancelRun()
+                    }
+                } else {
+                    IconBtn(icon: "doc.on.clipboard", dark: true) {
+                        state.copyDetails()
+                    }
+                    IconBtn(icon: "trash", dark: true) { state.output = "" }
                 }
-                IconBtn(icon: "trash", dark: true) { state.output = "" }
                 IconBtn(icon: state.outputOpen ? "chevron.down" : "chevron.up", dark: true) {
                     withAnimation(DS.Ani.std) { state.outputOpen.toggle() }
                 }

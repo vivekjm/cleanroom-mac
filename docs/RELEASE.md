@@ -56,6 +56,6 @@ brew uninstall cleanroom
 
 When publishing to a tap, copy `dist/Formula/cleanroom.rb` into that tap after the GitHub release artifact exists.
 
-The desktop app is intentionally high-level. It opens without a heavy storage scan, uses the fast dashboard summary for top-level Scan/Review refreshes, keeps implementation details hidden, and applies the safe cleanup flow through the native confirmation sheet.
+The desktop app is intentionally high-level. It opens without a heavy storage scan, uses the fast dashboard summary for top-level Scan/Review refreshes, keeps implementation details hidden, lets users stop long detailed actions, and applies the safe cleanup flow through the native confirmation sheet.
 
 Local app builds are ad-hoc signed. A notarized public app release requires a Developer ID certificate and Apple notarization outside this repository's default CI path.
