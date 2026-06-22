@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.22.0"
+VERSION="1.23.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -6709,6 +6709,16 @@ paths_field_present() {
   return 1
 }
 
+paths_present_count() {
+  local count=0 path expanded
+  for path in "$@"; do
+    [[ -z "${path:-}" ]] && continue
+    expanded="$(expand_path "$path")"
+    [[ -e "$expanded" ]] && count=$((count + 1))
+  done
+  printf '%s\n' "$count"
+}
+
 caches() {
   local rows
   rows="$(cache_rows)"
@@ -8016,8 +8026,15 @@ dashboard() {
 }
 
 dashboard_card_rows() {
-  local cache downloads large archives developer screenshots trash node
-  cache="$(sum_existing_kb "~/.cache" "~/Library/Logs" "~/.npm/_cacache" "~/.yarn/cache" "~/Library/pnpm/store")"
+  local cache cache_value cache_detail downloads large archives developer screenshots trash node
+  cache="$(paths_present_count "~/.cache" "~/Library/Logs" "~/.npm/_cacache" "~/.yarn/cache" "~/Library/pnpm/store")"
+  if [[ "$cache" -gt 0 ]]; then
+    cache_value="Review"
+    cache_detail="Cache locations found; open Caches for a focused review."
+  else
+    cache_value="Clear"
+    cache_detail="No common cache locations found."
+  fi
   downloads=0
   archives=0
   screenshots=0
@@ -8031,7 +8048,7 @@ dashboard_card_rows() {
     developer="$(developer_fast_rows | tab_rows_total_kb)"
   fi
 
-  printf '%s\t%s\t%s\t%s\t%s\n' "$cache" "caches" "Caches" "$(human_kb "$cache")" "App and system caches"
+  printf '0\t%s\t%s\t%s\t%s\n' "caches" "Caches" "$cache_value" "$cache_detail"
   printf '%s\t%s\t%s\t%s\t%s\n' "$node" "node-modules" "Node Modules" "$(human_kb "$node")" "Stale dependency folders"
   printf '%s\t%s\t%s\t%s\t%s\n' "$downloads" "downloads" "Downloads" "Review" "Old downloadable artifacts"
   printf '%s\t%s\t%s\t%s\t%s\n' "$large" "large-files" "Large Files" "$(human_kb "$large")" "Large files found quickly"
