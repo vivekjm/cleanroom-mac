@@ -85,9 +85,9 @@ final class AppState: ObservableObject {
     @Published var categories: [CleanCategory] = [
         CleanCategory(title: "Caches",       tagline: "App & system caches accumulating silently",      icon: "xmark.bin.fill",        color: DS.C.cardForest,   args: "caches-fast"),
         CleanCategory(title: "Node Modules", tagline: "Orphaned node_modules, stale npm/pnpm caches",   icon: "shippingbox.fill",      color: DS.C.cardViolet,   args: "nodes-fast --limit 30 --days 30"),
-        CleanCategory(title: "Downloads",    tagline: "Old downloads, DMGs, and forgotten installers",  icon: "arrow.down.to.line",    color: DS.C.cardAmber,    args: "downloads --limit 30 --days 30"),
+        CleanCategory(title: "Downloads",    tagline: "Old downloads, DMGs, and forgotten installers",  icon: "arrow.down.to.line",    color: DS.C.cardAmber,    args: "downloads-fast --limit 30 --days 30"),
         CleanCategory(title: "Large Files",  tagline: "Files over 500 MB that may no longer be needed", icon: "doc.fill",              color: DS.C.cardSlate,    args: "large-fast --limit 30 --min-mb 500"),
-        CleanCategory(title: "Archives",     tagline: "Old zip archives, tar files, and disk images",   icon: "archivebox.fill",       color: DS.C.cardRose,     args: "archives --limit 30 --days 7"),
+        CleanCategory(title: "Archives",     tagline: "Old zip archives, tar files, and disk images",   icon: "archivebox.fill",       color: DS.C.cardRose,     args: "archives-fast --limit 30 --days 7"),
         CleanCategory(title: "Developer",    tagline: "Build artifacts, virtualenvs, and toolchains",   icon: "hammer.fill",           color: DS.C.cardTeal,     args: "developer-fast --limit 30 --days 30"),
         CleanCategory(title: "Screenshots",  tagline: "Old screenshots accumulating on Desktop",        icon: "camera.viewfinder",     color: DS.C.cardBark,     args: "screenshots --limit 30 --days 7"),
         CleanCategory(title: "Trash",        tagline: "Files waiting in macOS Trash",                   icon: "trash.fill",            color: DS.C.cardCharcoal, args: "trash"),
@@ -440,17 +440,17 @@ final class AppState: ObservableObject {
 
     private func jsonItems(from parsed: Any) -> [[String: Any]]? {
         if let array = parsed as? [[String: Any]] {
-            return array
+            return appFacingItems(array)
         }
         if let object = parsed as? [String: Any] {
             if let available = object["available"] as? Bool, !available {
                 return []
             }
             if let array = object["items"] as? [[String: Any]] {
-                return array
+                return appFacingItems(array)
             }
             if let array = object["categories"] as? [[String: Any]] {
-                return array
+                return appFacingItems(array)
             }
             var grouped: [[String: Any]] = []
             for key in ["apps", "uninstallers", "receipts", "leftovers"] {
@@ -459,10 +459,20 @@ final class AppState: ObservableObject {
                 }
             }
             if !grouped.isEmpty {
-                return grouped
+                return appFacingItems(grouped)
             }
         }
         return nil
+    }
+
+    private func appFacingItems(_ items: [[String: Any]]) -> [[String: Any]] {
+        items.map { item in
+            var cleaned = item
+            for key in cleaned.keys where key.lowercased().contains("command") {
+                cleaned.removeValue(forKey: key)
+            }
+            return cleaned
+        }
     }
 
     private func summaryLine(for item: [String: Any]) -> String {
