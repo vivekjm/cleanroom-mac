@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.7.0"
+VERSION="1.8.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -75,6 +75,7 @@ Usage:
   cleanroom large [PATH] [--min-mb N] [--limit N] [--json]
   cleanroom large-fast [PATH] [--min-mb N] [--limit N] [--json]
   cleanroom brokenlinks [PATH] [--limit N] [--json]
+  cleanroom brokenlinks-fast [PATH] [--limit N] [--json]
   cleanroom quarantine [PATH] [--limit N] [--json]
   cleanroom quarantine-fast [PATH] [--limit N] [--json]
   cleanroom metadata [PATH...] [--limit N] [--json] [--apply --trash]
@@ -162,6 +163,7 @@ Actions:
   large                List largest files for review without deleting anything.
   large-fast           Quickly list large files using Spotlight metadata.
   brokenlinks          List broken symlinks for review without deleting anything.
+  brokenlinks-fast     Quickly preview shallow broken symlinks for desktop review.
   quarantine           Deep-scan files with macOS quarantine metadata for review.
   quarantine-fast      Quickly preview recent download/app quarantine metadata.
   metadata             Deep-scan .DS_Store, AppleDouble, Thumbs.db, and similar metadata clutter.
@@ -231,7 +233,7 @@ Options:
   --trash              Move deleted files to ~/.Trash/cleanroom-* instead of rm -rf.
   --yes                Do not prompt before --apply cleanup.
   --verbose            Print every path touched.
-  --json               Emit JSON for dashboard, overview, map, map-fast, snapshot, diff, state, permissions, review, scan, system-data, system-data-fast, plan, large, brokenlinks, quarantine, metadata, quicklook, fontcaches, webcaches, savedstate, projectcaches, updaters, browsercaches, duplicates,
+  --json               Emit JSON for dashboard, overview, map, map-fast, snapshot, diff, state, permissions, review, scan, system-data, system-data-fast, plan, large, brokenlinks, brokenlinks-fast, quarantine, metadata, quicklook, fontcaches, webcaches, savedstate, projectcaches, updaters, browsercaches, duplicates,
                        documents, desktop, screenshots, archives, downloads, installers, nodes, venvs, apps, uninstallers, appreview, appdata, libraries, cloud, cloudfiles, personal, communications,
                        browsers, leftovers, startup, loginitems,
                        trash, backups, xcode, caches, diagnostics, packages, npm-cache, yarn-cache, pnpm-store, cocoapods-cache, pip-cache, receipts, homebrew, homebrew-cleanup, toolchains,
@@ -337,6 +339,7 @@ Examples:
   cleanroom large ~/Documents --min-mb 250 --limit 30
   cleanroom large --json ~/Downloads
   cleanroom brokenlinks
+  cleanroom brokenlinks-fast
   cleanroom brokenlinks ~/Documents --limit 50
   cleanroom brokenlinks --json
   cleanroom quarantine
@@ -2845,6 +2848,32 @@ brokenlinks_rows() {
   done < <(brokenlinks_roots) | sort -rn | head -n "$LIMIT"
 }
 
+brokenlinks_fast_rows() {
+  local root path target epoch
+  while IFS= read -r root; do
+    [[ -d "$root" ]] || continue
+    local old_nullglob
+    old_nullglob="$(shopt -p nullglob || true)"
+    shopt -s nullglob
+    local candidates=(
+      "$root"/*
+      "$root"/.[!.]*
+      "$root"/..?*
+      "$root"/*/*
+      "$root"/.[!.]*/*
+      "$root"/..?*/*
+    )
+    eval "$old_nullglob"
+    for path in "${candidates[@]}"; do
+      [[ -L "$path" ]] || continue
+      [[ -e "$path" ]] && continue
+      target="$(readlink "$path" 2>/dev/null || true)"
+      epoch="$(path_mtime_epoch "$path")"
+      printf '%012d\t%s\t%s\t%s\n' "$epoch" "$path" "$target" "$(dirname "$path")"
+    done
+  done < <(brokenlinks_roots) | sort -rn | head -n "$LIMIT"
+}
+
 brokenlinks() {
   local rows
   rows="$(brokenlinks_rows)"
@@ -2884,6 +2913,46 @@ brokenlinks() {
     epoch_num="$(printf '%s\n' "${epoch:-0}" | sed 's/^0*//; s/^$/0/')"
     printf '%-12s %s -> %s\n' "$(file_mtime_iso "${epoch_num:-0}")" "$path" "$target"
     printf '  reveal: open -R %s\n' "$(shell_quote "$path")"
+  done <<<"$rows"
+}
+
+brokenlinks_fast() {
+  local rows
+  rows="$(brokenlinks_fast_rows)"
+
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '['
+    local first=1 epoch path target parent epoch_num
+    while IFS=$'\t' read -r epoch path target parent; do
+      [[ -z "${path:-}" ]] && continue
+      epoch_num="$(printf '%s\n' "${epoch:-0}" | sed 's/^0*//; s/^$/0/')"
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '{"path":"%s","target":"%s","parent":"%s","modified_epoch":%s,"modified":"%s","kind":"broken-link","mode":"fast","guidance":"%s"}' \
+        "$(printf '%s' "$path" | json_escape)" \
+        "$(printf '%s' "$target" | json_escape)" \
+        "$(printf '%s' "$parent" | json_escape)" \
+        "${epoch_num:-0}" \
+        "$(file_mtime_iso "${epoch_num:-0}" | json_escape)" \
+        "$(printf '%s' "Quick review checks common shallow folders only. Use deep Broken Links if you need a full recursive scan." | json_escape)"
+    done <<<"$rows"
+    printf ']\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}cleanroom quick broken links${RESET}"
+  printf 'Fast read-only preview of shallow broken symlinks. Nothing is deleted.\n'
+  printf 'Limit: %s\n\n' "$LIMIT"
+  if [[ -z "$rows" ]]; then
+    printf 'No broken symlinks found in common shallow folders.\n'
+    return 0
+  fi
+  printf '%-12s %s\n' "modified" "link -> target"
+  local epoch path target parent epoch_num
+  while IFS=$'\t' read -r epoch path target parent; do
+    [[ -z "${path:-}" ]] && continue
+    epoch_num="$(printf '%s\n' "${epoch:-0}" | sed 's/^0*//; s/^$/0/')"
+    printf '%-12s %s -> %s\n' "$(file_mtime_iso "${epoch_num:-0}")" "$path" "$target"
   done <<<"$rows"
 }
 
@@ -8220,7 +8289,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  dashboard|overview|map|map-fast|mapfast|snapshot|diff|state|permissions|review|scan|system-data|system-data-fast|systemdata-fast|systemdatafast|plan|large|large-fast|largefast|brokenlinks|quarantine|quarantine-fast|quarantinefast|metadata|metadata-fast|metadatafast|quicklook|fontcaches|font-caches|webcaches|web-caches|savedstate|saved-state|projectcaches|project-caches|projectcaches-fast|projectcachesfast|project-caches-fast|project-cachesfast|developer-fast|developerfast|updaters|updater-caches|browsercaches|browser-caches|duplicates|duplicates-fast|duplicatesfast|documents|desktop|screenshots|archives|downloads|installers|nodes|nodes-fast|nodesfast|venvs|venvs-fast|venvsfast|virtualenvs|virtualenvs-fast|virtualenvsfast|apps|apps-fast|appsfast|uninstallers|appreview|appdata|libraries|cloud|cloudfiles|cloud-files|personal|communications|comms|browsers|leftovers|backups|xcode|android|startup|loginitems|trash|caches|diagnostics|packages|npm-cache|npmcache|yarn-cache|yarncache|pnpm-store|pnpmstore|cocoapods-cache|pod-cache|podcache|pip-cache|pipcache|receipts|homebrew|homebrew-cleanup|brewcleanup|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
+  dashboard|overview|map|map-fast|mapfast|snapshot|diff|state|permissions|review|scan|system-data|system-data-fast|systemdata-fast|systemdatafast|plan|large|large-fast|largefast|brokenlinks|brokenlinks-fast|brokenlinksfast|broken-links-fast|broken-linksfast|quarantine|quarantine-fast|quarantinefast|metadata|metadata-fast|metadatafast|quicklook|fontcaches|font-caches|webcaches|web-caches|savedstate|saved-state|projectcaches|project-caches|projectcaches-fast|projectcachesfast|project-caches-fast|project-cachesfast|developer-fast|developerfast|updaters|updater-caches|browsercaches|browser-caches|duplicates|duplicates-fast|duplicatesfast|documents|desktop|screenshots|archives|downloads|installers|nodes|nodes-fast|nodesfast|venvs|venvs-fast|venvsfast|virtualenvs|virtualenvs-fast|virtualenvsfast|apps|apps-fast|appsfast|uninstallers|appreview|appdata|libraries|cloud|cloudfiles|cloud-files|personal|communications|comms|browsers|leftovers|backups|xcode|android|startup|loginitems|trash|caches|diagnostics|packages|npm-cache|npmcache|yarn-cache|yarncache|pnpm-store|pnpmstore|cocoapods-cache|pod-cache|podcache|pip-cache|pipcache|receipts|homebrew|homebrew-cleanup|brewcleanup|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -8318,7 +8387,7 @@ while [[ "$#" -gt 0 ]]; do
     -h|--help) usage; exit 0 ;;
     -v|--version) echo "$VERSION"; exit 0 ;;
     *)
-      if [[ "$ACTION" == "guard" || "$ACTION" == "diff" || "$ACTION" == "large" || "$ACTION" == "large-fast" || "$ACTION" == "largefast" || "$ACTION" == "brokenlinks" || "$ACTION" == "quarantine" || "$ACTION" == "quarantine-fast" || "$ACTION" == "quarantinefast" || "$ACTION" == "metadata" || "$ACTION" == "metadata-fast" || "$ACTION" == "metadatafast" || "$ACTION" == "projectcaches" || "$ACTION" == "project-caches" || "$ACTION" == "projectcaches-fast" || "$ACTION" == "projectcachesfast" || "$ACTION" == "project-caches-fast" || "$ACTION" == "project-cachesfast" || "$ACTION" == "developer-fast" || "$ACTION" == "developerfast" || "$ACTION" == "duplicates" || "$ACTION" == "duplicates-fast" || "$ACTION" == "duplicatesfast" || "$ACTION" == "documents" || "$ACTION" == "screenshots" || "$ACTION" == "archives" || "$ACTION" == "nodes" || "$ACTION" == "nodes-fast" || "$ACTION" == "nodesfast" || "$ACTION" == "venvs" || "$ACTION" == "venvs-fast" || "$ACTION" == "venvsfast" || "$ACTION" == "virtualenvs" || "$ACTION" == "virtualenvs-fast" || "$ACTION" == "virtualenvsfast" || "$ACTION" == "apps" || "$ACTION" == "apps-fast" || "$ACTION" == "appsfast" || "$ACTION" == "uninstallers" || "$ACTION" == "appreview" || "$ACTION" == "cloudfiles" || "$ACTION" == "cloud-files" || "$ACTION" == "leftovers" ]]; then
+      if [[ "$ACTION" == "guard" || "$ACTION" == "diff" || "$ACTION" == "large" || "$ACTION" == "large-fast" || "$ACTION" == "largefast" || "$ACTION" == "brokenlinks" || "$ACTION" == "brokenlinks-fast" || "$ACTION" == "brokenlinksfast" || "$ACTION" == "broken-links-fast" || "$ACTION" == "broken-linksfast" || "$ACTION" == "quarantine" || "$ACTION" == "quarantine-fast" || "$ACTION" == "quarantinefast" || "$ACTION" == "metadata" || "$ACTION" == "metadata-fast" || "$ACTION" == "metadatafast" || "$ACTION" == "projectcaches" || "$ACTION" == "project-caches" || "$ACTION" == "projectcaches-fast" || "$ACTION" == "projectcachesfast" || "$ACTION" == "project-caches-fast" || "$ACTION" == "project-cachesfast" || "$ACTION" == "developer-fast" || "$ACTION" == "developerfast" || "$ACTION" == "duplicates" || "$ACTION" == "duplicates-fast" || "$ACTION" == "duplicatesfast" || "$ACTION" == "documents" || "$ACTION" == "screenshots" || "$ACTION" == "archives" || "$ACTION" == "nodes" || "$ACTION" == "nodes-fast" || "$ACTION" == "nodesfast" || "$ACTION" == "venvs" || "$ACTION" == "venvs-fast" || "$ACTION" == "venvsfast" || "$ACTION" == "virtualenvs" || "$ACTION" == "virtualenvs-fast" || "$ACTION" == "virtualenvsfast" || "$ACTION" == "apps" || "$ACTION" == "apps-fast" || "$ACTION" == "appsfast" || "$ACTION" == "uninstallers" || "$ACTION" == "appreview" || "$ACTION" == "cloudfiles" || "$ACTION" == "cloud-files" || "$ACTION" == "leftovers" ]]; then
         PATH_ARGS+=("$1")
       else
         die "Unknown option: $1"
@@ -8345,6 +8414,7 @@ case "$ACTION" in
   large) large ;;
   large-fast|largefast) large_fast ;;
   brokenlinks) brokenlinks ;;
+  brokenlinks-fast|brokenlinksfast|broken-links-fast|broken-linksfast) brokenlinks_fast ;;
   quarantine) quarantine ;;
   quarantine-fast|quarantinefast) quarantine_fast ;;
   metadata) metadata ;;

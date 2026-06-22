@@ -637,6 +637,14 @@ grep 'broken-link' "$brokenlinks_json" >/dev/null
 grep 'missing-target' "$brokenlinks_json" >/dev/null
 grep 'open -R' "$brokenlinks_json" >/dev/null
 rm -f "$brokenlinks_json"
+"$BIN" brokenlinks-fast "$HOME/Documents" --limit 10 | grep 'broken-link' >/dev/null
+brokenlinks_fast_json="$(mktemp)"
+"$BIN" brokenlinks-fast --json "$HOME/Documents" --limit 10 > "$brokenlinks_fast_json"
+python3 -m json.tool "$brokenlinks_fast_json" >/dev/null
+grep '"mode":"fast"' "$brokenlinks_fast_json" >/dev/null
+grep 'broken-link' "$brokenlinks_fast_json" >/dev/null
+grep 'missing-target' "$brokenlinks_fast_json" >/dev/null
+rm -f "$brokenlinks_fast_json"
 "$BIN" quarantine "$HOME/Downloads" --limit 10 | grep 'old-installer.dmg' >/dev/null
 quarantine_json="$(mktemp)"
 "$BIN" quarantine --json "$HOME/Downloads" --limit 10 > "$quarantine_json"
