@@ -48,6 +48,7 @@ final class AppState: ObservableObject {
     @Published var output:           String  = "Ready.\n"
     @Published var running:          Bool    = false
     @Published var status:           String  = "Ready"
+    @Published var activityMessage:  String  = "Choose a scan or cleanup to begin."
     @Published var outputOpen:       Bool    = false
     @Published var showLeftovers:    Bool    = false
     @Published var showApplyConfirm: Bool    = false
@@ -108,9 +109,11 @@ final class AppState: ObservableObject {
            let lastStatsRefresh,
            Date().timeIntervalSince(lastStatsRefresh) < 30 {
             status = "Storage summary is up to date"
+            activityMessage = "Your storage summary was refreshed recently."
             return
         }
         status = "Measuring storage..."
+        activityMessage = "Checking disk usage without starting a cleanup."
         lastStatsRefresh = Date()
         let command = resolvedCommand(["dashboard", "--json"])
         Task.detached(priority: .background) {
@@ -118,6 +121,7 @@ final class AppState: ObservableObject {
             await MainActor.run {
                 self.parseStats(raw.output)
                 self.status = "Storage summary updated"
+                self.activityMessage = "Storage summary updated. No files were changed."
             }
         }
     }
@@ -170,6 +174,7 @@ final class AppState: ObservableObject {
         currentProcess = nil
         running    = true
         status     = "\(title) in progress..."
+        activityMessage = "\(title) is running. You can stop it anytime."
         output    += "\n\(title) started\n"
         let command = resolvedCommand(splitArgs(args))
         Task.detached(priority: .userInitiated) {
@@ -186,13 +191,16 @@ final class AppState: ObservableObject {
                 self.output += result.output
                 if result.status == 15 {
                     self.status = "\(title) stopped"
+                    self.activityMessage = "\(title) stopped. Open details to see where it paused."
                     self.output += "Stopped.\n"
                     self.outputOpen = true
                 } else if result.status == 0 {
                     self.status = "\(title) complete"
+                    self.activityMessage = "\(title) finished. Details are available if you need them."
                     self.outputOpen = false
                 } else {
                     self.status = "\(title) needs attention"
+                    self.activityMessage = "\(title) needs attention. Open details for what happened."
                     self.outputOpen = true
                 }
                 self.running = false
@@ -206,6 +214,7 @@ final class AppState: ObservableObject {
     func cancelRun() {
         guard let process = currentProcess, process.isRunning else { return }
         status = "Stopping..."
+        activityMessage = "Stopping the current action..."
         output += "Stopping current action...\n"
         outputOpen = true
         currentProcess = nil
@@ -220,6 +229,7 @@ final class AppState: ObservableObject {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(output, forType: .string)
         status = "Details copied"
+        activityMessage = "Activity details copied."
     }
 
     private func resolvedCommand(_ args: [String]) -> (executable: String, arguments: [String]) {
@@ -839,9 +849,16 @@ struct OutputPanel: View {
                     .fill(state.running ? DS.C.ctaOrange : DS.C.positive)
                     .frame(width: 7, height: 7)
                     .animation(DS.Ani.std, value: state.running)
-                Text(state.status)
-                    .font(DS.T.bodySm)
-                    .foregroundColor(DS.C.textOnDark.opacity(0.72))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(state.activityMessage)
+                        .font(DS.T.bodySm)
+                        .foregroundColor(DS.C.textOnDark.opacity(0.82))
+                        .lineLimit(1)
+                    Text(state.status)
+                        .font(DS.T.tag)
+                        .foregroundColor(DS.C.textOnDark.opacity(0.48))
+                        .lineLimit(1)
+                }
                 Spacer()
                 if state.running {
                     IconBtn(icon: "xmark.circle.fill", dark: true) {
