@@ -248,9 +248,15 @@ final class AppState: ObservableObject {
             "developer-fast", "nodes-fast", "venvs-fast", "apps-fast",
             "downloads", "archives", "screenshots", "trash", "cloudfiles",
             "quicklook", "fontcaches", "webcaches", "savedstate",
-            "projectcaches", "updaters", "browsercaches"
+            "projectcaches", "updaters", "browsercaches",
+            "xcode", "backups", "system-data", "containers", "toolchains",
+            "loginitems", "startup", "snapshot", "state", "protect", "rules",
+            "map", "doctor"
         ]
         if jsonActions.contains(action), !args.contains("--json") {
+            return args + ["--json"]
+        }
+        if action == "clean", args.contains("--preflight"), !args.contains("--json") {
             return args + ["--json"]
         }
         return args
@@ -320,9 +326,12 @@ final class AppState: ObservableObject {
 
     private func summaryLine(for item: [String: Any]) -> String {
         let size = stringValue(item["size"]) ?? stringValue(item["potential_reclaim"]) ?? "Review"
-        let title = stringValue(item["title"]) ?? stringValue(item["name"]) ?? stringValue(item["kind"]) ?? "Item"
+        let title = stringValue(item["title"]) ?? stringValue(item["name"]) ?? stringValue(item["kind"]) ?? stringValue(item["runtime"]) ?? stringValue(item["id"]) ?? "Item"
         if let path = stringValue(item["path"]) {
             return "\(size)  \(title)  \(path)"
+        }
+        if let paths = stringValue(item["paths"]) {
+            return "\(size)  \(title)  \(paths)"
         }
         if let paths = item["paths"] as? [String], let first = paths.first {
             return "\(size)  \(title)  \(first)"
