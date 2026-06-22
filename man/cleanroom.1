@@ -1,4 +1,4 @@
-.TH CLEANROOM 1 "June 2026" "cleanroom 0.89.0" "User Commands"
+.TH CLEANROOM 1 "June 2026" "cleanroom 0.90.0" "User Commands"
 .SH NAME
 cleanroom \- safe-by-default macOS storage cleaner
 .SH SYNOPSIS
@@ -43,6 +43,9 @@ cleanroom \- safe-by-default macOS storage cleaner
 .br
 .B cleanroom
 .RI "quarantine [path] [--limit n] [--json]"
+.br
+.B cleanroom
+.RI "quarantine-fast [path] [--limit n] [--json]"
 .br
 .B cleanroom
 .RI "metadata [path...] [--limit n] [--json] [--apply --trash]"
@@ -279,8 +282,11 @@ Quickly list large files using Spotlight metadata without deleting anything.
 List dangling symlinks for review without deleting anything.
 .TP
 .B quarantine
-List files and apps with macOS quarantine metadata without deleting files or
+Deep-scan files and apps with macOS quarantine metadata without deleting files or
 clearing attributes.
+.TP
+.B quarantine-fast
+Quickly preview shallow Downloads, Desktop, Documents, and Applications quarantine metadata.
 .TP
 .B metadata
 Deep-scan removable filesystem metadata clutter such as .DS_Store, AppleDouble

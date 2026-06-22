@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.89.0"
+VERSION="0.90.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -74,6 +74,7 @@ Usage:
   cleanroom large-fast [PATH] [--min-mb N] [--limit N] [--json]
   cleanroom brokenlinks [PATH] [--limit N] [--json]
   cleanroom quarantine [PATH] [--limit N] [--json]
+  cleanroom quarantine-fast [PATH] [--limit N] [--json]
   cleanroom metadata [PATH...] [--limit N] [--json] [--apply --trash]
   cleanroom metadata-fast [PATH...] [--limit N] [--json]
   cleanroom quicklook [--json]
@@ -152,7 +153,8 @@ Actions:
   large                List largest files for review without deleting anything.
   large-fast           Quickly list large files using Spotlight metadata.
   brokenlinks          List broken symlinks for review without deleting anything.
-  quarantine           List files with macOS quarantine metadata for review.
+  quarantine           Deep-scan files with macOS quarantine metadata for review.
+  quarantine-fast      Quickly preview recent download/app quarantine metadata.
   metadata             Deep-scan .DS_Store, AppleDouble, Thumbs.db, and similar metadata clutter.
   metadata-fast        Quickly preview filesystem metadata clutter using Spotlight.
   quicklook            Inventory Quick Look thumbnail and preview caches.
@@ -2749,31 +2751,86 @@ quarantine_rows() {
   done < <(quarantine_roots) | sort -t $'\t' -k1,1rn -k2,2rn | head -n "$LIMIT"
 }
 
+quarantine_fast_rows() {
+  command -v xattr >/dev/null 2>&1 || return 2
+  local root path value kb epoch
+  while IFS= read -r root; do
+    [[ -d "$root" ]] || continue
+    while IFS= read -r -d '' path; do
+      value="$(xattr -p com.apple.quarantine "$path" 2>/dev/null || true)"
+      [[ -n "$value" ]] || continue
+      kb="$(size_kb "$path")"
+      epoch="$(path_mtime_epoch "$path")"
+      printf '%012d\t%012d\t%s\t%s\t%s\n' "$kb" "$epoch" "$path" "$value" "$(dirname "$path")"
+    done < <(find "$root" -xdev -maxdepth 2 \( -type f -o -type d -name '*.app' \) -print0 2>/dev/null)
+  done < <(quarantine_roots) | sort -t $'\t' -k1,1rn -k2,2rn | head -n "$LIMIT"
+}
+
+quarantine_json_rows() {
+  local rows="$1"
+  printf '['
+  local first=1 kb epoch path value parent kb_num epoch_num
+  while IFS=$'\t' read -r kb epoch path value parent; do
+    [[ -z "${path:-}" ]] && continue
+    kb_num="$(printf '%s\n' "${kb:-0}" | sed 's/^0*//; s/^$/0/')"
+    epoch_num="$(printf '%s\n' "${epoch:-0}" | sed 's/^0*//; s/^$/0/')"
+    [[ "$first" -eq 0 ]] && printf ','
+    first=0
+    printf '{"path":"%s","parent":"%s","quarantine":"%s","size_kb":%s,"size":"%s","modified_epoch":%s,"modified":"%s","review_command":"%s","guidance":"%s"}' \
+      "$(printf '%s' "$path" | json_escape)" \
+      "$(printf '%s' "$parent" | json_escape)" \
+      "$(printf '%s' "$value" | json_escape)" \
+      "$kb_num" \
+      "$(human_kb "${kb:-0}" | json_escape)" \
+      "${epoch_num:-0}" \
+      "$(file_mtime_iso "${epoch_num:-0}" | json_escape)" \
+      "$(printf 'open -R %s' "$(shell_quote "$path")" | json_escape)" \
+      "$(printf '%s' "Quarantine metadata marks downloaded content. Review before deleting or clearing attributes." | json_escape)"
+  done <<<"$rows"
+  printf ']\n'
+}
+
+quarantine_fast() {
+  local rows available=1
+  rows="$(quarantine_fast_rows)" || available=0
+
+  if [[ "$JSON" -eq 1 ]]; then
+    if [[ "$available" -eq 0 ]]; then
+      printf '{"available":false,"reason":"xattr_unavailable","items":[]}\n'
+      return 0
+    fi
+    printf '{"available":true,"items":'
+    quarantine_json_rows "$rows"
+    printf '}\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}cleanroom quick quarantined downloads${RESET}"
+  printf 'Review-only shallow preview. No files are deleted and attributes are not changed.\n'
+  printf 'Limit: %s\n\n' "$LIMIT"
+  if [[ "$available" -eq 0 ]]; then
+    printf 'xattr not found; quarantine metadata cannot be inspected on this system.\n'
+    return 0
+  fi
+  if [[ -z "$rows" ]]; then
+    printf 'No quarantine metadata found in the fast review set.\n'
+    return 0
+  fi
+  printf '%-10s %-12s %s\n' "size" "modified" "path"
+  local kb epoch path value parent epoch_num
+  while IFS=$'\t' read -r kb epoch path value parent; do
+    [[ -z "${path:-}" ]] && continue
+    epoch_num="$(printf '%s\n' "${epoch:-0}" | sed 's/^0*//; s/^$/0/')"
+    printf '%-10s %-12s %s\n' "$(human_kb "$kb")" "$(file_mtime_iso "${epoch_num:-0}")" "$path"
+  done <<<"$rows"
+}
+
 quarantine() {
   local rows
   rows="$(quarantine_rows)"
 
   if [[ "$JSON" -eq 1 ]]; then
-    printf '['
-    local first=1 kb epoch path value parent kb_num epoch_num
-    while IFS=$'\t' read -r kb epoch path value parent; do
-      [[ -z "${path:-}" ]] && continue
-      kb_num="$(printf '%s\n' "${kb:-0}" | sed 's/^0*//; s/^$/0/')"
-      epoch_num="$(printf '%s\n' "${epoch:-0}" | sed 's/^0*//; s/^$/0/')"
-      [[ "$first" -eq 0 ]] && printf ','
-      first=0
-      printf '{"path":"%s","parent":"%s","quarantine":"%s","size_kb":%s,"size":"%s","modified_epoch":%s,"modified":"%s","review_command":"%s","guidance":"%s"}' \
-        "$(printf '%s' "$path" | json_escape)" \
-        "$(printf '%s' "$parent" | json_escape)" \
-        "$(printf '%s' "$value" | json_escape)" \
-        "$kb_num" \
-        "$(human_kb "${kb:-0}" | json_escape)" \
-        "${epoch_num:-0}" \
-        "$(file_mtime_iso "${epoch_num:-0}" | json_escape)" \
-        "$(printf 'open -R %s' "$(shell_quote "$path")" | json_escape)" \
-        "$(printf '%s' "Quarantine metadata marks downloaded content. Review before deleting or clearing attributes." | json_escape)"
-    done <<<"$rows"
-    printf ']\n'
+    quarantine_json_rows "$rows"
     return 0
   fi
 
@@ -7663,7 +7720,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  dashboard|overview|map|snapshot|diff|state|permissions|review|scan|system-data|plan|large|large-fast|largefast|brokenlinks|quarantine|metadata|metadata-fast|metadatafast|quicklook|fontcaches|font-caches|webcaches|web-caches|savedstate|saved-state|projectcaches|project-caches|updaters|updater-caches|browsercaches|browser-caches|duplicates|duplicates-fast|duplicatesfast|documents|desktop|screenshots|archives|downloads|installers|nodes|venvs|virtualenvs|apps|uninstallers|appreview|appdata|libraries|cloud|cloudfiles|cloud-files|personal|communications|comms|browsers|leftovers|backups|xcode|android|startup|loginitems|trash|caches|diagnostics|packages|npm-cache|npmcache|yarn-cache|yarncache|pnpm-store|pnpmstore|cocoapods-cache|pod-cache|podcache|pip-cache|pipcache|receipts|homebrew|homebrew-cleanup|brewcleanup|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
+  dashboard|overview|map|snapshot|diff|state|permissions|review|scan|system-data|plan|large|large-fast|largefast|brokenlinks|quarantine|quarantine-fast|quarantinefast|metadata|metadata-fast|metadatafast|quicklook|fontcaches|font-caches|webcaches|web-caches|savedstate|saved-state|projectcaches|project-caches|updaters|updater-caches|browsercaches|browser-caches|duplicates|duplicates-fast|duplicatesfast|documents|desktop|screenshots|archives|downloads|installers|nodes|venvs|virtualenvs|apps|uninstallers|appreview|appdata|libraries|cloud|cloudfiles|cloud-files|personal|communications|comms|browsers|leftovers|backups|xcode|android|startup|loginitems|trash|caches|diagnostics|packages|npm-cache|npmcache|yarn-cache|yarncache|pnpm-store|pnpmstore|cocoapods-cache|pod-cache|podcache|pip-cache|pipcache|receipts|homebrew|homebrew-cleanup|brewcleanup|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -7761,7 +7818,7 @@ while [[ "$#" -gt 0 ]]; do
     -h|--help) usage; exit 0 ;;
     -v|--version) echo "$VERSION"; exit 0 ;;
     *)
-      if [[ "$ACTION" == "guard" || "$ACTION" == "diff" || "$ACTION" == "large" || "$ACTION" == "large-fast" || "$ACTION" == "largefast" || "$ACTION" == "brokenlinks" || "$ACTION" == "quarantine" || "$ACTION" == "metadata" || "$ACTION" == "metadata-fast" || "$ACTION" == "metadatafast" || "$ACTION" == "projectcaches" || "$ACTION" == "project-caches" || "$ACTION" == "duplicates" || "$ACTION" == "duplicates-fast" || "$ACTION" == "duplicatesfast" || "$ACTION" == "documents" || "$ACTION" == "screenshots" || "$ACTION" == "archives" || "$ACTION" == "nodes" || "$ACTION" == "venvs" || "$ACTION" == "virtualenvs" || "$ACTION" == "apps" || "$ACTION" == "uninstallers" || "$ACTION" == "appreview" || "$ACTION" == "cloudfiles" || "$ACTION" == "cloud-files" || "$ACTION" == "leftovers" ]]; then
+      if [[ "$ACTION" == "guard" || "$ACTION" == "diff" || "$ACTION" == "large" || "$ACTION" == "large-fast" || "$ACTION" == "largefast" || "$ACTION" == "brokenlinks" || "$ACTION" == "quarantine" || "$ACTION" == "quarantine-fast" || "$ACTION" == "quarantinefast" || "$ACTION" == "metadata" || "$ACTION" == "metadata-fast" || "$ACTION" == "metadatafast" || "$ACTION" == "projectcaches" || "$ACTION" == "project-caches" || "$ACTION" == "duplicates" || "$ACTION" == "duplicates-fast" || "$ACTION" == "duplicatesfast" || "$ACTION" == "documents" || "$ACTION" == "screenshots" || "$ACTION" == "archives" || "$ACTION" == "nodes" || "$ACTION" == "venvs" || "$ACTION" == "virtualenvs" || "$ACTION" == "apps" || "$ACTION" == "uninstallers" || "$ACTION" == "appreview" || "$ACTION" == "cloudfiles" || "$ACTION" == "cloud-files" || "$ACTION" == "leftovers" ]]; then
         PATH_ARGS+=("$1")
       else
         die "Unknown option: $1"
@@ -7787,6 +7844,7 @@ case "$ACTION" in
   large-fast|largefast) large_fast ;;
   brokenlinks) brokenlinks ;;
   quarantine) quarantine ;;
+  quarantine-fast|quarantinefast) quarantine_fast ;;
   metadata) metadata ;;
   metadata-fast|metadatafast) metadata_fast ;;
   quicklook) quicklook ;;

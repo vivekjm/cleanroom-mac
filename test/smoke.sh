@@ -626,6 +626,14 @@ grep '"quarantine":"' "$quarantine_json" >/dev/null
 grep 'Safari' "$quarantine_json" >/dev/null
 grep 'open -R' "$quarantine_json" >/dev/null
 rm -f "$quarantine_json"
+"$BIN" quarantine-fast "$HOME/Downloads" --limit 10 | grep 'old-installer.dmg' >/dev/null
+quarantine_fast_json="$(mktemp)"
+"$BIN" quarantine-fast --json "$HOME/Downloads" --limit 10 > "$quarantine_fast_json"
+python3 -m json.tool "$quarantine_fast_json" >/dev/null
+grep '"available":true' "$quarantine_fast_json" >/dev/null
+grep 'old-installer.dmg' "$quarantine_fast_json" >/dev/null
+grep '"quarantine":"' "$quarantine_fast_json" >/dev/null
+rm -f "$quarantine_fast_json"
 "$BIN" metadata "$HOME/Documents" "$HOME/Downloads" "$HOME/Desktop" --limit 10 | grep '.DS_Store' >/dev/null
 "$BIN" metadata "$HOME/Documents" "$HOME/Downloads" "$HOME/Desktop" --limit 10 | grep 'Thumbs.db' >/dev/null
 metadata_json="$(mktemp)"

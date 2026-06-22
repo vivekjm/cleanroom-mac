@@ -205,6 +205,7 @@ cleanroom brokenlinks --json
 Review downloaded files with macOS quarantine metadata:
 
 ```sh
+cleanroom quarantine-fast
 cleanroom quarantine
 cleanroom quarantine ~/Downloads --limit 50
 cleanroom quarantine --json
