@@ -83,7 +83,7 @@ final class AppState: ObservableObject {
     ]
 
     @Published var categories: [CleanCategory] = [
-        CleanCategory(title: "Caches",       tagline: "App & system caches accumulating silently",      icon: "xmark.bin.fill",        color: DS.C.cardForest,   args: "caches"),
+        CleanCategory(title: "Caches",       tagline: "App & system caches accumulating silently",      icon: "xmark.bin.fill",        color: DS.C.cardForest,   args: "caches-fast"),
         CleanCategory(title: "Node Modules", tagline: "Orphaned node_modules, stale npm/pnpm caches",   icon: "shippingbox.fill",      color: DS.C.cardViolet,   args: "nodes-fast --limit 30 --days 30"),
         CleanCategory(title: "Downloads",    tagline: "Old downloads, DMGs, and forgotten installers",  icon: "arrow.down.to.line",    color: DS.C.cardAmber,    args: "downloads --limit 30 --days 30"),
         CleanCategory(title: "Large Files",  tagline: "Files over 500 MB that may no longer be needed", icon: "doc.fill",              color: DS.C.cardSlate,    args: "large-fast --limit 30 --min-mb 500"),
@@ -365,7 +365,7 @@ final class AppState: ObservableObject {
         let jsonActions: Set<String> = [
             "large-fast", "duplicates-fast", "brokenlinks", "brokenlinks-fast", "quarantine-fast", "metadata-fast",
             "developer-fast", "nodes-fast", "venvs-fast", "apps-fast",
-            "downloads", "archives", "screenshots", "trash", "cloudfiles",
+            "downloads", "archives", "screenshots", "trash", "cloudfiles", "caches-fast",
             "quicklook", "fontcaches", "webcaches", "savedstate",
             "projectcaches", "projectcaches-fast", "updaters", "browsercaches",
             "xcode", "backups", "system-data", "system-data-fast", "containers", "toolchains",
@@ -827,7 +827,7 @@ struct SidebarView: View {
                             NavRow("arrow.down.to.line",      "Downloads",   .run(title: "Downloads",   args: "downloads --limit 30 --days 30"), state)
                             NavRow("archivebox.fill",         "Archives",    .run(title: "Archives",    args: "archives --limit 30 --days 7"), state)
                             NavRow("camera.viewfinder",       "Screenshots", .run(title: "Screenshots", args: "screenshots --limit 30 --days 7"), state)
-                            NavRow("xmark.bin.fill",          "Caches",      .run(title: "Caches",      args: "caches"), state)
+                            NavRow("xmark.bin.fill",          "Caches",      .run(title: "Caches",      args: "caches-fast"), state)
                             NavRow("eye.fill",                "Quick Look",  .run(title: "Quick Look",  args: "quicklook"), state)
                             NavRow("textformat",              "Font Caches", .run(title: "Font Caches", args: "fontcaches"), state)
                             NavRow("safari.fill",             "Web Caches",  .run(title: "Web Caches",  args: "webcaches"), state)

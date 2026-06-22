@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.8.0"
+VERSION="1.9.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -120,6 +120,7 @@ Usage:
   cleanroom loginitems [--json]
   cleanroom trash [--json]
   cleanroom caches [--json]
+  cleanroom caches-fast [--json]
   cleanroom diagnostics [--json]
   cleanroom packages [--json]
   cleanroom npm-cache [--json] [--apply --yes]
@@ -203,6 +204,7 @@ Actions:
   loginitems           List user Login Items for review.
   trash                Inventory current user Trash contents.
   caches               Inventory safe and opt-in cache buckets.
+  caches-fast          Show a quick desktop-app cache summary.
   diagnostics          Inventory user logs and diagnostic reports.
   packages             Inventory package-manager caches and stores.
   npm-cache            Run npm's cache verifier, or clean npm cache with --apply.
@@ -236,7 +238,7 @@ Options:
   --json               Emit JSON for dashboard, overview, map, map-fast, snapshot, diff, state, permissions, review, scan, system-data, system-data-fast, plan, large, brokenlinks, brokenlinks-fast, quarantine, metadata, quicklook, fontcaches, webcaches, savedstate, projectcaches, updaters, browsercaches, duplicates,
                        documents, desktop, screenshots, archives, downloads, installers, nodes, venvs, apps, uninstallers, appreview, appdata, libraries, cloud, cloudfiles, personal, communications,
                        browsers, leftovers, startup, loginitems,
-                       trash, backups, xcode, caches, diagnostics, packages, npm-cache, yarn-cache, pnpm-store, cocoapods-cache, pip-cache, receipts, homebrew, homebrew-cleanup, toolchains,
+                       trash, backups, xcode, caches, caches-fast, diagnostics, packages, npm-cache, yarn-cache, pnpm-store, cocoapods-cache, pip-cache, receipts, homebrew, homebrew-cleanup, toolchains,
                        containers, android, snapshots, clean --preflight, doctor, protect, guard, or rules.
   --output PATH        Output path for report.
   --redact             Redact home, user, and temporary paths in Markdown reports.
@@ -426,6 +428,7 @@ Examples:
   cleanroom trash
   cleanroom trash --json
   cleanroom caches
+  cleanroom caches-fast
   cleanroom caches --json
   cleanroom diagnostics
   cleanroom diagnostics --json
@@ -6339,6 +6342,63 @@ caches() {
   done <<<"$rows"
 }
 
+caches_fast_rows() {
+  local core package quicklook fontcache webcache savedstate updater
+  core="$(sum_existing_kb "~/Library/Logs" "~/.npm/_cacache" "~/.npm/_logs" "~/.npm/_npx" "~/.yarn/cache" "~/.yarn/berry" "~/Library/pnpm/store")"
+  package="$(sum_existing_kb "~/Library/Caches/CocoaPods" "~/Library/Caches/Homebrew")"
+  quicklook="$(quicklook_total_kb)"
+  fontcache="$(fontcache_total_kb)"
+  webcache="$(webcache_total_kb)"
+  savedstate="$(savedstate_total_kb)"
+  updater="$(updatercache_total_kb)"
+
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$core" "core-caches" "Core Caches" "rebuildable" "cleanroom clean" "Fast estimate from logs, npm, Yarn, and pnpm stores." "$(human_kb "$core")"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$package" "package-caches" "Package Caches" "rebuildable" "cleanroom packages" "Fast estimate from Homebrew and CocoaPods caches. Gradle and broad package roots are skipped here for speed." "$(human_kb "$package")"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$quicklook" "quicklook-caches" "Quick Look" "rebuildable" "cleanroom quicklook" "Thumbnail and preview caches that macOS can rebuild." "$(human_kb "$quicklook")"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$fontcache" "font-caches" "Font Caches" "rebuildable" "cleanroom fontcaches" "User font cache databases. Actual font files stay protected." "$(human_kb "$fontcache")"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$webcache" "web-caches" "Safari/WebKit" "rebuildable" "cleanroom webcaches" "Safari and WebKit cache folders only; profiles and passwords stay protected." "$(human_kb "$webcache")"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$savedstate" "saved-state" "Saved State" "rebuildable" "cleanroom savedstate" "App window/session restoration state. Documents and profiles stay protected." "$(human_kb "$savedstate")"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$updater" "updater-caches" "Updater Caches" "rebuildable" "cleanroom updaters" "Sparkle and Squirrel updater cache/staging data." "$(human_kb "$updater")"
+  printf '0\t%s\t%s\t%s\t%s\t%s\t%s\n' "browser-caches" "Browser Caches" "protected" "cleanroom browsercaches" "Open Browser Caches for focused sizing. Profiles, passwords, cookies, bookmarks, and sessions stay protected." "Review"
+  printf '0\t%s\t%s\t%s\t%s\t%s\t%s\n' "user-cache-review" "User Cache Review" "review" "cleanroom caches" "Broad ~/.cache and ~/Library/Caches sizing is available in deep Caches review and skipped here for speed." "Review"
+  printf '0\t%s\t%s\t%s\t%s\t%s\t%s\n' "app-caches-review" "App Cache Review" "protected" "cleanroom caches" "Deep app cache sizing is available separately. Cleanroom only targets nested cache folders and keeps profiles, passwords, cookies, bookmarks, and settings protected." "Review"
+}
+
+caches_fast() {
+  local rows
+  rows="$(caches_fast_rows | sort -rn)"
+
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '['
+    local first=1 kb id title category command guidance display
+    while IFS=$'\t' read -r kb id title category command guidance display; do
+      [[ -z "${id:-}" ]] && continue
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '{"id":"%s","title":"%s","category":"%s","size_kb":%s,"size":"%s","command":"%s","guidance":"%s","mode":"fast"}' \
+        "$(printf '%s' "$id" | json_escape)" \
+        "$(printf '%s' "$title" | json_escape)" \
+        "$(printf '%s' "$category" | json_escape)" \
+        "${kb:-0}" \
+        "$(printf '%s' "${display:-$(human_kb "${kb:-0}")}" | json_escape)" \
+        "$(printf '%s' "$command" | json_escape)" \
+        "$(printf '%s' "$guidance" | json_escape)"
+    done <<<"$rows"
+    printf ']\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}cleanroom quick caches${RESET}"
+  printf 'Fast read-only cache summary for the desktop app. Deep nested app cache sizing is skipped.\n\n'
+  printf '%-10s %-18s %-12s %s\n' "size" "id" "category" "review"
+  local kb id title category command guidance display
+  while IFS=$'\t' read -r kb id title category command guidance display; do
+    [[ -z "${id:-}" ]] && continue
+    printf '%-10s %-18s %-12s %s\n' "${display:-$(human_kb "${kb:-0}")}" "$id" "$category" "$title"
+    printf '  %s\n' "$guidance"
+  done <<<"$rows"
+}
+
 diagnostics() {
   local rows
   rows="$(diagnostic_rows)"
@@ -8289,7 +8349,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  dashboard|overview|map|map-fast|mapfast|snapshot|diff|state|permissions|review|scan|system-data|system-data-fast|systemdata-fast|systemdatafast|plan|large|large-fast|largefast|brokenlinks|brokenlinks-fast|brokenlinksfast|broken-links-fast|broken-linksfast|quarantine|quarantine-fast|quarantinefast|metadata|metadata-fast|metadatafast|quicklook|fontcaches|font-caches|webcaches|web-caches|savedstate|saved-state|projectcaches|project-caches|projectcaches-fast|projectcachesfast|project-caches-fast|project-cachesfast|developer-fast|developerfast|updaters|updater-caches|browsercaches|browser-caches|duplicates|duplicates-fast|duplicatesfast|documents|desktop|screenshots|archives|downloads|installers|nodes|nodes-fast|nodesfast|venvs|venvs-fast|venvsfast|virtualenvs|virtualenvs-fast|virtualenvsfast|apps|apps-fast|appsfast|uninstallers|appreview|appdata|libraries|cloud|cloudfiles|cloud-files|personal|communications|comms|browsers|leftovers|backups|xcode|android|startup|loginitems|trash|caches|diagnostics|packages|npm-cache|npmcache|yarn-cache|yarncache|pnpm-store|pnpmstore|cocoapods-cache|pod-cache|podcache|pip-cache|pipcache|receipts|homebrew|homebrew-cleanup|brewcleanup|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
+  dashboard|overview|map|map-fast|mapfast|snapshot|diff|state|permissions|review|scan|system-data|system-data-fast|systemdata-fast|systemdatafast|plan|large|large-fast|largefast|brokenlinks|brokenlinks-fast|brokenlinksfast|broken-links-fast|broken-linksfast|quarantine|quarantine-fast|quarantinefast|metadata|metadata-fast|metadatafast|quicklook|fontcaches|font-caches|webcaches|web-caches|savedstate|saved-state|projectcaches|project-caches|projectcaches-fast|projectcachesfast|project-caches-fast|project-cachesfast|developer-fast|developerfast|updaters|updater-caches|browsercaches|browser-caches|duplicates|duplicates-fast|duplicatesfast|documents|desktop|screenshots|archives|downloads|installers|nodes|nodes-fast|nodesfast|venvs|venvs-fast|venvsfast|virtualenvs|virtualenvs-fast|virtualenvsfast|apps|apps-fast|appsfast|uninstallers|appreview|appdata|libraries|cloud|cloudfiles|cloud-files|personal|communications|comms|browsers|leftovers|backups|xcode|android|startup|loginitems|trash|caches|caches-fast|cachesfast|diagnostics|packages|npm-cache|npmcache|yarn-cache|yarncache|pnpm-store|pnpmstore|cocoapods-cache|pod-cache|podcache|pip-cache|pipcache|receipts|homebrew|homebrew-cleanup|brewcleanup|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -8459,6 +8519,7 @@ case "$ACTION" in
   loginitems) loginitems ;;
   trash) trash ;;
   caches) caches ;;
+  caches-fast|cachesfast) caches_fast ;;
   diagnostics) diagnostics ;;
   packages) packages ;;
   npm-cache|npmcache) npm_cache ;;
