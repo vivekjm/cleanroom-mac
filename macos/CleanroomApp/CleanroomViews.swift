@@ -342,7 +342,10 @@ final class AppState: ObservableObject {
     }
 
     private func appFacingSummaryText() -> String {
-        guard !reviewItems.isEmpty else { return output }
+        guard !reviewItems.isEmpty else {
+            let clean = Self.sanitizeForApp(output)
+            return clean.isEmpty ? "No review summary available yet.\n" : clean
+        }
         var lines = ["\(reviewTitle) — \(reviewItems.count) \(reviewItems.count == 1 ? "item" : "items")"]
         for item in reviewItems {
             lines.append("\(item.size)  \(item.title)  \(item.badge)")
@@ -414,7 +417,8 @@ final class AppState: ObservableObject {
         guard let data = trimmed.data(using: .utf8),
               let parsed = try? JSONSerialization.jsonObject(with: data),
               let items = jsonItems(from: parsed) else {
-            return details
+            let clean = Self.sanitizeForApp(details)
+            return clean.isEmpty ? "\(title) finished. A summary is available if you need it.\n" : clean
         }
 
         if items.isEmpty {
@@ -610,7 +614,9 @@ final class AppState: ObservableObject {
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
             p.waitUntilExit()
             let text = String(data: data, encoding: .utf8) ?? ""
-            let visibleText = sanitizeForApp(text)
+            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            let isStructured = trimmed.hasPrefix("{") || trimmed.hasPrefix("[")
+            let visibleText = isStructured && p.terminationStatus == 0 ? text : sanitizeForApp(text)
             if p.terminationStatus == 0 {
                 return CommandResult(output: visibleText.isEmpty ? "Completed.\n" : visibleText, status: p.terminationStatus)
             }
@@ -711,6 +717,10 @@ final class AppState: ObservableObject {
             "Preview with:",
             "Dry-run mode.",
             "Pass --apply",
+            "Running:",
+            "Useful next commands",
+            "Review-only inventory",
+            "Cleanup commands are dry-runs",
             "Use the deeper",
             "Use Apps when",
         ]
@@ -723,6 +733,9 @@ final class AppState: ObservableObject {
             "paths:",
             "quarantine:",
             "restore with:",
+            "running:",
+            "manage:",
+            "launch:",
         ]
         let lines = plainText.split(separator: "\n", omittingEmptySubsequences: false)
         let cleaned = lines
@@ -741,6 +754,13 @@ final class AppState: ObservableObject {
                     return nil
                 }
                 if hiddenFragments.contains(where: { line.localizedCaseInsensitiveContains($0) }) {
+                    return nil
+                }
+                if lowerTrimmed.contains(" --apply") ||
+                    lowerTrimmed.contains(" --json") ||
+                    lowerTrimmed.contains(" --trash") ||
+                    lowerTrimmed.contains(" --preflight") ||
+                    lowerTrimmed.hasPrefix("--") {
                     return nil
                 }
                 line = line.replacingOccurrences(of: "^\\s*cleanroom\\s+", with: "", options: [.regularExpression, .caseInsensitive])
