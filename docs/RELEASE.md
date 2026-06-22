@@ -56,6 +56,6 @@ brew uninstall cleanroom
 
 When publishing to a tap, copy `dist/Formula/cleanroom.rb` into that tap after the GitHub release artifact exists.
 
-The app wrapper is intentionally conservative. It runs scan/report/dry-run/history actions and copies explicit apply commands, but it does not provide one-click destructive cleanup.
+The desktop app is intentionally high-level. It opens without a heavy storage scan, measures storage only when the user asks, keeps implementation details hidden, and applies the safe cleanup flow through the native confirmation sheet.
 
 Local app builds are ad-hoc signed. A notarized public app release requires a Developer ID certificate and Apple notarization outside this repository's default CI path.

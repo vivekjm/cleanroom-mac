@@ -331,7 +331,7 @@ Groups nav items with an all-caps 10px header label.
 │ ██████  SYSTEM               │  └──────────┘  └──────────┘  └──────────┘  │
 │ ██████  ○ Xcode              │                                              │
 │ ██████  ○ Backups            │  ● Ready     [Copy Details][Clear]  [∨]      │
-│ ██████  ○ System Data        │  Storage summary updated                    │
+│ ██████  ○ System Data        │  Ready                                      │
 │ ██████                       │  → /Library/Caches: 2.3 GB                  │
 │ ██████  Protected mode       │                                              │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -378,7 +378,7 @@ swiftc -O \
 
 ### Populating Stats
 
-After refreshing the storage summary, parse the output and update `state.stats`:
+Storage measurement is intentionally user-triggered because it can be expensive on large Macs. After refreshing the storage summary, parse the output and update `state.stats`:
 
 ```swift
 // Example: update after overview runs

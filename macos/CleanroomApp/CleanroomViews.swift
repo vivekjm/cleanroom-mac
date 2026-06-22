@@ -50,9 +50,9 @@ final class AppState: ObservableObject {
 
     @Published var stats: [StorageStat] = [
         StorageStat(label: "Disk Used",   value: "—"),
-        StorageStat(label: "Reclaimable", value: "—"),
-        StorageStat(label: "Files Found", value: "—"),
-        StorageStat(label: "Last Scan",   value: "Never"),
+        StorageStat(label: "Reclaimable", value: "Run Scan"),
+        StorageStat(label: "Protected",   value: "On"),
+        StorageStat(label: "Last Scan",   value: "Not yet"),
     ]
 
     let categories: [CleanCategory] = [
@@ -75,13 +75,13 @@ final class AppState: ObservableObject {
         ("archives",  "ARCHIVES"),
     ]
 
-    var cliPath = ""
+    var enginePath = ""
     private var lastStatsRefresh: Date? = nil
 
-    func resolveCLI() {
+    func resolveEngine() {
         if let r = Bundle.main.resourceURL {
             let b = r.appendingPathComponent("bin/cleanroom").path
-            if FileManager.default.isExecutableFile(atPath: b) { cliPath = b; return }
+            if FileManager.default.isExecutableFile(atPath: b) { enginePath = b; return }
         }
         let home = FileManager.default.homeDirectoryForCurrentUser
         for c in [
@@ -89,12 +89,12 @@ final class AppState: ObservableObject {
             "/usr/local/bin/cleanroom",
             home.appendingPathComponent(".local/bin/cleanroom").path,
         ] where FileManager.default.isExecutableFile(atPath: c) {
-            cliPath = c; return
+            enginePath = c; return
         }
-        cliPath = "cleanroom"
+        enginePath = "cleanroom"
     }
 
-    // Silently fetch overview JSON to populate stats row
+    // Expensive storage measurement; run only when the user asks or after cleanup.
     func refreshStats(force: Bool = false) {
         guard !running else { return }
         if !force,
@@ -103,6 +103,7 @@ final class AppState: ObservableObject {
             status = "Storage summary is up to date"
             return
         }
+        status = "Measuring storage..."
         lastStatsRefresh = Date()
         let command = resolvedCommand(["overview", "--json"])
         Task.detached(priority: .background) {
@@ -132,9 +133,27 @@ final class AppState: ObservableObject {
         formatter.dateFormat = "h:mm a"
         stats[3].value = formatter.string(from: Date())
 
-        if let used = grab("disk_used") ?? grab("total_used") { stats[0].value = used }
-        if let rec  = grab("reclaimable") ?? grab("recoverable") { stats[1].value = rec }
-        if let fc   = grab("file_count") ?? grab("files") { stats[2].value = fc }
+        if let used = grab("used_kb") ?? grab("disk_used") ?? grab("total_used") {
+            stats[0].value = formatKBString(used)
+        }
+        if let rec = grab("estimate") ?? grab("reclaimable") ?? grab("recoverable") {
+            stats[1].value = rec
+        }
+        if let protected = grab("protected_present") {
+            stats[2].value = protected
+        }
+    }
+
+    private func formatKBString(_ raw: String) -> String {
+        guard let kb = Double(raw.trimmingCharacters(in: .whitespacesAndNewlines)) else { return raw }
+        let units = ["KB", "MB", "GB", "TB"]
+        var value = kb
+        var index = 0
+        while value >= 1024 && index < units.count - 1 {
+            value /= 1024
+            index += 1
+        }
+        return value >= 10 ? String(format: "%.0f%@", value, units[index]) : String(format: "%.1f%@", value, units[index])
     }
 
     func run(_ args: String, title: String) {
@@ -149,8 +168,8 @@ final class AppState: ObservableObject {
                 self.output    += result
                 self.status     = "\(title) complete"
                 self.running    = false
-                self.outputOpen = true
-                if title != "Apply" && title != "Safe Cleanup" {
+                self.outputOpen = false
+                if title == "Safe Cleanup" {
                     self.refreshStats(force: true)
                 }
             }
@@ -168,10 +187,10 @@ final class AppState: ObservableObject {
     }
 
     private func resolvedCommand(_ args: [String]) -> (executable: String, arguments: [String]) {
-        if cliPath.isEmpty || cliPath == "cleanroom" {
+        if enginePath.isEmpty || enginePath == "cleanroom" {
             return ("/usr/bin/env", ["cleanroom"] + args)
         }
-        return (cliPath, args)
+        return (enginePath, args)
     }
 
     private func splitArgs(_ raw: String) -> [String] {
@@ -220,11 +239,36 @@ final class AppState: ObservableObject {
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
             p.waitUntilExit()
             let text = String(data: data, encoding: .utf8) ?? ""
+            let visibleText = sanitizeForApp(text)
             if p.terminationStatus == 0 {
-                return text.isEmpty ? "Completed.\n" : text
+                return visibleText.isEmpty ? "Completed.\n" : visibleText
             }
-            return text + "\nThe action could not finish. Status \(p.terminationStatus).\n"
+            return visibleText + "\nThe action could not finish. Status \(p.terminationStatus).\n"
         } catch { return "Could not start this action: \(error.localizedDescription)\n" }
+    }
+
+    private static func sanitizeForApp(_ text: String) -> String {
+        let hiddenFragments = [
+            "cleanroom ",
+            "Preview cleanup with:",
+            "Apply cleanup with:",
+            "Preview emptying Trash with:",
+            "Empty Trash with:",
+            "Opt-in cleanup preview:",
+            "Opt-in cleanup apply:",
+            "Opt-in artifact preview:",
+            "Opt-in artifact apply:",
+            "Apply with:",
+            "Preview with:",
+        ]
+        let lines = text.split(separator: "\n", omittingEmptySubsequences: false)
+        let cleaned = lines
+            .filter { line in
+                !hiddenFragments.contains { line.localizedCaseInsensitiveContains($0) }
+            }
+            .joined(separator: "\n")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return cleaned.isEmpty ? "" : cleaned + "\n"
     }
 }
 
@@ -254,8 +298,8 @@ struct RootView: View {
             ApplyConfirmSheet(state: state)
         }
         .onAppear {
-            state.resolveCLI()
-            state.refreshStats()
+            state.resolveEngine()
+            state.status = "Ready"
         }
     }
 }
@@ -318,7 +362,7 @@ struct SidebarView: View {
                             NavRow("arrow.clockwise.circle.fill", "Updater Caches", .run(title: "Updater Caches", args: "updaters"), state)
                             NavRow("globe", "Browser Caches", .run(title: "Browser Caches", args: "browsercaches"), state)
                             NavRow("shippingbox.fill",        "Node Modules",.run(title: "Node Modules",args: "nodes --limit 30 --days 30"), state)
-                            NavRow("terminal.fill",           "Virtualenvs", .run(title: "Virtualenvs", args: "venvs --limit 30 --days 30"), state)
+                            NavRow("square.stack.3d.up.fill", "Virtualenvs", .run(title: "Virtualenvs", args: "venvs --limit 30 --days 30"), state)
                             NavRow("apps.iphone",             "Apps",        .run(title: "Apps",        args: "apps --limit 30"), state)
                             NavRow("app.badge.checkmark.fill","App Review",  .dashboard, state, onTap: { state.showLeftovers = true })
                             NavRow("trash.fill",              "Trash",       .run(title: "Trash",       args: "trash"), state)

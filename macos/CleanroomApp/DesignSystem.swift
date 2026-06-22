@@ -65,7 +65,7 @@ enum DS {
         static let surfaceRaised = Color(hex: "#F0FAF0")
         /// Dark-forest ink — sidebar background (ref image 3 dark section)
         static let sidebarBg     = Color(hex: "#0F1A0F")
-        /// Even deeper forest — terminal/output panel background
+        /// Even deeper forest — activity details panel background
         static let terminalBg    = Color(hex: "#0B160B")
 
         // ── Brand ──────────────────────────────────────────────────────────
@@ -102,7 +102,7 @@ enum DS {
         static let textSecondary = Color(hex: "#475569")
         /// Muted — placeholder, disabled text
         static let textMuted     = Color(hex: "#94A3B8")
-        /// On-dark text — used on sidebarBg / terminalBg
+        /// On-dark text — used on sidebarBg / activity details background
         static let textOnDark    = Color(hex: "#E8F5E8")
         static let textWhite     = Color.white
 
@@ -138,7 +138,7 @@ enum DS {
         /// labels sitting above numbers in the reference cards
         static let tag   = Font.system(size: 10, weight: .semibold)
 
-        // Monospaced — terminal output
+        // Monospaced — activity details output
         static let mono   = Font.system(size: 12, design: .monospaced)
         static let monoSm = Font.system(size: 11, design: .monospaced)
     }
