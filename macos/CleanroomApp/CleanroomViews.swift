@@ -196,7 +196,7 @@ final class AppState: ObservableObject {
                     self.outputOpen = true
                 } else if result.status == 0 {
                     self.status = "\(title) complete"
-                    self.activityMessage = "\(title) finished. Details are available if you need them."
+                    self.activityMessage = self.summarizeAction(title: title, args: args, details: result.output)
                     self.outputOpen = false
                 } else {
                     self.status = "\(title) needs attention"
@@ -237,6 +237,54 @@ final class AppState: ObservableObject {
             return ("/usr/bin/env", ["cleanroom"] + args)
         }
         return (enginePath, args)
+    }
+
+    private func summarizeAction(title: String, args: String, details: String) -> String {
+        let changedFiles = args.contains("--apply")
+        let noChangeText = changedFiles ? "" : " No files were changed."
+        let lowerDetails = details.lowercased()
+
+        if lowerDetails.contains("trash is empty") {
+            return "Trash is empty. No files were changed."
+        }
+        if lowerDetails.contains("nothing to clean") || lowerDetails.contains("no matches") || lowerDetails.contains("no files found") {
+            return "\(title) found nothing that needs attention.\(noChangeText)"
+        }
+        if changedFiles {
+            return "\(title) finished. Items were moved to Trash where possible."
+        }
+
+        let rows = reviewRows(in: details)
+        if rows.count == 1, let size = leadingSize(in: rows[0]) {
+            return "\(title) found 1 review item, starting at \(size). No files were changed."
+        }
+        if rows.count > 1, let size = leadingSize(in: rows[0]) {
+            return "\(title) found \(rows.count) review items, largest starts at \(size). No files were changed."
+        }
+        if rows.count > 0 {
+            return "\(title) found \(rows.count) review items. No files were changed."
+        }
+        return "\(title) finished. Details are available if you need them."
+    }
+
+    private func reviewRows(in details: String) -> [String] {
+        details
+            .split(separator: "\n", omittingEmptySubsequences: false)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { line in
+                guard !line.isEmpty else { return false }
+                guard line.range(of: "^[0-9]+(\\.[0-9]+)?\\s?(B|KB|MB|GB|TB)\\b", options: [.regularExpression, .caseInsensitive]) != nil else {
+                    return false
+                }
+                return !line.localizedCaseInsensitiveContains("total:")
+            }
+    }
+
+    private func leadingSize(in line: String) -> String? {
+        guard let range = line.range(of: "^[0-9]+(\\.[0-9]+)?\\s?(B|KB|MB|GB|TB)\\b", options: [.regularExpression, .caseInsensitive]) else {
+            return nil
+        }
+        return String(line[range])
     }
 
     private func splitArgs(_ raw: String) -> [String] {
@@ -300,8 +348,12 @@ final class AppState: ObservableObject {
     }
 
     private static func sanitizeForApp(_ text: String) -> String {
+        let plainText = text.replacingOccurrences(
+            of: "\u{001B}\\[[0-9;]*[A-Za-z]",
+            with: "",
+            options: .regularExpression
+        )
         let hiddenFragments = [
-            "cleanroom ",
             "Preview cleanup with:",
             "Apply cleanup with:",
             "Preview emptying Trash with:",
@@ -312,11 +364,26 @@ final class AppState: ObservableObject {
             "Opt-in artifact apply:",
             "Apply with:",
             "Preview with:",
+            "Dry-run mode.",
+            "Pass --apply",
         ]
-        let lines = text.split(separator: "\n", omittingEmptySubsequences: false)
+        let lines = plainText.split(separator: "\n", omittingEmptySubsequences: false)
         let cleaned = lines
-            .filter { line in
-                !hiddenFragments.contains { line.localizedCaseInsensitiveContains($0) }
+            .compactMap { rawLine -> String? in
+                var line = String(rawLine)
+                let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+                if trimmed.localizedCaseInsensitiveContains("apply:") ||
+                    trimmed.localizedCaseInsensitiveContains("preview:") {
+                    return nil
+                }
+                if hiddenFragments.contains(where: { line.localizedCaseInsensitiveContains($0) }) {
+                    return nil
+                }
+                line = line.replacingOccurrences(of: "preview command", with: "notes", options: .caseInsensitive)
+                if let commandRange = line.range(of: "\\s+cleanroom\\b.*$", options: [.regularExpression, .caseInsensitive]) {
+                    line.removeSubrange(commandRange)
+                }
+                return line
             }
             .joined(separator: "\n")
             .trimmingCharacters(in: .whitespacesAndNewlines)
