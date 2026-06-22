@@ -82,7 +82,7 @@ final class AppState: ObservableObject {
         StorageStat(label: "Last Scan",   value: "Not yet"),
     ]
 
-    let categories: [CleanCategory] = [
+    @Published var categories: [CleanCategory] = [
         CleanCategory(title: "Caches",       tagline: "App & system caches accumulating silently",      icon: "xmark.bin.fill",        color: DS.C.cardForest,   args: "caches"),
         CleanCategory(title: "Node Modules", tagline: "Orphaned node_modules, stale npm/pnpm caches",   icon: "shippingbox.fill",      color: DS.C.cardViolet,   args: "nodes-fast --limit 30 --days 30"),
         CleanCategory(title: "Downloads",    tagline: "Old downloads, DMGs, and forgotten installers",  icon: "arrow.down.to.line",    color: DS.C.cardAmber,    args: "downloads --limit 30 --days 30"),
@@ -165,6 +165,9 @@ final class AppState: ObservableObject {
     }
 
     private func parseStats(_ raw: String) {
+        if parseStatsJSON(raw) {
+            return
+        }
         // Best-effort: scan for recognisable patterns in JSON output.
         func grab(_ key: String) -> String? {
             let patterns = ["\"\(key)\"\\s*:\\s*\"([^\"]+)\"",
@@ -190,6 +193,67 @@ final class AppState: ObservableObject {
         }
         if let protected = grab("protected_present") {
             stats[2].value = protected
+        }
+    }
+
+    private func parseStatsJSON(_ raw: String) -> Bool {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let data = trimmed.data(using: .utf8),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return false
+        }
+
+        let formatter = DateFormatter()
+        formatter.dateFormat = "h:mm a"
+        stats[3].value = formatter.string(from: Date())
+
+        if let usedKB = numberValue(object["used_kb"]) {
+            stats[0].value = formatKBString(String(usedKB))
+        } else if let used = stringValue(object["used"]) ?? stringValue(object["disk_used"]) {
+            stats[0].value = used
+        }
+
+        if let summary = object["summary"] as? [String: Any] {
+            if let reclaimable = stringValue(summary["reclaimable"]) {
+                stats[1].value = reclaimable
+            }
+            if let protected = numberValue(summary["protected_present"]) {
+                stats[2].value = "\(protected) guarded"
+            } else if let protected = stringValue(summary["protected_present"]) {
+                stats[2].value = protected
+            }
+        }
+
+        if let cards = object["cards"] as? [[String: Any]] {
+            applyDashboardCards(cards)
+        }
+        return true
+    }
+
+    private func applyDashboardCards(_ cards: [[String: Any]]) {
+        var valuesByTitle: [String: String] = [:]
+        for card in cards {
+            guard let title = stringValue(card["title"]),
+                  let value = stringValue(card["value"]) else { continue }
+            valuesByTitle[title] = value
+        }
+        categories = categories.map { category in
+            var updated = category
+            if let value = valuesByTitle[category.title] {
+                updated.result = value
+            }
+            return updated
+        }
+    }
+
+    private func numberValue(_ value: Any?) -> Int? {
+        switch value {
+        case let number as NSNumber:
+            return number.intValue
+        case let text as String:
+            return Int(text)
+        default:
+            return nil
         }
     }
 

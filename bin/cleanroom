@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.2.0"
+VERSION="1.3.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -7231,9 +7231,31 @@ dashboard() {
   protected_count="$(protected_present_count)"
 
   if [[ "$JSON" -eq 1 ]]; then
+    local cards rows first=1 total=0 kb id title value detail
+    cards="$(dashboard_card_rows)"
+    while IFS=$'\t' read -r kb id title value detail; do
+      [[ -z "${id:-}" ]] && continue
+      total=$((total + ${kb:-0}))
+    done <<<"$cards"
     printf '{'
     disk_json
-    printf ',"summary":{"protected_present":%s,"safe_mode":true,"deep_scan_required":true,"reclaimable":"Run Scan"}' "$protected_count"
+    printf ',"summary":{"protected_present":%s,"safe_mode":true,"deep_scan_required":false,"reclaimable_kb":%s,"reclaimable":"%s"}' \
+      "$protected_count" \
+      "$total" \
+      "$(human_kb "$total" | json_escape)"
+    printf ',"cards":['
+    while IFS=$'\t' read -r kb id title value detail; do
+      [[ -z "${id:-}" ]] && continue
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '{"id":"%s","title":"%s","estimate_kb":%s,"value":"%s","detail":"%s"}' \
+        "$(printf '%s' "$id" | json_escape)" \
+        "$(printf '%s' "$title" | json_escape)" \
+        "${kb:-0}" \
+        "$(printf '%s' "$value" | json_escape)" \
+        "$(printf '%s' "$detail" | json_escape)"
+    done <<<"$cards"
+    printf ']'
     printf '}\n'
     return 0
   fi
@@ -7246,6 +7268,32 @@ dashboard() {
   printf '%-24s %s\n' "protected paths present" "$protected_count"
   printf '%-24s %s\n' "safe mode" "on"
   printf '%-24s %s\n' "reclaimable estimate" "run scan"
+}
+
+dashboard_card_rows() {
+  local cache downloads large archives developer screenshots trash node
+  cache="$(sum_existing_kb "~/Library/Caches" "~/.cache" "~/Library/Logs")"
+  downloads="$(download_artifact_total_kb)"
+  archives="$(archive_rows | tab_rows_total_kb)"
+  screenshots="$(screenshot_total_kb)"
+  trash="$(trash_total_kb)"
+  large=0
+  node=0
+  developer=0
+  if command -v mdfind >/dev/null 2>&1; then
+    large="$(large_fast_rows "$HOME" | tab_rows_total_kb)"
+    node="$(node_fast_rows | tab_rows_total_kb)"
+    developer="$(developer_fast_rows | tab_rows_total_kb)"
+  fi
+
+  printf '%s\t%s\t%s\t%s\t%s\n' "$cache" "caches" "Caches" "$(human_kb "$cache")" "App and system caches"
+  printf '%s\t%s\t%s\t%s\t%s\n' "$node" "node-modules" "Node Modules" "$(human_kb "$node")" "Stale dependency folders"
+  printf '%s\t%s\t%s\t%s\t%s\n' "$downloads" "downloads" "Downloads" "$(human_kb "$downloads")" "Old downloadable artifacts"
+  printf '%s\t%s\t%s\t%s\t%s\n' "$large" "large-files" "Large Files" "$(human_kb "$large")" "Large files found quickly"
+  printf '%s\t%s\t%s\t%s\t%s\n' "$archives" "archives" "Archives" "$(human_kb "$archives")" "Old archives and disk images"
+  printf '%s\t%s\t%s\t%s\t%s\n' "$developer" "developer" "Developer" "$(human_kb "$developer")" "Stale developer dependency folders"
+  printf '%s\t%s\t%s\t%s\t%s\n' "$screenshots" "screenshots" "Screenshots" "$(human_kb "$screenshots")" "Old screenshots and recordings"
+  printf '%s\t%s\t%s\t%s\t%s\n' "$trash" "trash" "Trash" "$(human_kb "$trash")" "Current Trash contents"
 }
 
 snapshots() {

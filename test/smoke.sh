@@ -441,7 +441,11 @@ dashboard_json="$(mktemp)"
 "$BIN" dashboard --json > "$dashboard_json"
 python3 -m json.tool "$dashboard_json" >/dev/null
 grep '"safe_mode":true' "$dashboard_json" >/dev/null
-grep '"deep_scan_required":true' "$dashboard_json" >/dev/null
+grep '"deep_scan_required":false' "$dashboard_json" >/dev/null
+grep '"cards":' "$dashboard_json" >/dev/null
+grep '"title":"Caches"' "$dashboard_json" >/dev/null
+grep '"title":"Node Modules"' "$dashboard_json" >/dev/null
+grep '"reclaimable_kb":' "$dashboard_json" >/dev/null
 rm -f "$dashboard_json"
 "$BIN" overview | grep 'cleanroom overview' >/dev/null
 overview_json="$(mktemp)"
