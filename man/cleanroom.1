@@ -1,7 +1,10 @@
-.TH CLEANROOM 1 "June 2026" "cleanroom 0.80.0" "User Commands"
+.TH CLEANROOM 1 "June 2026" "cleanroom 0.81.0" "User Commands"
 .SH NAME
 cleanroom \- safe-by-default macOS storage cleaner
 .SH SYNOPSIS
+.B cleanroom
+.RI "dashboard [--json]"
+.br
 .B cleanroom
 .RI "overview [--json]"
 .br
@@ -222,8 +225,11 @@ By default it does not delete browser profiles, saved password databases,
 Keychains, Photos libraries, Mail, iCloud Drive, or arbitrary personal files.
 .SH COMMANDS
 .TP
+.B dashboard
+Show a fast read-only desktop-app storage summary without deep size walks.
+.TP
 .B overview
-Show a read-only storage dashboard with disk state, summaries, and next steps.
+Show a deeper read-only storage dashboard with disk state, summaries, and next steps.
 .TP
 .B map
 Rank focused major storage buckets such as Documents, Downloads, user
@@ -590,6 +596,7 @@ when they contain pyvenv.cfg.
 .SH EXAMPLES
 .nf
 cleanroom overview
+cleanroom dashboard --json
 cleanroom map --json
 cleanroom snapshot --output ~/Desktop/cleanroom-before.json
 cleanroom diff ~/Desktop/cleanroom-before.json ~/Desktop/cleanroom-after.json

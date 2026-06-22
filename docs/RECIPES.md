@@ -5,6 +5,7 @@ Common `cleanroom` workflows.
 ## Start Here
 
 ```sh
+cleanroom dashboard
 cleanroom overview
 cleanroom map
 cleanroom snapshot
@@ -70,6 +71,7 @@ cleanroom clean --preset dev --preflight
 ## Automation / Reporting
 
 ```sh
+cleanroom dashboard --json
 cleanroom overview --json
 cleanroom map --json
 cleanroom snapshot --json
@@ -137,7 +139,9 @@ cleanroom state --json
 cleanroom permissions --json
 ```
 
-`overview --json` emits a compact dashboard with disk state, summary counts, and top cleanup recommendations.
+`dashboard --json` emits a fast app-friendly summary with disk state and safety status. It avoids deep size walks and is the preferred source for desktop refreshes.
+
+`overview --json` emits a deeper dashboard with disk state, summary counts, and top cleanup recommendations.
 
 `map --json` emits a read-only focused storage bucket map with paths, safety category, size, next command, and description. Buckets can overlap when a smaller folder is also part of a larger parent.
 

@@ -4,6 +4,7 @@ _cleanroom() {
   local -a commands options
 
   commands=(
+    'dashboard:Show fast desktop storage summary'
     'overview:Show read-only storage dashboard'
     'map:Show major storage bucket map'
     'snapshot:Write a storage-map snapshot'

@@ -105,7 +105,7 @@ final class AppState: ObservableObject {
         }
         status = "Measuring storage..."
         lastStatsRefresh = Date()
-        let command = resolvedCommand(["overview", "--json"])
+        let command = resolvedCommand(["dashboard", "--json"])
         Task.detached(priority: .background) {
             let raw = await Self.exec(command.executable, command.arguments)
             await MainActor.run {

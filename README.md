@@ -132,6 +132,8 @@ The app wrapper is ad-hoc signed for local builds. It is not Developer ID notari
 Get a read-only dashboard:
 
 ```sh
+cleanroom dashboard
+cleanroom dashboard --json
 cleanroom overview
 cleanroom overview --json
 ```
@@ -835,6 +837,8 @@ Config files use simple `key=value` lines and are never executed as shell.
 `--trash` applies to paths that `cleanroom` removes directly. System commands delegated to macOS or developer tools, such as Time Machine snapshot thinning or simulator reset, may still be irreversible.
 
 `restore` only restores entries that were moved by `--trash` and still exist in the cleanroom Trash folder. It skips destinations that already exist.
+
+`dashboard` is the fast desktop-app summary. It reports disk state and safety status without running deep size walks.
 
 `overview` summarizes disk state, top recommendations, package-store size, toolchain-cache size, container storage size, diagnostic-report size, protected-data presence, snapshots, app bundle count, and useful next commands without deleting anything.
 

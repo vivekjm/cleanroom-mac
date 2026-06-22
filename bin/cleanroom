@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.80.0"
+VERSION="0.81.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -59,6 +59,7 @@ usage() {
 cleanroom - safe macOS storage cleaner
 
 Usage:
+  cleanroom dashboard [--json]
   cleanroom overview [--json]
   cleanroom map [--json]
   cleanroom snapshot [--json] [--output PATH]
@@ -134,6 +135,7 @@ Usage:
   cleanroom help
 
 Actions:
+  dashboard            Show a fast read-only desktop-app storage summary.
   overview             Show a read-only storage dashboard and next steps.
   map                  Show a read-only map of major storage buckets.
   snapshot             Write a timestamped storage-map snapshot for before/after tracking.
@@ -212,7 +214,7 @@ Options:
   --trash              Move deleted files to ~/.Trash/cleanroom-* instead of rm -rf.
   --yes                Do not prompt before --apply cleanup.
   --verbose            Print every path touched.
-  --json               Emit JSON for overview, map, snapshot, diff, state, permissions, review, scan, system-data, plan, large, brokenlinks, quarantine, metadata, quicklook, fontcaches, webcaches, savedstate, projectcaches, updaters, browsercaches, duplicates,
+  --json               Emit JSON for dashboard, overview, map, snapshot, diff, state, permissions, review, scan, system-data, plan, large, brokenlinks, quarantine, metadata, quicklook, fontcaches, webcaches, savedstate, projectcaches, updaters, browsercaches, duplicates,
                        documents, desktop, screenshots, archives, downloads, installers, nodes, venvs, apps, uninstallers, appreview, appdata, libraries, cloud, cloudfiles, personal, communications,
                        browsers, leftovers, startup, loginitems,
                        trash, backups, xcode, caches, diagnostics, packages, npm-cache, yarn-cache, pnpm-store, cocoapods-cache, pip-cache, receipts, homebrew, homebrew-cleanup, toolchains,
@@ -6531,6 +6533,28 @@ overview() {
   printf 'cleanroom protect\n'
 }
 
+dashboard() {
+  local protected_count
+  protected_count="$(protected_present_count)"
+
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '{'
+    disk_json
+    printf ',"summary":{"protected_present":%s,"safe_mode":true,"deep_scan_required":true,"reclaimable":"Run Scan"}' "$protected_count"
+    printf '}\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}cleanroom dashboard${RESET}"
+  printf 'Fast read-only desktop summary. Nothing is deleted.\n\n'
+  printf '%s\n' "${BOLD}Disk${RESET}"
+  disk_line
+  printf '\n%s\n' "${BOLD}Safety${RESET}"
+  printf '%-24s %s\n' "protected paths present" "$protected_count"
+  printf '%-24s %s\n' "safe mode" "on"
+  printf '%-24s %s\n' "reclaimable estimate" "run scan"
+}
+
 snapshots() {
   local rows
   rows="$(snapshot_rows)"
@@ -7361,7 +7385,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  overview|map|snapshot|diff|state|permissions|review|scan|system-data|plan|large|brokenlinks|quarantine|metadata|quicklook|fontcaches|font-caches|webcaches|web-caches|savedstate|saved-state|projectcaches|project-caches|updaters|updater-caches|browsercaches|browser-caches|duplicates|documents|desktop|screenshots|archives|downloads|installers|nodes|venvs|virtualenvs|apps|uninstallers|appreview|appdata|libraries|cloud|cloudfiles|cloud-files|personal|communications|comms|browsers|leftovers|backups|xcode|android|startup|loginitems|trash|caches|diagnostics|packages|npm-cache|npmcache|yarn-cache|yarncache|pnpm-store|pnpmstore|cocoapods-cache|pod-cache|podcache|pip-cache|pipcache|receipts|homebrew|homebrew-cleanup|brewcleanup|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
+  dashboard|overview|map|snapshot|diff|state|permissions|review|scan|system-data|plan|large|brokenlinks|quarantine|metadata|quicklook|fontcaches|font-caches|webcaches|web-caches|savedstate|saved-state|projectcaches|project-caches|updaters|updater-caches|browsercaches|browser-caches|duplicates|documents|desktop|screenshots|archives|downloads|installers|nodes|venvs|virtualenvs|apps|uninstallers|appreview|appdata|libraries|cloud|cloudfiles|cloud-files|personal|communications|comms|browsers|leftovers|backups|xcode|android|startup|loginitems|trash|caches|diagnostics|packages|npm-cache|npmcache|yarn-cache|yarncache|pnpm-store|pnpmstore|cocoapods-cache|pod-cache|podcache|pip-cache|pipcache|receipts|homebrew|homebrew-cleanup|brewcleanup|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -7470,6 +7494,7 @@ while [[ "$#" -gt 0 ]]; do
 done
 
 case "$ACTION" in
+  dashboard) dashboard ;;
   overview) overview ;;
   map) map ;;
   snapshot) snapshot ;;
