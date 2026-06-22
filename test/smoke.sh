@@ -457,6 +457,13 @@ grep '"container_kb"' "$overview_json" >/dev/null
 grep '"diagnostic_kb"' "$overview_json" >/dev/null
 grep '"recommendations"' "$overview_json" >/dev/null
 rm -f "$overview_json"
+"$BIN" map-fast | grep 'quick storage map' >/dev/null
+map_fast_json="$(mktemp)"
+"$BIN" map-fast --json > "$map_fast_json"
+python3 -m json.tool "$map_fast_json" >/dev/null
+grep '"id":"caches"' "$map_fast_json" >/dev/null
+grep '"category":"summary"' "$map_fast_json" >/dev/null
+rm -f "$map_fast_json"
 "$BIN" map | grep 'storage map' >/dev/null
 map_json="$(mktemp)"
 "$BIN" map --json > "$map_json"

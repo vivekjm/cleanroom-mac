@@ -358,7 +358,7 @@ final class AppState: ObservableObject {
             "projectcaches", "projectcaches-fast", "updaters", "browsercaches",
             "xcode", "backups", "system-data", "containers", "toolchains",
             "loginitems", "startup", "snapshot", "state", "protect", "rules",
-            "map", "doctor", "leftovers", "appreview"
+            "map", "map-fast", "doctor", "leftovers", "appreview"
         ]
         if jsonActions.contains(action), !args.contains("--json") {
             return args + ["--json"]
@@ -796,7 +796,7 @@ struct SidebarView: View {
                         SidebarSection("OVERVIEW") {
                             NavRow("square.grid.2x2.fill",    "Dashboard",   .dashboard, state)
                             NavRow("heart.text.square.fill",  "Doctor",      .run(title: "Doctor",      args: "doctor"), state)
-                            NavRow("chart.bar.fill",          "Storage Map", .run(title: "Map",         args: "map"), state)
+                            NavRow("chart.bar.fill",          "Storage Map", .run(title: "Storage Map", args: "map-fast"), state)
                             NavRow("magnifyingglass",         "Refresh Summary", .dashboard, state, onTap: { state.refreshStats(force: true) })
                             NavRow("text.badge.checkmark",    "Review",      .dashboard, state, onTap: { state.filter = "all"; state.refreshStats(force: true) })
                             NavRow("list.clipboard.fill",     "Clean Plan",  .dashboard, state, onTap: { state.showApplyConfirm = true })
