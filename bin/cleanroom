@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="0.88.0"
+VERSION="0.89.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -75,6 +75,7 @@ Usage:
   cleanroom brokenlinks [PATH] [--limit N] [--json]
   cleanroom quarantine [PATH] [--limit N] [--json]
   cleanroom metadata [PATH...] [--limit N] [--json] [--apply --trash]
+  cleanroom metadata-fast [PATH...] [--limit N] [--json]
   cleanroom quicklook [--json]
   cleanroom fontcaches [--json]
   cleanroom webcaches [--json]
@@ -152,7 +153,8 @@ Actions:
   large-fast           Quickly list large files using Spotlight metadata.
   brokenlinks          List broken symlinks for review without deleting anything.
   quarantine           List files with macOS quarantine metadata for review.
-  metadata             Find .DS_Store, AppleDouble, Thumbs.db, and similar metadata clutter.
+  metadata             Deep-scan .DS_Store, AppleDouble, Thumbs.db, and similar metadata clutter.
+  metadata-fast        Quickly preview filesystem metadata clutter using Spotlight.
   quicklook            Inventory Quick Look thumbnail and preview caches.
   fontcaches           Inventory rebuildable user font cache databases.
   webcaches            Inventory Safari and WebKit browser cache folders.
@@ -2840,36 +2842,99 @@ metadata_rows() {
   done < <(metadata_roots) | sort -t $'\t' -k1,1rn -k2,2rn | head -n "$LIMIT"
 }
 
+metadata_fast_rows() {
+  command -v mdfind >/dev/null 2>&1 || return 2
+  local root pattern path name kind kb epoch
+  while IFS= read -r root; do
+    [[ -d "$root" ]] || continue
+    for pattern in ".DS_Store" "._*" "__MACOSX" "Thumbs.db" "ehthumbs.db" "Desktop.ini" ".TemporaryItems" ".Trashes" ".fseventsd"; do
+      mdfind -onlyin "$root" "kMDItemFSName == \"$pattern\"" 2>/dev/null || true
+    done
+  done < <(metadata_roots) |
+    sort -u |
+    while IFS= read -r path; do
+      [[ -e "$path" ]] || continue
+      name="$(basename "$path")"
+      kind="$(metadata_kind "$name")"
+      [[ -n "$kind" ]] || continue
+      kb="$(size_kb "$path")"
+      epoch="$(path_mtime_epoch "$path")"
+      printf '%012d\t%012d\t%s\t%s\t%s\n' "$kb" "$epoch" "$kind" "$name" "$path"
+    done |
+    sort -t $'\t' -k1,1rn -k2,2rn |
+    head -n "$LIMIT"
+}
+
+metadata_json_rows() {
+  local rows="$1"
+  printf '['
+  local first=1 kb epoch kind name path kb_num epoch_num status reason line
+  while IFS=$'\t' read -r kb epoch kind name path; do
+    [[ -z "${path:-}" ]] && continue
+    kb_num="$(printf '%s\n' "${kb:-0}" | sed 's/^0*//; s/^$/0/')"
+    epoch_num="$(printf '%s\n' "${epoch:-0}" | sed 's/^0*//; s/^$/0/')"
+    line="$(guard_status "$path")"
+    status="${line%%$'\t'*}"
+    reason="${line#*$'\t'}"
+    [[ "$first" -eq 0 ]] && printf ','
+    first=0
+    printf '{"path":"%s","name":"%s","kind":"%s","size_kb":%s,"size":"%s","modified_epoch":%s,"modified":"%s","status":"%s","reason":"%s","preview_command":"%s","apply_command":"%s"}' \
+      "$(printf '%s' "$path" | json_escape)" \
+      "$(printf '%s' "$name" | json_escape)" \
+      "$(printf '%s' "$kind" | json_escape)" \
+      "$kb_num" \
+      "$(human_kb "${kb:-0}" | json_escape)" \
+      "${epoch_num:-0}" \
+      "$(file_mtime_iso "${epoch_num:-0}" | json_escape)" \
+      "$(printf '%s' "$status" | json_escape)" \
+      "$(printf '%s' "$reason" | json_escape)" \
+      "$(printf 'cleanroom metadata --limit %s' "$LIMIT" | json_escape)" \
+      "$(printf 'cleanroom metadata --apply --trash --limit %s' "$LIMIT" | json_escape)"
+  done <<<"$rows"
+  printf ']\n'
+}
+
+metadata_fast() {
+  local rows available=1
+  rows="$(metadata_fast_rows)" || available=0
+
+  if [[ "$JSON" -eq 1 ]]; then
+    if [[ "$available" -eq 0 ]]; then
+      printf '{"available":false,"reason":"spotlight_unavailable","items":[]}\n'
+      return 0
+    fi
+    printf '{"available":true,"items":'
+    metadata_json_rows "$rows"
+    printf '}\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}cleanroom quick metadata clutter${RESET}"
+  printf 'Preview list from Spotlight metadata. No files are deleted.\n'
+  printf 'Limit: %s\n\n' "$LIMIT"
+  if [[ "$available" -eq 0 ]]; then
+    printf 'Spotlight search is not available. Use the deeper Metadata scan when you want an exhaustive review.\n'
+    return 0
+  fi
+  if [[ -z "$rows" ]]; then
+    printf 'No filesystem metadata clutter found in the Spotlight index.\n'
+    return 0
+  fi
+  printf '%-10s %-18s %-12s %s\n' "size" "kind" "modified" "path"
+  local kb epoch kind name path epoch_num
+  while IFS=$'\t' read -r kb epoch kind name path; do
+    [[ -z "${path:-}" ]] && continue
+    epoch_num="$(printf '%s\n' "${epoch:-0}" | sed 's/^0*//; s/^$/0/')"
+    printf '%-10s %-18s %-12s %s\n' "$(human_kb "$kb")" "$kind" "$(file_mtime_iso "${epoch_num:-0}")" "$path"
+  done <<<"$rows"
+}
+
 metadata() {
   local rows
   rows="$(metadata_rows)"
 
   if [[ "$JSON" -eq 1 ]]; then
-    printf '['
-    local first=1 kb epoch kind name path kb_num epoch_num status reason line
-    while IFS=$'\t' read -r kb epoch kind name path; do
-      [[ -z "${path:-}" ]] && continue
-      kb_num="$(printf '%s\n' "${kb:-0}" | sed 's/^0*//; s/^$/0/')"
-      epoch_num="$(printf '%s\n' "${epoch:-0}" | sed 's/^0*//; s/^$/0/')"
-      line="$(guard_status "$path")"
-      status="${line%%$'\t'*}"
-      reason="${line#*$'\t'}"
-      [[ "$first" -eq 0 ]] && printf ','
-      first=0
-      printf '{"path":"%s","name":"%s","kind":"%s","size_kb":%s,"size":"%s","modified_epoch":%s,"modified":"%s","status":"%s","reason":"%s","preview_command":"%s","apply_command":"%s"}' \
-        "$(printf '%s' "$path" | json_escape)" \
-        "$(printf '%s' "$name" | json_escape)" \
-        "$(printf '%s' "$kind" | json_escape)" \
-        "$kb_num" \
-        "$(human_kb "${kb:-0}" | json_escape)" \
-        "${epoch_num:-0}" \
-        "$(file_mtime_iso "${epoch_num:-0}" | json_escape)" \
-        "$(printf '%s' "$status" | json_escape)" \
-        "$(printf '%s' "$reason" | json_escape)" \
-        "$(printf 'cleanroom metadata --limit %s' "$LIMIT" | json_escape)" \
-        "$(printf 'cleanroom metadata --apply --trash --limit %s' "$LIMIT" | json_escape)"
-    done <<<"$rows"
-    printf ']\n'
+    metadata_json_rows "$rows"
     return 0
   fi
 
@@ -7598,7 +7663,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  dashboard|overview|map|snapshot|diff|state|permissions|review|scan|system-data|plan|large|large-fast|largefast|brokenlinks|quarantine|metadata|quicklook|fontcaches|font-caches|webcaches|web-caches|savedstate|saved-state|projectcaches|project-caches|updaters|updater-caches|browsercaches|browser-caches|duplicates|duplicates-fast|duplicatesfast|documents|desktop|screenshots|archives|downloads|installers|nodes|venvs|virtualenvs|apps|uninstallers|appreview|appdata|libraries|cloud|cloudfiles|cloud-files|personal|communications|comms|browsers|leftovers|backups|xcode|android|startup|loginitems|trash|caches|diagnostics|packages|npm-cache|npmcache|yarn-cache|yarncache|pnpm-store|pnpmstore|cocoapods-cache|pod-cache|podcache|pip-cache|pipcache|receipts|homebrew|homebrew-cleanup|brewcleanup|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
+  dashboard|overview|map|snapshot|diff|state|permissions|review|scan|system-data|plan|large|large-fast|largefast|brokenlinks|quarantine|metadata|metadata-fast|metadatafast|quicklook|fontcaches|font-caches|webcaches|web-caches|savedstate|saved-state|projectcaches|project-caches|updaters|updater-caches|browsercaches|browser-caches|duplicates|duplicates-fast|duplicatesfast|documents|desktop|screenshots|archives|downloads|installers|nodes|venvs|virtualenvs|apps|uninstallers|appreview|appdata|libraries|cloud|cloudfiles|cloud-files|personal|communications|comms|browsers|leftovers|backups|xcode|android|startup|loginitems|trash|caches|diagnostics|packages|npm-cache|npmcache|yarn-cache|yarncache|pnpm-store|pnpmstore|cocoapods-cache|pod-cache|podcache|pip-cache|pipcache|receipts|homebrew|homebrew-cleanup|brewcleanup|toolchains|containers|snapshots|report|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -7696,7 +7761,7 @@ while [[ "$#" -gt 0 ]]; do
     -h|--help) usage; exit 0 ;;
     -v|--version) echo "$VERSION"; exit 0 ;;
     *)
-      if [[ "$ACTION" == "guard" || "$ACTION" == "diff" || "$ACTION" == "large" || "$ACTION" == "large-fast" || "$ACTION" == "largefast" || "$ACTION" == "brokenlinks" || "$ACTION" == "quarantine" || "$ACTION" == "metadata" || "$ACTION" == "projectcaches" || "$ACTION" == "project-caches" || "$ACTION" == "duplicates" || "$ACTION" == "duplicates-fast" || "$ACTION" == "duplicatesfast" || "$ACTION" == "documents" || "$ACTION" == "screenshots" || "$ACTION" == "archives" || "$ACTION" == "nodes" || "$ACTION" == "venvs" || "$ACTION" == "virtualenvs" || "$ACTION" == "apps" || "$ACTION" == "uninstallers" || "$ACTION" == "appreview" || "$ACTION" == "cloudfiles" || "$ACTION" == "cloud-files" || "$ACTION" == "leftovers" ]]; then
+      if [[ "$ACTION" == "guard" || "$ACTION" == "diff" || "$ACTION" == "large" || "$ACTION" == "large-fast" || "$ACTION" == "largefast" || "$ACTION" == "brokenlinks" || "$ACTION" == "quarantine" || "$ACTION" == "metadata" || "$ACTION" == "metadata-fast" || "$ACTION" == "metadatafast" || "$ACTION" == "projectcaches" || "$ACTION" == "project-caches" || "$ACTION" == "duplicates" || "$ACTION" == "duplicates-fast" || "$ACTION" == "duplicatesfast" || "$ACTION" == "documents" || "$ACTION" == "screenshots" || "$ACTION" == "archives" || "$ACTION" == "nodes" || "$ACTION" == "venvs" || "$ACTION" == "virtualenvs" || "$ACTION" == "apps" || "$ACTION" == "uninstallers" || "$ACTION" == "appreview" || "$ACTION" == "cloudfiles" || "$ACTION" == "cloud-files" || "$ACTION" == "leftovers" ]]; then
         PATH_ARGS+=("$1")
       else
         die "Unknown option: $1"
@@ -7723,6 +7788,7 @@ case "$ACTION" in
   brokenlinks) brokenlinks ;;
   quarantine) quarantine ;;
   metadata) metadata ;;
+  metadata-fast|metadatafast) metadata_fast ;;
   quicklook) quicklook ;;
   fontcaches|font-caches) fontcaches ;;
   webcaches|web-caches) webcaches ;;

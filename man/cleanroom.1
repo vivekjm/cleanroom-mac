@@ -1,4 +1,4 @@
-.TH CLEANROOM 1 "June 2026" "cleanroom 0.88.0" "User Commands"
+.TH CLEANROOM 1 "June 2026" "cleanroom 0.89.0" "User Commands"
 .SH NAME
 cleanroom \- safe-by-default macOS storage cleaner
 .SH SYNOPSIS
@@ -46,6 +46,9 @@ cleanroom \- safe-by-default macOS storage cleaner
 .br
 .B cleanroom
 .RI "metadata [path...] [--limit n] [--json] [--apply --trash]"
+.br
+.B cleanroom
+.RI "metadata-fast [path...] [--limit n] [--json]"
 .br
 .B cleanroom
 .RI "quicklook [--json]"
@@ -280,9 +283,12 @@ List files and apps with macOS quarantine metadata without deleting files or
 clearing attributes.
 .TP
 .B metadata
-List removable filesystem metadata clutter such as .DS_Store, AppleDouble
+Deep-scan removable filesystem metadata clutter such as .DS_Store, AppleDouble
 files, __MACOSX folders, Thumbs.db, and Desktop.ini. Applied cleanup requires
 .BR --trash .
+.TP
+.B metadata-fast
+Quickly preview removable filesystem metadata clutter using Spotlight metadata.
 .TP
 .B quicklook
 Inventory rebuildable Quick Look thumbnail and preview caches.

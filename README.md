@@ -213,6 +213,7 @@ cleanroom quarantine --json
 Review removable filesystem metadata clutter:
 
 ```sh
+cleanroom metadata-fast
 cleanroom metadata
 cleanroom metadata ~/Documents ~/Downloads --limit 50
 cleanroom metadata --apply --trash

@@ -303,10 +303,17 @@ cat >"$TEST_HOME/bin/mdfind" <<'SH'
 #!/usr/bin/env bash
 if [[ "${1:-}" == "-onlyin" ]]; then
   root="${2:-}"
-  [[ -f "$root/Downloads/big-test.bin" ]] && printf '%s\n' "$root/Downloads/big-test.bin"
-  [[ -f "$root/Downloads/old-installer.dmg" ]] && printf '%s\n' "$root/Downloads/old-installer.dmg"
-  [[ -f "$root/Documents/duplicates/copy-a.bin" ]] && printf '%s\n' "$root/Documents/duplicates/copy-a.bin"
-  [[ -f "$root/Documents/duplicates/copy-b.bin" ]] && printf '%s\n' "$root/Documents/duplicates/copy-b.bin"
+  query="${3:-}"
+  if [[ "$query" == *"kMDItemFSName"* ]]; then
+    [[ -f "$root/Documents/.DS_Store" ]] && printf '%s\n' "$root/Documents/.DS_Store"
+    [[ -f "$root/Downloads/._old-installer.dmg" ]] && printf '%s\n' "$root/Downloads/._old-installer.dmg"
+    [[ -f "$root/Desktop/Thumbs.db" ]] && printf '%s\n' "$root/Desktop/Thumbs.db"
+  else
+    [[ -f "$root/Downloads/big-test.bin" ]] && printf '%s\n' "$root/Downloads/big-test.bin"
+    [[ -f "$root/Downloads/old-installer.dmg" ]] && printf '%s\n' "$root/Downloads/old-installer.dmg"
+    [[ -f "$root/Documents/duplicates/copy-a.bin" ]] && printf '%s\n' "$root/Documents/duplicates/copy-a.bin"
+    [[ -f "$root/Documents/duplicates/copy-b.bin" ]] && printf '%s\n' "$root/Documents/duplicates/copy-b.bin"
+  fi
   exit 0
 fi
 exit 2
@@ -629,6 +636,15 @@ grep '"kind":"appledouble"' "$metadata_json" >/dev/null
 grep '"kind":"windows-metadata"' "$metadata_json" >/dev/null
 grep 'cleanroom metadata --apply --trash' "$metadata_json" >/dev/null
 rm -f "$metadata_json"
+"$BIN" metadata-fast "$HOME" --limit 10 | grep '.DS_Store' >/dev/null
+metadata_fast_json="$(mktemp)"
+"$BIN" metadata-fast --json "$HOME" --limit 10 > "$metadata_fast_json"
+python3 -m json.tool "$metadata_fast_json" >/dev/null
+grep '"available":true' "$metadata_fast_json" >/dev/null
+grep '"kind":"finder-metadata"' "$metadata_fast_json" >/dev/null
+grep '"kind":"appledouble"' "$metadata_fast_json" >/dev/null
+grep '"kind":"windows-metadata"' "$metadata_fast_json" >/dev/null
+rm -f "$metadata_fast_json"
 if "$BIN" metadata "$HOME/Documents" --apply --yes --limit 1 >/dev/null 2>&1; then
   echo "metadata apply without --trash should fail" >&2
   exit 1

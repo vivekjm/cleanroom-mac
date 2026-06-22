@@ -465,7 +465,7 @@ struct SidebarView: View {
                             NavRow("doc.on.doc.fill",         "Duplicates",  .run(title: "Duplicates",   args: "duplicates-fast --limit 20 --min-mb 100"), state)
                             NavRow("link.badge.plus",         "Broken Links",.run(title: "Broken Links", args: "brokenlinks --limit 40"), state)
                             NavRow("lock.shield.fill",        "Quarantine",  .run(title: "Quarantine",   args: "quarantine --limit 40"), state)
-                            NavRow("sparkle.magnifyingglass", "Metadata",    .run(title: "Metadata",     args: "metadata --limit 40"), state)
+                            NavRow("sparkle.magnifyingglass", "Metadata",    .run(title: "Metadata",     args: "metadata-fast --limit 40"), state)
                             NavRow("magnifyingglass.circle.fill","Leftovers", .dashboard, state, onTap: { state.showLeftovers = true })
                         }
                         SidebarSection("CATEGORIES") {
