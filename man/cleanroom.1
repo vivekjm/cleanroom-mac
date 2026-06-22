@@ -1,4 +1,4 @@
-.TH CLEANROOM 1 "June 2026" "cleanroom 1.11.0" "User Commands"
+.TH CLEANROOM 1 "June 2026" "cleanroom 1.12.0" "User Commands"
 .SH NAME
 cleanroom \- safe-by-default macOS storage cleaner
 .SH SYNOPSIS
@@ -111,7 +111,13 @@ cleanroom \- safe-by-default macOS storage cleaner
 .RI "archives [path] [--days n] [--limit n] [--json]"
 .br
 .B cleanroom
+.RI "archives-fast [path] [--days n] [--limit n] [--json]"
+.br
+.B cleanroom
 .RI "downloads [--days n] [--limit n] [--json]"
+.br
+.B cleanroom
+.RI "downloads-fast [--days n] [--limit n] [--json]"
 .br
 .B cleanroom
 .RI "installers [--days n] [--limit n] [--json]"
@@ -385,8 +391,14 @@ limited to known screenshot/recording filenames.
 .B archives
 List archive and disk image files for review without deleting anything.
 .TP
+.B archives-fast
+Quickly preview old archives and disk images in Downloads and Desktop, or in a provided path.
+.TP
 .B downloads
 List old files in ~/Downloads for review. Cleanup is opt-in for old downloadable artifacts only.
+.TP
+.B downloads-fast
+Quickly preview old files in ~/Downloads with a bounded top-level scan.
 .TP
 .B installers
 List old downloaded installer files in ~/Downloads for review.
@@ -683,7 +695,9 @@ cleanroom documents ~/Documents --limit 40
 cleanroom desktop --limit 40
 cleanroom screenshots ~/Desktop --days 7 --limit 50
 cleanroom archives ~/Downloads --days 7 --limit 50
+cleanroom archives-fast ~/Downloads --days 7 --limit 50
 cleanroom downloads --days 30 --limit 50
+cleanroom downloads-fast --days 30 --limit 50
 cleanroom installers --days 30 --limit 50
 cleanroom nodes ~/Documents --days 45 --limit 30
 cleanroom venvs ~/Documents --days 45 --limit 30

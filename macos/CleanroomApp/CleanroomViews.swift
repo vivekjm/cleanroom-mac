@@ -365,7 +365,7 @@ final class AppState: ObservableObject {
         let jsonActions: Set<String> = [
             "large-fast", "duplicates-fast", "brokenlinks", "brokenlinks-fast", "quarantine-fast", "metadata-fast",
             "developer-fast", "nodes-fast", "venvs-fast", "apps-fast",
-            "downloads", "archives", "screenshots", "trash", "cloudfiles", "caches-fast",
+            "downloads", "downloads-fast", "archives", "archives-fast", "screenshots", "trash", "cloudfiles", "caches-fast",
             "quicklook", "fontcaches", "webcaches", "savedstate",
             "projectcaches", "projectcaches-fast", "updaters", "browsercaches",
             "xcode", "backups", "system-data", "system-data-fast", "containers", "toolchains",
@@ -824,8 +824,8 @@ struct SidebarView: View {
                             NavRow("magnifyingglass.circle.fill","Leftovers", .dashboard, state, onTap: { state.showLeftovers = true })
                         }
                         SidebarSection("CATEGORIES") {
-                            NavRow("arrow.down.to.line",      "Downloads",   .run(title: "Downloads",   args: "downloads --limit 30 --days 30"), state)
-                            NavRow("archivebox.fill",         "Archives",    .run(title: "Archives",    args: "archives --limit 30 --days 7"), state)
+                            NavRow("arrow.down.to.line",      "Downloads",   .run(title: "Downloads",   args: "downloads-fast --limit 30 --days 30"), state)
+                            NavRow("archivebox.fill",         "Archives",    .run(title: "Archives",    args: "archives-fast --limit 30 --days 7"), state)
                             NavRow("camera.viewfinder",       "Screenshots", .run(title: "Screenshots", args: "screenshots --limit 30 --days 7"), state)
                             NavRow("xmark.bin.fill",          "Caches",      .run(title: "Caches",      args: "caches-fast"), state)
                             NavRow("eye.fill",                "Quick Look",  .run(title: "Quick Look",  args: "quicklook"), state)

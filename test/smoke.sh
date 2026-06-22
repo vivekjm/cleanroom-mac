@@ -884,6 +884,14 @@ grep '"name":"old-archive.zip"' "$archives_json" >/dev/null
 grep '"kind":"archive"' "$archives_json" >/dev/null
 grep 'open -R' "$archives_json" >/dev/null
 rm -f "$archives_json"
+"$BIN" archives-fast "$HOME/Downloads" --days 7 --limit 10 | grep 'old-archive.zip' >/dev/null
+archives_fast_json="$(mktemp)"
+"$BIN" archives-fast --json "$HOME/Downloads" --days 7 --limit 10 > "$archives_fast_json"
+python3 -m json.tool "$archives_fast_json" >/dev/null
+grep '"mode":"fast"' "$archives_fast_json" >/dev/null
+grep '"name":"old-archive.zip"' "$archives_fast_json" >/dev/null
+grep '"kind":"archive"' "$archives_fast_json" >/dev/null
+rm -f "$archives_fast_json"
 "$BIN" downloads --days 30 --limit 5 | grep 'old-installer.dmg' >/dev/null
 downloads_json="$(mktemp)"
 "$BIN" downloads --json --days 30 --limit 5 > "$downloads_json"
@@ -893,6 +901,14 @@ grep '"age_days"' "$downloads_json" >/dev/null
 grep '"cleanup_eligible":true' "$downloads_json" >/dev/null
 grep 'cleanroom clean --apply --trash --include-download-artifacts --days 30' "$downloads_json" >/dev/null
 rm -f "$downloads_json"
+"$BIN" downloads-fast --days 30 --limit 5 | grep 'old-installer.dmg' >/dev/null
+downloads_fast_json="$(mktemp)"
+"$BIN" downloads-fast --json --days 30 --limit 5 > "$downloads_fast_json"
+python3 -m json.tool "$downloads_fast_json" >/dev/null
+grep '"mode":"fast"' "$downloads_fast_json" >/dev/null
+grep 'old-installer.dmg' "$downloads_fast_json" >/dev/null
+grep '"cleanup_eligible":true' "$downloads_fast_json" >/dev/null
+rm -f "$downloads_fast_json"
 "$BIN" installers --days 30 --limit 5 | grep 'old-installer.dmg' >/dev/null
 installers_json="$(mktemp)"
 "$BIN" installers --json --days 30 --limit 5 > "$installers_json"
