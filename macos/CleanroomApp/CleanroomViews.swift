@@ -617,9 +617,10 @@ final class AppState: ObservableObject {
             if p.terminationStatus == 15 {
                 return CommandResult(output: visibleText, status: p.terminationStatus)
             }
-            return CommandResult(output: visibleText + "\nThe action could not finish. Status \(p.terminationStatus).\n", status: p.terminationStatus)
+            let fallback = visibleText.isEmpty ? "" : visibleText + "\n"
+            return CommandResult(output: fallback + "This review could not finish. Please try again or run Health Check.\n", status: p.terminationStatus)
         } catch {
-            return CommandResult(output: "Could not start this action: \(error.localizedDescription)\n", status: -1)
+            return CommandResult(output: "Cleanroom could not start this review. \(error.localizedDescription)\n", status: -1)
         }
     }
 
@@ -668,9 +669,11 @@ final class AppState: ObservableObject {
         if raw.localizedCaseInsensitiveContains("Trash mode can recover") {
             return "Moved to Trash where possible."
         }
+        if raw.contains("--") || raw.localizedCaseInsensitiveContains("dry-run") {
+            return "Review first; cleaning only happens after confirmation."
+        }
         return raw
-            .replacingOccurrences(of: "--trash", with: "Trash recovery")
-            .replacingOccurrences(of: "--apply", with: "cleaning")
+            .replacingOccurrences(of: "dry-run", with: "review", options: .caseInsensitive)
     }
 
     nonisolated private static func friendlyCleanupNote(_ raw: String) -> String {
