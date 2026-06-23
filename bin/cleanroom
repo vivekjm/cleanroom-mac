@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.52.0"
+VERSION="1.53.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -165,6 +165,7 @@ Usage:
   cleanroom restore [--log PATH] [--apply]
   cleanroom interactive [options]
   cleanroom doctor [--json]
+  cleanroom doctor-fast [--json]
   cleanroom protect [--json]
   cleanroom protect-fast [--json]
   cleanroom guard PATH... [--json]
@@ -270,6 +271,7 @@ Actions:
   restore              Restore files moved by --trash from an apply log. Dry-run unless --apply.
   interactive          Choose cleanup categories in a guided prompt.
   doctor               Check platform, dependencies, permissions, and risky state.
+  doctor-fast          Show a high-level app health check without tool diagnostics.
   protect              Audit protected personal data that cleanroom will not remove.
   guard                Explain whether specific paths are removable by cleanroom.
   rules                List cleanup rules, safety level, opt-in flag, and affected paths.
@@ -9501,6 +9503,42 @@ doctor() {
   return 0
 }
 
+doctor_fast() {
+  local available_kb available protected_count rules_ready protected_ready catalog_status catalog_summary
+  available_kb="$(df -k /System/Volumes/Data 2>/dev/null | awk 'NR==2 {print $4}' || df -k / | awk 'NR==2 {print $4}')"
+  available="$(human_kb "${available_kb:-0}")"
+  protected_count="$(protected_present_count)"
+  if [[ -f "$(rules_file)" ]]; then rules_ready=true; else rules_ready=false; fi
+  if [[ -f "$(protected_file)" ]]; then protected_ready=true; else protected_ready=false; fi
+  if [[ "$rules_ready" == true && "$protected_ready" == true ]]; then
+    catalog_status="Ready"
+    catalog_summary="Cleanup rules and protected personal-data guards are available."
+  else
+    catalog_status="Needs Attention"
+    catalog_summary="One or more safety catalogs could not be loaded."
+  fi
+
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '['
+    printf '{"id":"disk-space","title":"Disk Space","size":"%s available","status":"Review","safety":"Review only","summary":"Your Mac has %s available. No files were changed.","mode":"fast"},' \
+      "$(printf '%s' "$available" | json_escape)" \
+      "$(printf '%s' "$available" | json_escape)"
+    printf '{"id":"safety-catalogs","title":"Safety Catalogs","size":"Ready","status":"%s","safety":"Protected","summary":"%s","mode":"fast"},' \
+      "$(printf '%s' "$catalog_status" | json_escape)" \
+      "$(printf '%s' "$catalog_summary" | json_escape)"
+    printf '{"id":"protected-data","title":"Protected Data","size":"%s guarded","status":"Protected","safety":"Protected","summary":"Passwords, browser profiles, Photos, Mail, Messages, backups, and cloud folders stay guarded.","mode":"fast"}' \
+      "$protected_count"
+    printf ']\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}quick health check${RESET}"
+  printf 'High-level app health. Tool diagnostics are hidden for desktop users.\n\n'
+  printf '%-18s %-16s %s\n' "Disk Space" "Review" "$available available"
+  printf '%-18s %-16s %s\n' "Safety Catalogs" "$catalog_status" "$catalog_summary"
+  printf '%-18s %-16s %s\n' "Protected Data" "Protected" "$protected_count guarded locations present"
+}
+
 init_config() {
   local file
   file="${CONFIG_FILE:-$(config_default_path)}"
@@ -9804,7 +9842,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  dashboard|overview|map|map-fast|mapfast|snapshot|snapshot-fast|snapshotfast|diff|state|state-fast|statefast|permissions|review|scan|system-data|system-data-fast|systemdata-fast|systemdatafast|plan|plan-fast|planfast|large|large-fast|largefast|brokenlinks|brokenlinks-fast|brokenlinksfast|broken-links-fast|broken-linksfast|quarantine|quarantine-fast|quarantinefast|metadata|metadata-fast|metadatafast|quicklook|quicklook-fast|quicklookfast|fontcaches|fontcaches-fast|fontcachesfast|font-caches|font-caches-fast|font-cachesfast|webcaches|webcaches-fast|webcachesfast|web-caches|web-caches-fast|web-cachesfast|savedstate|savedstate-fast|savedstatefast|saved-state|saved-state-fast|saved-statefast|projectcaches|project-caches|projectcaches-fast|projectcachesfast|project-caches-fast|project-cachesfast|developer-fast|developerfast|updaters|updaters-fast|updatersfast|updater-caches|updater-caches-fast|updater-cachesfast|browsercaches|browser-caches|browsercaches-fast|browsercachesfast|browser-caches-fast|browser-cachesfast|duplicates|duplicates-fast|duplicatesfast|documents|desktop|screenshots|screenshots-fast|screenshotsfast|archives|archives-fast|archivesfast|downloads|downloads-fast|downloadsfast|installers|nodes|nodes-fast|nodesfast|venvs|venvs-fast|venvsfast|virtualenvs|virtualenvs-fast|virtualenvsfast|apps|apps-fast|appsfast|uninstallers|appreview|aitools|aitools-fast|aitoolsfast|ai-tools|ai|appdata|libraries|cloud|cloudfiles|cloudfiles-fast|cloudfilesfast|cloud-files|cloud-files-fast|cloud-filesfast|personal|communications|comms|browsers|leftovers|backups|backups-fast|backupsfast|xcode|xcode-fast|xcodefast|android|startup|startup-fast|startupfast|loginitems|loginitems-fast|loginitemsfast|trash|trash-fast|trashfast|caches|caches-instant|cachesinstant|caches-fast|cachesfast|diagnostics|packages|npm-cache|npmcache|yarn-cache|yarncache|pnpm-store|pnpmstore|cocoapods-cache|pod-cache|podcache|pip-cache|pipcache|receipts|homebrew|homebrew-cleanup|brewcleanup|toolchains|toolchains-fast|toolchainsfast|containers|containers-fast|containersfast|snapshots|report|report-fast|reportfast|clean|history|restore|interactive|doctor|protect|protect-fast|protectfast|guard|rules|rules-fast|rulesfast|categories|init-config|help)
+  dashboard|overview|map|map-fast|mapfast|snapshot|snapshot-fast|snapshotfast|diff|state|state-fast|statefast|permissions|review|scan|system-data|system-data-fast|systemdata-fast|systemdatafast|plan|plan-fast|planfast|large|large-fast|largefast|brokenlinks|brokenlinks-fast|brokenlinksfast|broken-links-fast|broken-linksfast|quarantine|quarantine-fast|quarantinefast|metadata|metadata-fast|metadatafast|quicklook|quicklook-fast|quicklookfast|fontcaches|fontcaches-fast|fontcachesfast|font-caches|font-caches-fast|font-cachesfast|webcaches|webcaches-fast|webcachesfast|web-caches|web-caches-fast|web-cachesfast|savedstate|savedstate-fast|savedstatefast|saved-state|saved-state-fast|saved-statefast|projectcaches|project-caches|projectcaches-fast|projectcachesfast|project-caches-fast|project-cachesfast|developer-fast|developerfast|updaters|updaters-fast|updatersfast|updater-caches|updater-caches-fast|updater-cachesfast|browsercaches|browser-caches|browsercaches-fast|browsercachesfast|browser-caches-fast|browser-cachesfast|duplicates|duplicates-fast|duplicatesfast|documents|desktop|screenshots|screenshots-fast|screenshotsfast|archives|archives-fast|archivesfast|downloads|downloads-fast|downloadsfast|installers|nodes|nodes-fast|nodesfast|venvs|venvs-fast|venvsfast|virtualenvs|virtualenvs-fast|virtualenvsfast|apps|apps-fast|appsfast|uninstallers|appreview|aitools|aitools-fast|aitoolsfast|ai-tools|ai|appdata|libraries|cloud|cloudfiles|cloudfiles-fast|cloudfilesfast|cloud-files|cloud-files-fast|cloud-filesfast|personal|communications|comms|browsers|leftovers|backups|backups-fast|backupsfast|xcode|xcode-fast|xcodefast|android|startup|startup-fast|startupfast|loginitems|loginitems-fast|loginitemsfast|trash|trash-fast|trashfast|caches|caches-instant|cachesinstant|caches-fast|cachesfast|diagnostics|packages|npm-cache|npmcache|yarn-cache|yarncache|pnpm-store|pnpmstore|cocoapods-cache|pod-cache|podcache|pip-cache|pipcache|receipts|homebrew|homebrew-cleanup|brewcleanup|toolchains|toolchains-fast|toolchainsfast|containers|containers-fast|containersfast|snapshots|report|report-fast|reportfast|clean|history|restore|interactive|doctor|doctor-fast|doctorfast|protect|protect-fast|protectfast|guard|rules|rules-fast|rulesfast|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -10018,6 +10056,7 @@ case "$ACTION" in
   restore) restore ;;
   interactive) interactive ;;
   doctor) doctor ;;
+  doctor-fast|doctorfast) doctor_fast ;;
   protect) protect ;;
   protect-fast|protectfast) protect_fast ;;
   guard) guard ;;

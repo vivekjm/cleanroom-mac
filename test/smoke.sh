@@ -1486,6 +1486,14 @@ python3 -m json.tool "$doctor_json" >/dev/null
 grep '"tools"' "$doctor_json" >/dev/null
 grep '"safety"' "$doctor_json" >/dev/null
 rm -f "$doctor_json"
+"$BIN" doctor-fast | grep 'quick health check' >/dev/null
+doctor_fast_json="$(mktemp)"
+"$BIN" doctor-fast --json > "$doctor_fast_json"
+python3 -m json.tool "$doctor_fast_json" >/dev/null
+grep '"id":"disk-space"' "$doctor_fast_json" >/dev/null
+grep '"id":"protected-data"' "$doctor_fast_json" >/dev/null
+grep '"mode":"fast"' "$doctor_fast_json" >/dev/null
+rm -f "$doctor_fast_json"
 "$BIN" protect | grep 'chrome-login-data' >/dev/null
 protect_json="$(mktemp)"
 "$BIN" protect --json > "$protect_json"

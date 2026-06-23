@@ -76,7 +76,7 @@ struct AppAction: Hashable {
     let title: String
     let args: [String]
 
-    static let healthCheck = AppAction(title: "Health Check", args: ["doctor"])
+    static let healthCheck = AppAction(title: "Health Check", args: ["doctor-fast"])
     static let storageOverview = AppAction(title: "Storage Overview", args: ["map-fast"])
     static let largeFiles = AppAction(title: "Large Files", args: ["large-fast", "--limit", "30", "--min-mb", "500"])
     static let duplicates = AppAction(title: "Duplicates", args: ["duplicates-fast", "--limit", "20", "--min-mb", "100"])
@@ -473,7 +473,7 @@ final class AppState: ObservableObject {
             "aitools", "aitools-fast", "ai-tools", "ai",
             "xcode", "xcode-fast", "backups", "backups-fast", "system-data", "system-data-fast", "containers", "containers-fast", "toolchains", "toolchains-fast",
             "loginitems", "loginitems-fast", "startup", "startup-fast", "snapshot", "snapshot-fast", "state", "state-fast", "protect", "protect-fast", "rules", "rules-fast",
-            "map", "map-fast", "plan-fast", "doctor", "leftovers", "appreview", "history", "report-fast"
+            "map", "map-fast", "plan-fast", "doctor", "doctor-fast", "leftovers", "appreview", "history", "report-fast"
         ]
         if jsonActions.contains(action), !args.contains("--json") {
             return args + ["--json"]

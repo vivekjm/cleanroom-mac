@@ -569,6 +569,8 @@ Check environment and safety assumptions:
 ```sh
 cleanroom doctor
 cleanroom doctor --json
+cleanroom doctor-fast
+cleanroom doctor-fast --json
 ```
 
 Audit protected personal data and app profile paths:
@@ -906,7 +908,7 @@ Config files use simple `key=value` lines and are never executed as shell.
 
 `diagnostics` inventories user logs, diagnostic reports, and CrashReporter data. Default cleanup already removes old log files; diagnostic report cleanup is opt-in with `cleanroom clean --include-diagnostics --days N`.
 
-`doctor --json` emits platform, config, disk, dependency, and safety-catalog diagnostics for wrappers and support reports.
+`doctor --json` emits platform, config, disk, dependency, and safety-catalog diagnostics for wrappers and support reports. `doctor-fast` gives desktop users a high-level health check without tool diagnostics.
 
 `report` writes a Markdown summary with disk state, cleanup candidates, largest known cleanup locations, large-file hints from Spotlight, protected personal-data paths, and safety notes. Add `--redact` before sharing in GitHub issues or support chats; it masks home, user, and temporary paths while keeping storage categories readable.
 
