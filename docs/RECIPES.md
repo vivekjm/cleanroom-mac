@@ -205,7 +205,7 @@ cleanroom permissions --json
 
 `documents --json [PATH]` emits top-level file/folder sizes with kind, guard status, and follow-up commands. It is intentionally review-only and helps explain a large Documents storage category before deleting anything. Use `documents-fast --json [PATH]` for desktop apps and quick reviews; it avoids deep folder sizing and prompts users to open a folder only when they want detail.
 
-`desktop --json` emits the same guarded top-level inventory for `~/Desktop`. It is intentionally review-only and useful for screenshot/export/project clutter.
+`desktop --json` emits the same guarded top-level inventory for `~/Desktop`. It is intentionally review-only and useful for screenshot/export/project clutter. Use `desktop-fast --json` for a responsive app view that avoids deep folder sizing.
 
 `screenshots --json [PATH]` emits screenshot and screen recording files with age, modified date, size, Finder reveal command, and matching preview/apply commands. Cleanup is opt-in because screenshots can contain sensitive data.
 

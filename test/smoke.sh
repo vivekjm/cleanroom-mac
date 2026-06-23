@@ -979,6 +979,14 @@ grep '"name":"old-disk-image.dmg"' "$desktop_json" >/dev/null
 grep '"guard_status":"review"' "$desktop_json" >/dev/null
 grep 'cleanroom large' "$desktop_json" >/dev/null
 rm -f "$desktop_json"
+"$BIN" desktop-fast --limit 10 | grep 'quick Desktop review' >/dev/null
+desktop_fast_json="$(mktemp)"
+"$BIN" desktop-fast --json --limit 10 > "$desktop_fast_json"
+python3 -m json.tool "$desktop_fast_json" >/dev/null
+grep '"mode":"fast"' "$desktop_fast_json" >/dev/null
+grep '"name":"old-disk-image.dmg"' "$desktop_fast_json" >/dev/null
+grep '"size":"512KB"' "$desktop_fast_json" >/dev/null
+rm -f "$desktop_fast_json"
 "$BIN" screenshots "$HOME/Desktop" --days 7 --limit 10 | grep 'Screenshot 2026' >/dev/null
 screenshots_json="$(mktemp)"
 "$BIN" screenshots --json "$HOME/Desktop" --days 7 --limit 10 > "$screenshots_json"

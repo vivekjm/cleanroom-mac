@@ -303,6 +303,7 @@ Break down Desktop clutter:
 ```sh
 cleanroom desktop
 cleanroom desktop --json
+cleanroom desktop-fast --json
 ```
 
 Review screenshot and screen recording clutter:
@@ -896,7 +897,7 @@ Config files use simple `key=value` lines and are never executed as shell.
 
 `documents` ranks the top-level files and folders inside `~/Documents` or a provided directory. It is review-only, includes each item's guard status, and prints follow-up `documents` and `large` commands so you can drill down safely. `documents-fast` is the responsive desktop-app version: it shows exact sizes for loose files and labels folders as "Open folder" instead of deep-scanning them.
 
-`desktop` is a convenience shortcut for the same guarded top-level inventory on `~/Desktop`, useful when screenshots, exports, archives, and loose project folders have piled up.
+`desktop` is a convenience shortcut for the same guarded top-level inventory on `~/Desktop`, useful when screenshots, exports, archives, and loose project folders have piled up. `desktop-fast` gives the desktop app the same responsive treatment as `documents-fast`.
 
 `screenshots` lists screenshot and screen recording files in Desktop, Downloads, and Documents, or a provided folder. Cleanup is opt-in with `--include-screenshots` and targets only known screenshot/recording filenames older than `--days`; arbitrary images and videos are not removed.
 

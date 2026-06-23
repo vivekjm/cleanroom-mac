@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.56.0"
+VERSION="1.57.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -103,6 +103,7 @@ Usage:
   cleanroom documents [PATH] [--limit N] [--json]
   cleanroom documents-fast [PATH] [--limit N] [--json]
   cleanroom desktop [--limit N] [--json]
+  cleanroom desktop-fast [--limit N] [--json]
   cleanroom screenshots [PATH] [--days N] [--limit N] [--json]
   cleanroom archives [PATH] [--days N] [--limit N] [--json]
   cleanroom archives-fast [PATH] [--days N] [--limit N] [--json]
@@ -435,6 +436,7 @@ Examples:
   cleanroom documents-fast --json
   cleanroom desktop
   cleanroom desktop --json
+  cleanroom desktop-fast --json
   cleanroom screenshots
   cleanroom screenshots ~/Desktop --days 7 --limit 50
   cleanroom screenshots --json
@@ -3998,25 +4000,36 @@ documents_fast() {
 
   local rows
   rows="$(documents_fast_rows "$root")"
+  local area="Documents" area_location="in Documents"
+  if [[ "$root" == "$HOME/Desktop" ]]; then
+    area="Desktop"
+    area_location="on Desktop"
+  fi
 
   if [[ "$JSON" -eq 1 ]]; then
     printf '['
-    local first=1 kb kb_num kind guard path name size summary review_root
+    local first=1 kb kb_num kind guard path name size summary review_root review_command
     while IFS=$'\t' read -r kb kind guard path; do
       [[ -z "${path:-}" ]] && continue
       kb_num="$(printf '%s\n' "$kb" | sed 's/^0*//; s/^$/0/')"
       name="$(basename "$path")"
       if [[ "$kind" == "file" ]]; then
         size="$(human_kb "${kb:-0}")"
-        summary="Loose file in Documents. Review before deleting or moving."
+        summary="Loose file $area_location. Review before deleting or moving."
       else
         size="Open folder"
         summary="Folder size is checked only when you open a deeper review."
       fi
       if [[ "$kind" == "directory" ]]; then
         review_root="$path"
+        review_command="$(printf 'cleanroom documents %s --limit %s' "$(shell_quote "$review_root")" "$LIMIT")"
       else
         review_root="$(dirname "$path")"
+        if [[ "$review_root" == "$HOME/Desktop" ]]; then
+          review_command="$(printf 'cleanroom desktop --limit %s' "$LIMIT")"
+        else
+          review_command="$(printf 'cleanroom documents %s --limit %s' "$(shell_quote "$review_root")" "$LIMIT")"
+        fi
       fi
       [[ "$first" -eq 0 ]] && printf ','
       first=0
@@ -4028,13 +4041,13 @@ documents_fast() {
         "$kb_num" \
         "$(printf '%s' "$size" | json_escape)" \
         "$(printf '%s' "$summary" | json_escape)" \
-        "$(printf 'cleanroom documents %s --limit %s' "$(shell_quote "$review_root")" "$LIMIT" | json_escape)"
+        "$(printf '%s' "$review_command" | json_escape)"
     done <<<"$rows"
     printf ']\n'
     return 0
   fi
 
-  printf '%s\n' "${BOLD}cleanroom quick Documents review${RESET}"
+  printf '%s\n' "${BOLD}cleanroom quick $area review${RESET}"
   printf 'Fast read-only view. Folder sizes are not deep-scanned until you open a folder.\n'
   printf 'Path: %s  Limit: %s\n\n' "$root" "$LIMIT"
   if [[ -z "$rows" ]]; then
@@ -4057,6 +4070,11 @@ documents_fast() {
 desktop() {
   PATH_ARGS=("$HOME/Desktop")
   documents
+}
+
+desktop_fast() {
+  PATH_ARGS=("$HOME/Desktop")
+  documents_fast
 }
 
 screenshot_roots() {
@@ -9971,7 +9989,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  dashboard|overview|map|map-fast|mapfast|snapshot|snapshot-fast|snapshotfast|diff|state|state-fast|statefast|permissions|review|scan|system-data|system-data-fast|systemdata-fast|systemdatafast|plan|plan-fast|planfast|large|large-fast|largefast|brokenlinks|brokenlinks-fast|brokenlinksfast|broken-links-fast|broken-linksfast|quarantine|quarantine-fast|quarantinefast|metadata|metadata-fast|metadatafast|quicklook|quicklook-fast|quicklookfast|fontcaches|fontcaches-fast|fontcachesfast|font-caches|font-caches-fast|font-cachesfast|webcaches|webcaches-fast|webcachesfast|web-caches|web-caches-fast|web-cachesfast|savedstate|savedstate-fast|savedstatefast|saved-state|saved-state-fast|saved-statefast|projectcaches|project-caches|projectcaches-fast|projectcachesfast|project-caches-fast|project-cachesfast|developer-fast|developerfast|updaters|updaters-fast|updatersfast|updater-caches|updater-caches-fast|updater-cachesfast|browsercaches|browser-caches|browsercaches-fast|browsercachesfast|browser-caches-fast|browser-cachesfast|duplicates|duplicates-fast|duplicatesfast|documents|documents-fast|documentsfast|desktop|screenshots|screenshots-fast|screenshotsfast|archives|archives-fast|archivesfast|downloads|downloads-fast|downloadsfast|installers|nodes|nodes-fast|nodesfast|venvs|venvs-fast|venvsfast|virtualenvs|virtualenvs-fast|virtualenvsfast|apps|apps-fast|appsfast|uninstallers|appreview|aitools|aitools-fast|aitoolsfast|ai-tools|ai|appdata|libraries|cloud|cloudfiles|cloudfiles-fast|cloudfilesfast|cloud-files|cloud-files-fast|cloud-filesfast|personal|communications|comms|browsers|leftovers|backups|backups-fast|backupsfast|xcode|xcode-fast|xcodefast|android|startup|startup-fast|startupfast|loginitems|loginitems-fast|loginitemsfast|trash|trash-fast|trashfast|caches|caches-instant|cachesinstant|caches-fast|cachesfast|diagnostics|packages|npm-cache|npmcache|yarn-cache|yarncache|pnpm-store|pnpmstore|cocoapods-cache|pod-cache|podcache|pip-cache|pipcache|receipts|homebrew|homebrew-cleanup|brewcleanup|toolchains|toolchains-fast|toolchainsfast|containers|containers-fast|containersfast|snapshots|report|report-fast|reportfast|clean|history|history-fast|historyfast|restore|interactive|doctor|doctor-fast|doctorfast|protect|protect-fast|protectfast|guard|rules|rules-fast|rulesfast|categories|init-config|help)
+  dashboard|overview|map|map-fast|mapfast|snapshot|snapshot-fast|snapshotfast|diff|state|state-fast|statefast|permissions|review|scan|system-data|system-data-fast|systemdata-fast|systemdatafast|plan|plan-fast|planfast|large|large-fast|largefast|brokenlinks|brokenlinks-fast|brokenlinksfast|broken-links-fast|broken-linksfast|quarantine|quarantine-fast|quarantinefast|metadata|metadata-fast|metadatafast|quicklook|quicklook-fast|quicklookfast|fontcaches|fontcaches-fast|fontcachesfast|font-caches|font-caches-fast|font-cachesfast|webcaches|webcaches-fast|webcachesfast|web-caches|web-caches-fast|web-cachesfast|savedstate|savedstate-fast|savedstatefast|saved-state|saved-state-fast|saved-statefast|projectcaches|project-caches|projectcaches-fast|projectcachesfast|project-caches-fast|project-cachesfast|developer-fast|developerfast|updaters|updaters-fast|updatersfast|updater-caches|updater-caches-fast|updater-cachesfast|browsercaches|browser-caches|browsercaches-fast|browsercachesfast|browser-caches-fast|browser-cachesfast|duplicates|duplicates-fast|duplicatesfast|documents|documents-fast|documentsfast|desktop|desktop-fast|desktopfast|screenshots|screenshots-fast|screenshotsfast|archives|archives-fast|archivesfast|downloads|downloads-fast|downloadsfast|installers|nodes|nodes-fast|nodesfast|venvs|venvs-fast|venvsfast|virtualenvs|virtualenvs-fast|virtualenvsfast|apps|apps-fast|appsfast|uninstallers|appreview|aitools|aitools-fast|aitoolsfast|ai-tools|ai|appdata|libraries|cloud|cloudfiles|cloudfiles-fast|cloudfilesfast|cloud-files|cloud-files-fast|cloud-filesfast|personal|communications|comms|browsers|leftovers|backups|backups-fast|backupsfast|xcode|xcode-fast|xcodefast|android|startup|startup-fast|startupfast|loginitems|loginitems-fast|loginitemsfast|trash|trash-fast|trashfast|caches|caches-instant|cachesinstant|caches-fast|cachesfast|diagnostics|packages|npm-cache|npmcache|yarn-cache|yarncache|pnpm-store|pnpmstore|cocoapods-cache|pod-cache|podcache|pip-cache|pipcache|receipts|homebrew|homebrew-cleanup|brewcleanup|toolchains|toolchains-fast|toolchainsfast|containers|containers-fast|containersfast|snapshots|report|report-fast|reportfast|clean|history|history-fast|historyfast|restore|interactive|doctor|doctor-fast|doctorfast|protect|protect-fast|protectfast|guard|rules|rules-fast|rulesfast|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -10069,7 +10087,7 @@ while [[ "$#" -gt 0 ]]; do
     -h|--help) usage; exit 0 ;;
     -v|--version) echo "$VERSION"; exit 0 ;;
     *)
-      if [[ "$ACTION" == "guard" || "$ACTION" == "diff" || "$ACTION" == "large" || "$ACTION" == "large-fast" || "$ACTION" == "largefast" || "$ACTION" == "brokenlinks" || "$ACTION" == "brokenlinks-fast" || "$ACTION" == "brokenlinksfast" || "$ACTION" == "broken-links-fast" || "$ACTION" == "broken-linksfast" || "$ACTION" == "quarantine" || "$ACTION" == "quarantine-fast" || "$ACTION" == "quarantinefast" || "$ACTION" == "metadata" || "$ACTION" == "metadata-fast" || "$ACTION" == "metadatafast" || "$ACTION" == "projectcaches" || "$ACTION" == "project-caches" || "$ACTION" == "projectcaches-fast" || "$ACTION" == "projectcachesfast" || "$ACTION" == "project-caches-fast" || "$ACTION" == "project-cachesfast" || "$ACTION" == "developer-fast" || "$ACTION" == "developerfast" || "$ACTION" == "duplicates" || "$ACTION" == "duplicates-fast" || "$ACTION" == "duplicatesfast" || "$ACTION" == "documents" || "$ACTION" == "documents-fast" || "$ACTION" == "documentsfast" || "$ACTION" == "screenshots" || "$ACTION" == "screenshots-fast" || "$ACTION" == "screenshotsfast" || "$ACTION" == "archives" || "$ACTION" == "archives-fast" || "$ACTION" == "archivesfast" || "$ACTION" == "nodes" || "$ACTION" == "nodes-fast" || "$ACTION" == "nodesfast" || "$ACTION" == "venvs" || "$ACTION" == "venvs-fast" || "$ACTION" == "venvsfast" || "$ACTION" == "virtualenvs" || "$ACTION" == "virtualenvs-fast" || "$ACTION" == "virtualenvsfast" || "$ACTION" == "apps" || "$ACTION" == "apps-fast" || "$ACTION" == "appsfast" || "$ACTION" == "uninstallers" || "$ACTION" == "appreview" || "$ACTION" == "cloudfiles" || "$ACTION" == "cloudfiles-fast" || "$ACTION" == "cloudfilesfast" || "$ACTION" == "cloud-files" || "$ACTION" == "cloud-files-fast" || "$ACTION" == "cloud-filesfast" || "$ACTION" == "leftovers" ]]; then
+      if [[ "$ACTION" == "guard" || "$ACTION" == "diff" || "$ACTION" == "large" || "$ACTION" == "large-fast" || "$ACTION" == "largefast" || "$ACTION" == "brokenlinks" || "$ACTION" == "brokenlinks-fast" || "$ACTION" == "brokenlinksfast" || "$ACTION" == "broken-links-fast" || "$ACTION" == "broken-linksfast" || "$ACTION" == "quarantine" || "$ACTION" == "quarantine-fast" || "$ACTION" == "quarantinefast" || "$ACTION" == "metadata" || "$ACTION" == "metadata-fast" || "$ACTION" == "metadatafast" || "$ACTION" == "projectcaches" || "$ACTION" == "project-caches" || "$ACTION" == "projectcaches-fast" || "$ACTION" == "projectcachesfast" || "$ACTION" == "project-caches-fast" || "$ACTION" == "project-cachesfast" || "$ACTION" == "developer-fast" || "$ACTION" == "developerfast" || "$ACTION" == "duplicates" || "$ACTION" == "duplicates-fast" || "$ACTION" == "duplicatesfast" || "$ACTION" == "documents" || "$ACTION" == "documents-fast" || "$ACTION" == "documentsfast" || "$ACTION" == "desktop-fast" || "$ACTION" == "desktopfast" || "$ACTION" == "screenshots" || "$ACTION" == "screenshots-fast" || "$ACTION" == "screenshotsfast" || "$ACTION" == "archives" || "$ACTION" == "archives-fast" || "$ACTION" == "archivesfast" || "$ACTION" == "nodes" || "$ACTION" == "nodes-fast" || "$ACTION" == "nodesfast" || "$ACTION" == "venvs" || "$ACTION" == "venvs-fast" || "$ACTION" == "venvsfast" || "$ACTION" == "virtualenvs" || "$ACTION" == "virtualenvs-fast" || "$ACTION" == "virtualenvsfast" || "$ACTION" == "apps" || "$ACTION" == "apps-fast" || "$ACTION" == "appsfast" || "$ACTION" == "uninstallers" || "$ACTION" == "appreview" || "$ACTION" == "cloudfiles" || "$ACTION" == "cloudfiles-fast" || "$ACTION" == "cloudfilesfast" || "$ACTION" == "cloud-files" || "$ACTION" == "cloud-files-fast" || "$ACTION" == "cloud-filesfast" || "$ACTION" == "leftovers" ]]; then
         PATH_ARGS+=("$1")
       else
         die "Unknown option: $1"
@@ -10124,6 +10142,7 @@ case "$ACTION" in
   documents) documents ;;
   documents-fast|documentsfast) documents_fast ;;
   desktop) desktop ;;
+  desktop-fast|desktopfast) desktop_fast ;;
   screenshots) screenshots ;;
   screenshots-fast|screenshotsfast) screenshots_fast ;;
   archives) archives ;;
