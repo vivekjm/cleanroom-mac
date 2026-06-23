@@ -155,7 +155,7 @@ final class AppState: ObservableObject {
 
     @Published var dest:             NavDest = .dashboard
     @Published var filter:           String  = "all"
-    @Published var reviewSummary:    String  = "Choose a review to see a report here.\n"
+    @Published var reviewSummary:    String  = "Choose a review to see details here.\n"
     @Published var running:          Bool    = false
     @Published var statsLoading:     Bool    = false
     @Published var status:           String  = "Ready"
@@ -164,7 +164,7 @@ final class AppState: ObservableObject {
     @Published var showLeftovers:    Bool    = false
     @Published var showApplyConfirm: Bool    = false
     @Published var cardOffset:       Int     = 0
-    @Published var reviewTitle:      String  = "Review Report"
+    @Published var reviewTitle:      String  = "Review Details"
     @Published var reviewItems:      [ReviewItem] = []
     @Published var cleanupPlanItems: [CleanupPlanItem] = []
     @Published var cleanupPlanNotes: [String] = []
@@ -576,23 +576,23 @@ final class AppState: ObservableObject {
     func copyDetails() {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(appFacingSummaryText(), forType: .string)
-        status = "Report copied"
-        activityMessage = "Review report copied."
+        status = "Details copied"
+        activityMessage = "Review details copied."
     }
 
     func clearSummary() {
-        reviewSummary = "Choose a review to see a report here.\n"
-        reviewTitle = "Review Report"
+        reviewSummary = "Choose a review to see details here.\n"
+        reviewTitle = "Review Details"
         reviewItems = []
         status = "Ready"
-        activityMessage = "Report cleared. Choose a review when you are ready."
+        activityMessage = "Details cleared. Choose a review when you are ready."
         summaryOpen = false
     }
 
     private func appFacingSummaryText() -> String {
         guard !reviewItems.isEmpty else {
             return [
-                reviewTitle == "Review Report" ? "Cleanroom" : reviewTitle,
+                reviewTitle == "Review Details" ? "Cleanroom" : reviewTitle,
                 activityMessage,
                 status
             ]
@@ -2223,16 +2223,16 @@ struct ReviewSummaryPanel: View {
                     IconBtn(icon: "doc.on.clipboard", dark: true) {
                         state.copyDetails()
                     }
-                    .help("Copy report")
+                    .help("Copy details")
                     IconBtn(icon: "xmark", dark: true) {
                         state.clearSummary()
                     }
-                    .help("Clear report")
+                    .help("Clear details")
                 }
                 IconBtn(icon: state.summaryOpen ? "chevron.down" : "chevron.up", dark: true) {
                     withAnimation(DS.Ani.std) { state.summaryOpen.toggle() }
                 }
-                .help(state.summaryOpen ? "Hide report" : "Show report")
+                .help(state.summaryOpen ? "Hide details" : "Show details")
             }
             .padding(.horizontal, DS.Sp.lg)
             .padding(.vertical, DS.Sp.sm)
@@ -2314,8 +2314,8 @@ struct EmptyReportPanel: View {
         if state.running { return "Review In Progress" }
         if state.statsLoading { return "Storage Analysis In Progress" }
         if state.status.localizedCaseInsensitiveContains("attention") { return "Needs Attention" }
-        if state.status.localizedCaseInsensitiveContains("copied") { return "Report Copied" }
-        if state.reviewTitle != "Review Report" { return state.reviewTitle }
+        if state.status.localizedCaseInsensitiveContains("copied") { return "Details Copied" }
+        if state.reviewTitle != "Review Details" { return state.reviewTitle }
         return "Ready When You Are"
     }
 
