@@ -127,7 +127,7 @@ final class AppState: ObservableObject {
 
     @Published var stats: [StorageStat] = [
         StorageStat(label: "Disk Used",   value: "—"),
-        StorageStat(label: "Reclaimable", value: "Checking"),
+        StorageStat(label: "Reclaimable", value: "Refresh"),
         StorageStat(label: "Protected",   value: "On"),
         StorageStat(label: "Last Scan",   value: "Not yet"),
     ]
@@ -171,6 +171,12 @@ final class AppState: ObservableObject {
             enginePath = c; return
         }
         enginePath = "cleanroom"
+    }
+
+    func prepareForUse() {
+        resolveEngine()
+        status = "Ready"
+        activityMessage = "Choose a review, or refresh the storage summary when you want updated numbers."
     }
 
     // Expensive storage measurement; run only when the user asks or after cleanup.
@@ -1101,9 +1107,7 @@ struct RootView: View {
             ApplyConfirmSheet(state: state)
         }
         .onAppear {
-            state.resolveEngine()
-            state.status = "Ready"
-            state.refreshStats(force: true)
+            state.prepareForUse()
         }
     }
 }
