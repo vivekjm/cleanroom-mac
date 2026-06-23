@@ -1095,7 +1095,7 @@ final class AppState: ObservableObject {
             let fallback = visibleText.isEmpty ? "" : visibleText + "\n"
             return CommandResult(output: fallback + "This review could not finish. Please try again or run Health Check.\n", status: p.terminationStatus)
         } catch {
-            return CommandResult(output: "Cleanroom could not start this review. \(error.localizedDescription)\n", status: -1)
+            return CommandResult(output: "This review could not start. Reopen the app and try again, or run Health Check.\n", status: -1)
         }
     }
 
