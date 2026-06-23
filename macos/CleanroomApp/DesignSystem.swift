@@ -65,8 +65,8 @@ enum DS {
         static let surfaceRaised = Color(hex: "#F0FAF0")
         /// Dark-forest ink — sidebar background (ref image 3 dark section)
         static let sidebarBg     = Color(hex: "#0F1A0F")
-        /// Even deeper forest — activity details panel background
-        static let terminalBg    = Color(hex: "#0B160B")
+        /// Even deeper forest — review summary panel background
+        static let summaryBg     = Color(hex: "#0B160B")
 
         // ── Brand ──────────────────────────────────────────────────────────
         /// Dominant brand purple (the vivid background colour in ref images 1 & 4)
@@ -138,7 +138,7 @@ enum DS {
         /// labels sitting above numbers in the reference cards
         static let tag   = Font.system(size: 10, weight: .semibold)
 
-        // Monospaced — activity details output
+        // Monospaced — compact path snippets when needed
         static let mono   = Font.system(size: 12, design: .monospaced)
         static let monoSm = Font.system(size: 11, design: .monospaced)
     }
@@ -192,6 +192,6 @@ enum DS {
         static let minWidth:  CGFloat = 1080
         static let minHeight: CGFloat = 700
         static let cardMinW:  CGFloat = 240
-        static let outputH:   CGFloat = 240
+        static let summaryH:  CGFloat = 240
     }
 }

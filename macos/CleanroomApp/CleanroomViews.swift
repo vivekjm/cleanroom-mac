@@ -137,11 +137,11 @@ final class AppState: ObservableObject {
 
     @Published var dest:             NavDest = .dashboard
     @Published var filter:           String  = "all"
-    @Published var output:           String  = "No activity yet.\n"
+    @Published var reviewSummary:    String  = "Choose a review to see a summary here.\n"
     @Published var running:          Bool    = false
     @Published var status:           String  = "Ready"
     @Published var activityMessage:  String  = "Choose a review or cleanup to begin."
-    @Published var outputOpen:       Bool    = false
+    @Published var summaryOpen:      Bool    = false
     @Published var showLeftovers:    Bool    = false
     @Published var showApplyConfirm: Bool    = false
     @Published var cardOffset:       Int     = 0
@@ -359,7 +359,7 @@ final class AppState: ObservableObject {
         running    = true
         status     = "\(action.title) in progress..."
         activityMessage = "\(action.title) is running. You can stop it anytime."
-        output    += "\nReviewing \(action.title)...\n"
+        reviewSummary = "\(action.title) is running.\n"
         reviewTitle = action.title
         reviewItems = []
         let commandArgs = appFacingArgs(action.args)
@@ -378,24 +378,24 @@ final class AppState: ObservableObject {
                 let displayOutput = self.presentableDetails(title: action.title, action: action, details: result.output)
                 self.reviewTitle = action.title
                 self.reviewItems = self.presentableReviewItems(title: action.title, action: action, details: result.output)
-                self.output += displayOutput
+                self.reviewSummary = displayOutput
                 if result.status == 15 {
                     self.status = "\(action.title) stopped"
                     self.activityMessage = "\(action.title) stopped. Open the summary to see where it paused."
-                    self.output += "Review stopped.\n"
-                    self.outputOpen = true
+                    self.reviewSummary += "Review stopped.\n"
+                    self.summaryOpen = true
                 } else if result.status == 124 {
                     self.status = "\(action.title) paused"
                     self.activityMessage = "\(action.title) took too long. Try a narrower review or run Health Check."
-                    self.outputOpen = true
+                    self.summaryOpen = true
                 } else if result.status == 0 {
                     self.status = "\(action.title) complete"
                     self.activityMessage = self.summarizeAction(action: action, details: displayOutput)
-                    self.outputOpen = false
+                    self.summaryOpen = false
                 } else {
                     self.status = "\(action.title) needs attention"
                     self.activityMessage = "\(action.title) needs attention. Open the summary for what happened."
-                    self.outputOpen = true
+                    self.summaryOpen = true
                 }
                 self.running = false
                 if action == .safeCleanup {
@@ -409,8 +409,8 @@ final class AppState: ObservableObject {
         guard let process = currentProcess, process.isRunning else { return }
         status = "Stopping..."
         activityMessage = "Stopping the current action..."
-        output += "Stopping current action...\n"
-        outputOpen = true
+        reviewSummary = "Stopping the current review...\n"
+        summaryOpen = true
         currentProcess = nil
         reviewItems = []
         process.terminate()
@@ -431,9 +431,18 @@ final class AppState: ObservableObject {
         activityMessage = "Review summary copied."
     }
 
+    func clearSummary() {
+        reviewSummary = "Choose a review to see a summary here.\n"
+        reviewTitle = "Review Summary"
+        reviewItems = []
+        status = "Ready"
+        activityMessage = "Summary cleared. Choose a review when you are ready."
+        summaryOpen = false
+    }
+
     private func appFacingSummaryText() -> String {
         guard !reviewItems.isEmpty else {
-            let clean = Self.sanitizeForApp(output)
+            let clean = Self.sanitizeForApp(reviewSummary)
             return clean.isEmpty ? "No review summary available yet.\n" : clean
         }
         var lines = ["\(reviewTitle) — \(reviewItems.count) \(reviewItems.count == 1 ? "item" : "items")"]
@@ -1552,7 +1561,7 @@ struct MainPanelView: View {
                     .padding(DS.Sp.xl)
                 }
             }
-            OutputPanel(state: state)
+            ReviewSummaryPanel(state: state)
         }
         .background(DS.C.canvas)
     }
@@ -1831,10 +1840,10 @@ struct EmptyFilterState: View {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// MARK: – Activity Summary Panel
+// MARK: – Review Summary Panel
 // ═══════════════════════════════════════════════════════════════
 
-struct OutputPanel: View {
+struct ReviewSummaryPanel: View {
     @ObservedObject var state: AppState
 
     var body: some View {
@@ -1859,29 +1868,32 @@ struct OutputPanel: View {
                     IconBtn(icon: "xmark.circle.fill", dark: true) {
                         state.cancelRun()
                     }
+                    .help("Stop current review")
                 } else {
                     IconBtn(icon: "doc.on.clipboard", dark: true) {
                         state.copyDetails()
                     }
-                    IconBtn(icon: "trash", dark: true) {
-                        state.output = "No activity yet.\n"
-                        state.reviewItems = []
+                    .help("Copy summary")
+                    IconBtn(icon: "xmark", dark: true) {
+                        state.clearSummary()
                     }
+                    .help("Clear summary")
                 }
-                IconBtn(icon: state.outputOpen ? "chevron.down" : "chevron.up", dark: true) {
-                    withAnimation(DS.Ani.std) { state.outputOpen.toggle() }
+                IconBtn(icon: state.summaryOpen ? "chevron.down" : "chevron.up", dark: true) {
+                    withAnimation(DS.Ani.std) { state.summaryOpen.toggle() }
                 }
+                .help(state.summaryOpen ? "Hide summary" : "Show summary")
             }
             .padding(.horizontal, DS.Sp.lg)
             .padding(.vertical, DS.Sp.sm)
             .background(DS.C.sidebarBg.opacity(0.96))
 
-            if state.outputOpen {
+            if state.summaryOpen {
                 ScrollViewReader { proxy in
                     ScrollView(showsIndicators: true) {
                         VStack(alignment: .leading, spacing: DS.Sp.md) {
                             if state.reviewItems.isEmpty {
-                                Text(state.output)
+                                Text(state.reviewSummary)
                                     .font(DS.T.bodySm)
                                     .lineSpacing(3)
                                     .foregroundColor(DS.C.textOnDark.opacity(0.88))
@@ -1905,9 +1917,9 @@ struct OutputPanel: View {
                         .padding(DS.Sp.lg)
                         .id("bottom")
                     }
-                    .frame(height: DS.Layout.outputH)
-                    .background(DS.C.sidebarBg.opacity(0.98))
-                    .onReceive(state.$output) { _ in
+                    .frame(height: DS.Layout.summaryH)
+                    .background(DS.C.summaryBg.opacity(0.98))
+                    .onReceive(state.$reviewSummary) { _ in
                         withAnimation(DS.Ani.snap) { proxy.scrollTo("bottom", anchor: .bottom) }
                     }
                 }
