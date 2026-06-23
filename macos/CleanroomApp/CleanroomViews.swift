@@ -157,7 +157,7 @@ final class AppState: ObservableObject {
 
     @Published var stats: [StorageStat] = [
         StorageStat(label: "Disk Used",   value: "—"),
-        StorageStat(label: "Reclaimable", value: "Refresh"),
+        StorageStat(label: "Reclaimable", value: "Analyze"),
         StorageStat(label: "Protected",   value: "On"),
         StorageStat(label: "Last Scan",   value: "Not yet"),
     ]
@@ -214,7 +214,7 @@ final class AppState: ObservableObject {
     func prepareForUse() {
         resolveEngine()
         status = "Ready"
-        activityMessage = "Choose a review, or refresh the storage summary when you want updated numbers."
+        activityMessage = "Choose an area to review, or analyze storage when you want updated numbers."
     }
 
     // Expensive storage measurement; run only when the user asks or after cleanup.
@@ -369,9 +369,9 @@ final class AppState: ObservableObject {
         currentRunID = runID
         currentProcess = nil
         running    = true
-        status     = "\(action.title) in progress..."
-        activityMessage = "\(action.title) is running. You can stop it anytime."
-        reviewSummary = "\(action.title) is running.\n"
+        status     = "Reviewing \(action.title)..."
+        activityMessage = "Reviewing \(action.title). You can stop it anytime."
+        reviewSummary = "Reviewing \(action.title).\n"
         reviewTitle = action.title
         reviewItems = []
         let commandArgs = appFacingArgs(action.args)
@@ -1446,7 +1446,7 @@ struct SidebarView: View {
                             NavRow("square.grid.2x2.fill",    "Dashboard",   .dashboard, state)
                             NavRow("heart.text.square.fill",  "App Checkup", .run(.healthCheck), state)
                             NavRow("chart.bar.fill",          "Storage Overview", .run(.storageOverview), state)
-                            NavRow("magnifyingglass",         "Refresh Summary", .dashboard, state, onTap: { state.refreshStats(force: true) })
+                            NavRow("magnifyingglass",         "Analyze Storage", .dashboard, state, onTap: { state.refreshStats(force: true) })
                             NavRow("text.badge.checkmark",    "Review",      .dashboard, state, onTap: { state.filter = "all"; state.refreshStats(force: true) })
                             NavRow("list.clipboard.fill",     "Clean Safely", .dashboard, state, onTap: { state.showApplyConfirm = true })
                         }
@@ -1665,8 +1665,7 @@ struct HeaderStats: View {
 
             // Action strip below stats
             HStack(spacing: DS.Sp.sm) {
-                PillBtn("Refresh", style: .ghost) { state.refreshStats(force: true) }
-                PillBtn("Update Summary", style: .ghost) { state.refreshStats(force: true) }
+                PillBtn("Analyze Storage", style: .ghost) { state.refreshStats(force: true) }
                 Spacer()
                 PillBtn("Clean Safely", style: .primary) {
                     state.showApplyConfirm = true
@@ -1767,7 +1766,7 @@ struct FilterBar: View {
             Spacer()
             Button { state.refreshStats(force: true) } label: {
                 HStack(spacing: 4) {
-                    Text("Refresh Summary").font(DS.T.body)
+                    Text("Analyze Storage").font(DS.T.body)
                     Image(systemName: "arrow.right").font(.system(size: 10, weight: .semibold))
                 }
                 .foregroundColor(DS.C.textSecondary)
