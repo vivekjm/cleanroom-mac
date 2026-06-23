@@ -1754,11 +1754,16 @@ struct FilterBar: View {
 
     var body: some View {
         HStack(spacing: DS.Sp.xs) {
-            ForEach(state.filters, id: \.id) { f in
-                FilterChip(label: f.label, active: state.filter == f.id) {
-                    withAnimation(DS.Ani.snap) { state.filter = f.id }
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: DS.Sp.xs) {
+                    ForEach(state.filters, id: \.id) { f in
+                        FilterChip(label: f.label, active: state.filter == f.id) {
+                            withAnimation(DS.Ani.snap) { state.filter = f.id }
+                        }
+                    }
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             Spacer()
             Button { state.refreshStats(force: true) } label: {
                 HStack(spacing: 4) {
@@ -1814,6 +1819,8 @@ struct CategoryCardView: View {
                 Text(category.title.uppercased())
                     .font(DS.T.tag).kerning(0.8)
                     .foregroundColor(.white.opacity(0.65))
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.82)
             }
             .padding(.horizontal, DS.Sp.lg)
             .padding(.top, DS.Sp.lg)
