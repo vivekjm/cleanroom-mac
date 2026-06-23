@@ -1,4 +1,4 @@
-.TH CLEANROOM 1 "June 2026" "cleanroom 1.49.0" "User Commands"
+.TH CLEANROOM 1 "June 2026" "cleanroom 1.50.0" "User Commands"
 .SH NAME
 cleanroom \- safe-by-default macOS storage cleaner
 .SH SYNOPSIS
@@ -226,6 +226,9 @@ cleanroom \- safe-by-default macOS storage cleaner
 .br
 .B cleanroom
 .RI "trash [--json]"
+.br
+.B cleanroom
+.RI "trash-fast [--json]"
 .br
 .B cleanroom
 .RI "caches [--json]"
@@ -567,6 +570,9 @@ removing anything.
 .B trash
 Inventory current user Trash contents without emptying Trash.
 .TP
+.B trash-fast
+Quickly review Trash without deep-sizing deleted folders.
+.TP
 .B caches
 Inventory safe and opt-in cache buckets with preview/apply commands.
 .TP
@@ -841,6 +847,7 @@ cleanroom startup --json
 cleanroom startup-fast --json
 cleanroom loginitems --json
 cleanroom trash --json
+cleanroom trash-fast --json
 cleanroom caches --json
 cleanroom diagnostics --json
 cleanroom packages --json

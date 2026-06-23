@@ -1266,6 +1266,14 @@ trash_json="$(mktemp)"
 python3 -m json.tool "$trash_json" >/dev/null
 grep 'old-trash.txt' "$trash_json" >/dev/null
 rm -f "$trash_json"
+"$BIN" trash-fast | grep 'quick Trash review' >/dev/null
+trash_fast_json="$(mktemp)"
+"$BIN" trash-fast --json > "$trash_fast_json"
+python3 -m json.tool "$trash_fast_json" >/dev/null
+grep '"id":"user-trash"' "$trash_fast_json" >/dev/null
+grep '"mode":"fast"' "$trash_fast_json" >/dev/null
+grep '"safety":"Irreversible"' "$trash_fast_json" >/dev/null
+rm -f "$trash_fast_json"
 "$BIN" packages | grep 'pnpm-store' >/dev/null
 packages_json="$(mktemp)"
 "$BIN" packages --json > "$packages_json"

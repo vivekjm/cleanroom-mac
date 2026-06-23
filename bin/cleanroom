@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.49.0"
+VERSION="1.50.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -136,6 +136,7 @@ Usage:
   cleanroom startup-fast [--json]
   cleanroom loginitems [--json]
   cleanroom trash [--json]
+  cleanroom trash-fast [--json]
   cleanroom caches [--json]
   cleanroom caches-instant [--json]
   cleanroom caches-fast [--json]
@@ -241,6 +242,7 @@ Actions:
   startup-fast         Quickly summarize startup item locations for desktop review.
   loginitems           List user Login Items for review.
   trash                Inventory current user Trash contents.
+  trash-fast           Quickly review Trash without deep sizing deleted folders.
   caches               Inventory safe and opt-in cache buckets.
   caches-instant       Show an instant desktop-app cache overview.
   caches-fast          Show a quick desktop-app cache summary.
@@ -7021,6 +7023,12 @@ trash_total_kb() {
   size_kb "~/.Trash"
 }
 
+trash_fast_count() {
+  local dir="$HOME/.Trash"
+  [[ -d "$dir" ]] || { printf '0\n'; return 0; }
+  (find "$dir" -mindepth 1 -maxdepth 1 2>/dev/null || true) | awk 'END {print NR + 0}'
+}
+
 count_files_under() {
   local path="$1"
   [[ -d "$path" ]] || { printf '0\n'; return; }
@@ -7190,6 +7198,36 @@ trash() {
   done <<<"$rows"
   printf '\nPreview emptying Trash with: cleanroom clean --include-user-trash\n'
   printf 'Empty Trash with: cleanroom clean --include-user-trash --apply\n'
+}
+
+trash_fast() {
+  local dir="$HOME/.Trash" count present status size
+  count="$(trash_fast_count)"
+  if [[ "$count" -gt 0 ]]; then
+    present=true
+    status="Review"
+    size="${count} item"
+    [[ "$count" -eq 1 ]] || size="${count} items"
+  else
+    present=false
+    status="Clear"
+    size="Empty"
+  fi
+
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '[{"id":"user-trash","title":"Current Trash","path":"%s","present":%s,"count":%s,"size":"%s","status":"%s","safety":"Irreversible","summary":"Already-deleted items. Emptying Trash is explicit and cannot be restored by Cleanroom.","mode":"fast"}]\n' \
+      "$(printf '%s' "$dir" | json_escape)" \
+      "$present" \
+      "$count" \
+      "$(printf '%s' "$size" | json_escape)" \
+      "$(printf '%s' "$status" | json_escape)"
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}quick Trash review${RESET}"
+  printf 'Fast review. Deleted folders are not deep-sized.\n\n'
+  printf '%-10s %s\n' "$size" "$dir"
+  printf 'Emptying Trash is explicit and irreversible.\n'
 }
 
 package_rows() {
@@ -9695,7 +9733,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  dashboard|overview|map|map-fast|mapfast|snapshot|snapshot-fast|snapshotfast|diff|state|permissions|review|scan|system-data|system-data-fast|systemdata-fast|systemdatafast|plan|plan-fast|planfast|large|large-fast|largefast|brokenlinks|brokenlinks-fast|brokenlinksfast|broken-links-fast|broken-linksfast|quarantine|quarantine-fast|quarantinefast|metadata|metadata-fast|metadatafast|quicklook|quicklook-fast|quicklookfast|fontcaches|fontcaches-fast|fontcachesfast|font-caches|font-caches-fast|font-cachesfast|webcaches|webcaches-fast|webcachesfast|web-caches|web-caches-fast|web-cachesfast|savedstate|savedstate-fast|savedstatefast|saved-state|saved-state-fast|saved-statefast|projectcaches|project-caches|projectcaches-fast|projectcachesfast|project-caches-fast|project-cachesfast|developer-fast|developerfast|updaters|updaters-fast|updatersfast|updater-caches|updater-caches-fast|updater-cachesfast|browsercaches|browser-caches|browsercaches-fast|browsercachesfast|browser-caches-fast|browser-cachesfast|duplicates|duplicates-fast|duplicatesfast|documents|desktop|screenshots|screenshots-fast|screenshotsfast|archives|archives-fast|archivesfast|downloads|downloads-fast|downloadsfast|installers|nodes|nodes-fast|nodesfast|venvs|venvs-fast|venvsfast|virtualenvs|virtualenvs-fast|virtualenvsfast|apps|apps-fast|appsfast|uninstallers|appreview|aitools|aitools-fast|aitoolsfast|ai-tools|ai|appdata|libraries|cloud|cloudfiles|cloudfiles-fast|cloudfilesfast|cloud-files|cloud-files-fast|cloud-filesfast|personal|communications|comms|browsers|leftovers|backups|backups-fast|backupsfast|xcode|xcode-fast|xcodefast|android|startup|startup-fast|startupfast|loginitems|trash|caches|caches-instant|cachesinstant|caches-fast|cachesfast|diagnostics|packages|npm-cache|npmcache|yarn-cache|yarncache|pnpm-store|pnpmstore|cocoapods-cache|pod-cache|podcache|pip-cache|pipcache|receipts|homebrew|homebrew-cleanup|brewcleanup|toolchains|toolchains-fast|toolchainsfast|containers|containers-fast|containersfast|snapshots|report|report-fast|reportfast|clean|history|restore|interactive|doctor|protect|protect-fast|protectfast|guard|rules|rules-fast|rulesfast|categories|init-config|help)
+  dashboard|overview|map|map-fast|mapfast|snapshot|snapshot-fast|snapshotfast|diff|state|permissions|review|scan|system-data|system-data-fast|systemdata-fast|systemdatafast|plan|plan-fast|planfast|large|large-fast|largefast|brokenlinks|brokenlinks-fast|brokenlinksfast|broken-links-fast|broken-linksfast|quarantine|quarantine-fast|quarantinefast|metadata|metadata-fast|metadatafast|quicklook|quicklook-fast|quicklookfast|fontcaches|fontcaches-fast|fontcachesfast|font-caches|font-caches-fast|font-cachesfast|webcaches|webcaches-fast|webcachesfast|web-caches|web-caches-fast|web-cachesfast|savedstate|savedstate-fast|savedstatefast|saved-state|saved-state-fast|saved-statefast|projectcaches|project-caches|projectcaches-fast|projectcachesfast|project-caches-fast|project-cachesfast|developer-fast|developerfast|updaters|updaters-fast|updatersfast|updater-caches|updater-caches-fast|updater-cachesfast|browsercaches|browser-caches|browsercaches-fast|browsercachesfast|browser-caches-fast|browser-cachesfast|duplicates|duplicates-fast|duplicatesfast|documents|desktop|screenshots|screenshots-fast|screenshotsfast|archives|archives-fast|archivesfast|downloads|downloads-fast|downloadsfast|installers|nodes|nodes-fast|nodesfast|venvs|venvs-fast|venvsfast|virtualenvs|virtualenvs-fast|virtualenvsfast|apps|apps-fast|appsfast|uninstallers|appreview|aitools|aitools-fast|aitoolsfast|ai-tools|ai|appdata|libraries|cloud|cloudfiles|cloudfiles-fast|cloudfilesfast|cloud-files|cloud-files-fast|cloud-filesfast|personal|communications|comms|browsers|leftovers|backups|backups-fast|backupsfast|xcode|xcode-fast|xcodefast|android|startup|startup-fast|startupfast|loginitems|trash|trash-fast|trashfast|caches|caches-instant|cachesinstant|caches-fast|cachesfast|diagnostics|packages|npm-cache|npmcache|yarn-cache|yarncache|pnpm-store|pnpmstore|cocoapods-cache|pod-cache|podcache|pip-cache|pipcache|receipts|homebrew|homebrew-cleanup|brewcleanup|toolchains|toolchains-fast|toolchainsfast|containers|containers-fast|containersfast|snapshots|report|report-fast|reportfast|clean|history|restore|interactive|doctor|protect|protect-fast|protectfast|guard|rules|rules-fast|rulesfast|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -9881,6 +9919,7 @@ case "$ACTION" in
   startup-fast|startupfast) startup_fast ;;
   loginitems) loginitems ;;
   trash) trash ;;
+  trash-fast|trashfast) trash_fast ;;
   caches) caches ;;
   caches-instant|cachesinstant) caches_instant ;;
   caches-fast|cachesfast) caches_fast ;;
