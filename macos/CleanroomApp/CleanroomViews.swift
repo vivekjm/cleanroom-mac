@@ -72,6 +72,13 @@ struct CleanupPlanItem: Identifiable {
     var recovery: String
 }
 
+private struct CachedReview {
+    var title: String
+    var summary: String
+    var items: [ReviewItem]
+    var createdAt: Date
+}
+
 struct AppAction: Hashable {
     let title: String
     let args: [String]
@@ -194,6 +201,8 @@ final class AppState: ObservableObject {
     private var lastStatsRefresh: Date? = nil
     private var currentProcess: Process? = nil
     private var currentRunID = UUID()
+    private var reviewCache: [String: CachedReview] = [:]
+    private let reviewCacheTTL: TimeInterval = 120
 
     func resolveEngine() {
         if let r = Bundle.main.resourceURL {
@@ -365,6 +374,16 @@ final class AppState: ObservableObject {
 
     func run(_ action: AppAction) {
         guard !running else { return }
+        if let cached = cachedReview(for: action) {
+            dest = .run(action)
+            reviewTitle = cached.title
+            reviewSummary = cached.summary
+            reviewItems = cached.items
+            status = "\(action.title) ready"
+            activityMessage = "Showing a recent \(action.title) review. Analyze again later for fresh numbers."
+            summaryOpen = false
+            return
+        }
         let runID = UUID()
         currentRunID = runID
         currentProcess = nil
@@ -404,6 +423,7 @@ final class AppState: ObservableObject {
                     self.status = "\(action.title) complete"
                     self.activityMessage = self.summarizeAction(action: action, details: displayOutput)
                     self.summaryOpen = false
+                    self.storeCachedReview(title: action.title, summary: displayOutput, items: self.reviewItems, for: action)
                 } else {
                     self.status = "\(action.title) needs attention"
                     self.activityMessage = "\(action.title) needs attention. Open the summary for what happened."
@@ -449,6 +469,31 @@ final class AppState: ObservableObject {
             first == "report-fast" ||
             first == "doctor-fast" ||
             (first == "clean" && action.args.contains("--preflight"))
+    }
+
+    private func cacheKey(for action: AppAction) -> String {
+        ([action.title] + action.args).joined(separator: "\u{1F}")
+    }
+
+    private func cachedReview(for action: AppAction) -> CachedReview? {
+        guard isQuickAction(action), action != .safeCleanup else { return nil }
+        let key = cacheKey(for: action)
+        guard let cached = reviewCache[key],
+              Date().timeIntervalSince(cached.createdAt) < reviewCacheTTL else {
+            reviewCache.removeValue(forKey: key)
+            return nil
+        }
+        return cached
+    }
+
+    private func storeCachedReview(title: String, summary: String, items: [ReviewItem], for action: AppAction) {
+        guard isQuickAction(action), action != .safeCleanup else { return }
+        reviewCache[cacheKey(for: action)] = CachedReview(
+            title: title,
+            summary: summary,
+            items: items,
+            createdAt: Date()
+        )
     }
 
     func runLeftovers(_ query: String) {
