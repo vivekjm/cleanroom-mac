@@ -164,11 +164,17 @@ final class AppState: ObservableObject {
 
     @Published var categories: [CleanCategory] = [
         CleanCategory(title: "Caches",       tagline: "App & system caches accumulating silently",      icon: "xmark.bin.fill",        color: DS.C.cardForest,   action: .caches),
+        CleanCategory(title: "Documents",    tagline: "Large documents and folders to review first",    icon: "folder.fill",           color: DS.C.cardSlate,    action: .documents),
+        CleanCategory(title: "App Data",     tagline: "Large app support folders and local state",      icon: "internaldrive.fill",    color: DS.C.cardTeal,     action: .appData),
+        CleanCategory(title: "Media Libraries", tagline: "Photos, music, and creative libraries stay protected", icon: "photo.fill", color: DS.C.cardRose, action: .mediaLibraries),
         CleanCategory(title: "Project Dependencies", tagline: "Old project packages and rebuildable caches", icon: "shippingbox.fill",      color: DS.C.cardViolet,   action: .javascriptPackages),
         CleanCategory(title: "Downloads",    tagline: "Old downloads, DMGs, and forgotten installers",  icon: "arrow.down.to.line",    color: DS.C.cardAmber,    action: .downloads),
         CleanCategory(title: "Large Files",  tagline: "Files over 500 MB that may no longer be needed", icon: "doc.fill",              color: DS.C.cardSlate,    action: .largeFiles),
+        CleanCategory(title: "Cloud Files",  tagline: "Large local files inside synced cloud folders",  icon: "icloud.fill",           color: DS.C.cardForest,   action: .cloudFiles),
         CleanCategory(title: "Archives",     tagline: "Old zip archives, tar files, and disk images",   icon: "archivebox.fill",       color: DS.C.cardRose,     action: .archives),
+        CleanCategory(title: "Apps",         tagline: "Installed apps to review before removal",        icon: "apps.iphone",           color: DS.C.cardCharcoal, action: .apps),
         CleanCategory(title: "Developer Files", tagline: "Build artifacts and SDK caches", icon: "hammer.fill",           color: DS.C.cardTeal,     action: .developerFiles),
+        CleanCategory(title: "System Data",  tagline: "System storage buckets explained safely",        icon: "externaldrive.fill",    color: DS.C.cardBark,     action: .systemData),
         CleanCategory(title: "Screenshots",  tagline: "Old screenshots accumulating on Desktop",        icon: "camera.viewfinder",     color: DS.C.cardBark,     action: .screenshots),
         CleanCategory(title: "Trash",        tagline: "Files waiting in macOS Trash",                   icon: "trash.fill",            color: DS.C.cardCharcoal, action: .trash),
     ]
@@ -179,6 +185,8 @@ final class AppState: ObservableObject {
         ("dev",       "DEVELOPER"),
         ("downloads", "DOWNLOADS"),
         ("files",     "LARGE FILES"),
+        ("apps",      "APPS"),
+        ("system",    "SYSTEM"),
         ("archives",  "ARCHIVES"),
     ]
 
@@ -1049,6 +1057,8 @@ final class AppState: ObservableObject {
         case "dev":       return categories.filter { ["Project Dependencies", "Developer Files"].contains($0.title) }
         case "downloads": return categories.filter { ["Downloads", "Archives"].contains($0.title) }
         case "files":     return categories.filter { $0.title == "Large Files" }
+        case "apps":      return categories.filter { ["Apps", "App Data"].contains($0.title) }
+        case "system":    return categories.filter { ["System Data", "Media Libraries", "Cloud Files"].contains($0.title) }
         case "archives":  return categories.filter { $0.title == "Archives" }
         default:          return categories
         }
