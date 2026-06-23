@@ -83,6 +83,7 @@ private struct CachedCleanupPlan {
     var items: [CleanupPlanItem]
     var notes: [String]
     var createdAt: Date
+    var ttl: TimeInterval
 }
 
 struct AppAction: Hashable {
@@ -214,6 +215,7 @@ final class AppState: ObservableObject {
     private var cleanupPlanCache: CachedCleanupPlan? = nil
     private var cleanupPlanGeneration = UUID()
     private let reviewCacheTTL: TimeInterval = 120
+    private let fallbackCacheTTL: TimeInterval = 30
 
     func resolveEngine() {
         if let r = Bundle.main.resourceURL {
@@ -283,7 +285,7 @@ final class AppState: ObservableObject {
     func refreshCleanupPlan() {
         guard !cleanupPlanLoading else { return }
         if let cached = cleanupPlanCache,
-           Date().timeIntervalSince(cached.createdAt) < reviewCacheTTL {
+           Date().timeIntervalSince(cached.createdAt) < cached.ttl {
             cleanupPlanItems = cached.items
             cleanupPlanNotes = cached.notes
             return
@@ -301,11 +303,12 @@ final class AppState: ObservableObject {
                 guard self.cleanupPlanGeneration == generation else { return }
                 self.cleanupPlanItems = parsed.items
                 self.cleanupPlanNotes = parsed.notes
-                if result.status == 0 {
+                if result.status == 0 || !parsed.items.isEmpty || !parsed.notes.isEmpty {
                     self.cleanupPlanCache = CachedCleanupPlan(
                         items: parsed.items,
                         notes: parsed.notes,
-                        createdAt: Date()
+                        createdAt: Date(),
+                        ttl: result.status == 0 ? self.reviewCacheTTL : self.fallbackCacheTTL
                     )
                 }
                 self.cleanupPlanLoading = false
