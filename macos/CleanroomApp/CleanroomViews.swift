@@ -206,6 +206,7 @@ final class AppState: ObservableObject {
 
     var enginePath = ""
     private var lastStatsRefresh: Date? = nil
+    private var statsGeneration = UUID()
     private var currentProcess: Process? = nil
     private var currentRunID = UUID()
     private var reviewCache: [String: CachedReview] = [:]
@@ -257,10 +258,12 @@ final class AppState: ObservableObject {
         activityMessage = "Checking disk usage without starting a cleanup."
         statsLoading = true
         lastStatsRefresh = Date()
+        let generation = statsGeneration
         let command = resolvedCommand(["dashboard", "--json"])
         Task.detached(priority: .background) {
             let result = await Self.exec(command.executable, command.arguments, timeoutSeconds: AppRunLimit.quickSummary)
             await MainActor.run {
+                guard self.statsGeneration == generation else { return }
                 if result.status == 0 {
                     self.parseStats(result.output)
                     self.status = "Storage report updated"
@@ -551,6 +554,8 @@ final class AppState: ObservableObject {
 
     private func clearRecentResults() {
         clearReviewCache()
+        statsGeneration = UUID()
+        statsLoading = false
         cleanupPlanCache = nil
         cleanupPlanGeneration = UUID()
         cleanupPlanLoading = false
