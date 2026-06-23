@@ -706,6 +706,9 @@ final class AppState: ObservableObject {
     private func appFacingItems(_ items: [[String: Any]]) -> [[String: Any]] {
         items.map { item in
             var cleaned = item
+            if let location = friendlyLocationHint(from: cleaned) {
+                cleaned["location"] = location
+            }
             for key in cleaned.keys where shouldHideAppField(key) {
                 cleaned.removeValue(forKey: key)
             }
@@ -723,7 +726,18 @@ final class AppState: ObservableObject {
 
     private func shouldHideAppField(_ key: String) -> Bool {
         let lower = key.lowercased()
+        let pathFields: Set<String> = [
+            "path",
+            "paths",
+            "record_path",
+            "log_path",
+            "plist",
+            "target",
+            "source",
+            "file"
+        ]
         return lower.contains("command") ||
+            pathFields.contains(lower) ||
             lower == "mode" ||
             lower == "raw" ||
             lower == "hash" ||
@@ -757,7 +771,8 @@ final class AppState: ObservableObject {
             lower.contains(" --trash") ||
             lower.contains(" --json") ||
             lower.contains(" --include") ||
-            lower.contains(" --preflight")
+            lower.contains(" --preflight") ||
+            isSensitivePathText(text)
     }
 
     private func normalizeAppText(_ text: String) -> String {
@@ -861,7 +876,8 @@ final class AppState: ObservableObject {
             lower.contains(" --") ||
             lower.hasPrefix("--") ||
             lower.contains("preview command") ||
-            lower.contains("apply command") {
+            lower.contains("apply command") ||
+            isSensitivePathText(text) {
             return nil
         }
         return friendlyLabelIfBackendToken(text)
@@ -940,6 +956,7 @@ final class AppState: ObservableObject {
     }
 
     private func friendlyLocationHint(from item: [String: Any]) -> String? {
+        if let location = stringValue(item["location"]) { return location }
         guard let path = displayPath(from: item) else { return nil }
         return friendlyLocation(shortPath(path))
     }
@@ -967,6 +984,25 @@ final class AppState: ObservableObject {
             return "~" + path.dropFirst(home.count)
         }
         return path
+    }
+
+    private func isSensitivePathText(_ text: String) -> Bool {
+        Self.isSensitivePathText(text)
+    }
+
+    private static func isSensitivePathText(_ text: String) -> Bool {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let lower = trimmed.lowercased()
+        return lower.hasPrefix("/users/") ||
+            lower.hasPrefix("~/") ||
+            lower.hasPrefix("/private/") ||
+            lower.hasPrefix("/var/") ||
+            lower.hasPrefix("/tmp/") ||
+            lower.contains("/library/application support/") ||
+            lower.contains("/library/containers/") ||
+            lower.contains("/library/group containers/") ||
+            lower.contains("/library/caches/") ||
+            lower.contains("/node_modules/")
     }
 
     private func stringValue(_ value: Any?) -> String? {
@@ -1305,7 +1341,8 @@ final class AppState: ObservableObject {
                 if hiddenFragments.contains(where: { line.localizedCaseInsensitiveContains($0) }) {
                     return nil
                 }
-                if lowerTrimmed.contains(" --apply") ||
+                if Self.isSensitivePathText(trimmed) ||
+                    lowerTrimmed.contains(" --apply") ||
                     lowerTrimmed.contains(" --json") ||
                     lowerTrimmed.contains(" --trash") ||
                     lowerTrimmed.contains(" --preflight") ||
