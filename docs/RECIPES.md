@@ -225,7 +225,7 @@ cleanroom permissions --json
 
 `appreview --json QUERY...` emits matching app bundles, vendor uninstallers, package receipts, and leftover candidates in one read-only object. Use it before removing apps so official uninstallers and package records are visible before leftover cleanup.
 
-`appdata --json` emits large top-level app support/container folders with size and guard status. It is intentionally review-only and does not remove app state.
+`appdata --json` emits large top-level app support/container folders with size and guard status. It is intentionally review-only and does not remove app state. Use `appdata-fast --json` for a responsive desktop view that skips deep folder sizing.
 
 `libraries --json` emits protected Photos, Music, TV, iMovie, GarageBand, Logic, and related creative library sizes. It is intentionally review-only and does not delete personal media or projects.
 

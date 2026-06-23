@@ -394,6 +394,7 @@ Review large app data folders:
 cleanroom appdata
 cleanroom appdata --limit 30
 cleanroom appdata --json
+cleanroom appdata-fast --json
 ```
 
 Review protected media and creative libraries:
@@ -957,7 +958,7 @@ Config files use simple `key=value` lines and are never executed as shell.
 
 `aitools` inventories known AI-agent generated state and local AI model stores. `aitools-fast` skips deep model sizing for responsive desktop reviews. Cleanup remains split into explicit opt-in flags: `--include-ai-workspaces` for generated workspace state and `--include-ai-models` for downloaded model stores/backends.
 
-`appdata` ranks top-level Application Support, Containers, Group Containers, HTTPStorages, WebKit, and saved-state folders. It is review-only and includes the central guard status so protected profiles and personal data stand out before you investigate with `leftovers APPNAME`.
+`appdata` ranks top-level Application Support, Containers, Group Containers, HTTPStorages, WebKit, and saved-state folders. It is review-only and includes the central guard status so protected profiles and personal data stand out before you investigate with `leftovers APPNAME`. `appdata-fast` gives the desktop app the same folder list without deep sizing.
 
 `android` helps diagnose large developer storage created by Android Studio, Expo, React Native, Flutter, and native Android work. It inventories the SDK and emulator footprint before suggesting the explicit `clean --include-dev-heavy` path for redownloadable NDK/system-image/temp-download data.
 

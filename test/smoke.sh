@@ -1134,6 +1134,14 @@ grep 'CleanroomTestAdobe' "$appdata_json" >/dev/null
 grep '"status":"allowed"' "$appdata_json" >/dev/null
 grep '"status":"refused-protected"' "$appdata_json" >/dev/null
 rm -f "$appdata_json"
+"$BIN" appdata-fast --limit 20 | grep 'quick app data review' >/dev/null
+appdata_fast_json="$(mktemp)"
+"$BIN" appdata-fast --json --limit 20 > "$appdata_fast_json"
+python3 -m json.tool "$appdata_fast_json" >/dev/null
+grep '"mode":"fast"' "$appdata_fast_json" >/dev/null
+grep '"name":"CleanroomTestAdobe"' "$appdata_fast_json" >/dev/null
+grep '"size":"Open folder"' "$appdata_fast_json" >/dev/null
+rm -f "$appdata_fast_json"
 "$BIN" libraries | grep 'Photos Library' >/dev/null
 libraries_json="$(mktemp)"
 "$BIN" libraries --json > "$libraries_json"

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.58.0"
+VERSION="1.59.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -122,6 +122,7 @@ Usage:
   cleanroom aitools [--json]
   cleanroom aitools-fast [--json]
   cleanroom appdata [--limit N] [--json]
+  cleanroom appdata-fast [--limit N] [--json]
   cleanroom libraries [--json]
   cleanroom cloud [--json]
   cleanroom cloudfiles [PATH] [--min-mb N] [--limit N] [--json]
@@ -5743,6 +5744,60 @@ appdata_rows() {
   true
 }
 
+appdata_fast_rows() {
+  local category root_template root path
+  while IFS=$'\t' read -r category root_template; do
+    root="$(expand_path "$root_template")"
+    [[ -d "$root" ]] || continue
+    while IFS= read -r -d '' path; do
+      printf '%s\t%s\n' "$category" "$path"
+    done < <(find "$root" -mindepth 1 -maxdepth 1 -type d ! -name '.*' -print0 2>/dev/null)
+  done < <(appdata_roots) | sort -f | head -n "$LIMIT"
+  true
+}
+
+appdata_fast() {
+  local rows
+  rows="$(appdata_fast_rows)"
+
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '['
+    local first=1 category path status reason line
+    while IFS=$'\t' read -r category path; do
+      [[ -z "${path:-}" ]] && continue
+      line="$(guard_status "$path")"
+      status="${line%%$'\t'*}"
+      reason="${line#*$'\t'}"
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '{"path":"%s","name":"%s","category":"%s","size":"%s","status":"%s","reason":"%s","summary":"%s","mode":"fast","review_command":"%s"}' \
+        "$(printf '%s' "$path" | json_escape)" \
+        "$(basename "$path" | json_escape)" \
+        "$(printf '%s' "$category" | json_escape)" \
+        "$(printf '%s' "Open folder" | json_escape)" \
+        "$(printf '%s' "$status" | json_escape)" \
+        "$(printf '%s' "$reason" | json_escape)" \
+        "$(printf '%s' "App data is review-only. Open a folder review before removing anything." | json_escape)" \
+        "$(printf 'cleanroom appdata --limit %s' "$LIMIT" | json_escape)"
+    done <<<"$rows"
+    printf ']\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}quick app data review${RESET}"
+  printf 'Fast read-only view. Folder sizes are skipped until you open a deeper review.\n\n'
+  if [[ -z "$rows" ]]; then
+    printf 'No app data folders found.\n'
+    return 0
+  fi
+  printf '%-12s %-18s %s\n' "size" "category" "name"
+  local category path
+  while IFS=$'\t' read -r category path; do
+    [[ -z "${path:-}" ]] && continue
+    printf '%-12s %-18s %s\n' "Open folder" "$category" "$(basename "$path")"
+  done <<<"$rows"
+}
+
 appdata() {
   local rows
   rows="$(appdata_rows)"
@@ -9989,7 +10044,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  dashboard|overview|map|map-fast|mapfast|snapshot|snapshot-fast|snapshotfast|diff|state|state-fast|statefast|permissions|review|scan|system-data|system-data-fast|systemdata-fast|systemdatafast|plan|plan-fast|planfast|large|large-fast|largefast|brokenlinks|brokenlinks-fast|brokenlinksfast|broken-links-fast|broken-linksfast|quarantine|quarantine-fast|quarantinefast|metadata|metadata-fast|metadatafast|quicklook|quicklook-fast|quicklookfast|fontcaches|fontcaches-fast|fontcachesfast|font-caches|font-caches-fast|font-cachesfast|webcaches|webcaches-fast|webcachesfast|web-caches|web-caches-fast|web-cachesfast|savedstate|savedstate-fast|savedstatefast|saved-state|saved-state-fast|saved-statefast|projectcaches|project-caches|projectcaches-fast|projectcachesfast|project-caches-fast|project-cachesfast|developer-fast|developerfast|updaters|updaters-fast|updatersfast|updater-caches|updater-caches-fast|updater-cachesfast|browsercaches|browser-caches|browsercaches-fast|browsercachesfast|browser-caches-fast|browser-cachesfast|duplicates|duplicates-fast|duplicatesfast|documents|documents-fast|documentsfast|desktop|desktop-fast|desktopfast|screenshots|screenshots-fast|screenshotsfast|archives|archives-fast|archivesfast|downloads|downloads-fast|downloadsfast|installers|nodes|nodes-fast|nodesfast|venvs|venvs-fast|venvsfast|virtualenvs|virtualenvs-fast|virtualenvsfast|apps|apps-fast|appsfast|uninstallers|appreview|aitools|aitools-fast|aitoolsfast|ai-tools|ai|appdata|libraries|cloud|cloudfiles|cloudfiles-fast|cloudfilesfast|cloud-files|cloud-files-fast|cloud-filesfast|personal|communications|comms|browsers|leftovers|backups|backups-fast|backupsfast|xcode|xcode-fast|xcodefast|android|startup|startup-fast|startupfast|loginitems|loginitems-fast|loginitemsfast|trash|trash-fast|trashfast|caches|caches-instant|cachesinstant|caches-fast|cachesfast|diagnostics|packages|npm-cache|npmcache|yarn-cache|yarncache|pnpm-store|pnpmstore|cocoapods-cache|pod-cache|podcache|pip-cache|pipcache|receipts|homebrew|homebrew-cleanup|brewcleanup|toolchains|toolchains-fast|toolchainsfast|containers|containers-fast|containersfast|snapshots|report|report-fast|reportfast|clean|history|history-fast|historyfast|restore|interactive|doctor|doctor-fast|doctorfast|protect|protect-fast|protectfast|guard|rules|rules-fast|rulesfast|categories|init-config|help)
+  dashboard|overview|map|map-fast|mapfast|snapshot|snapshot-fast|snapshotfast|diff|state|state-fast|statefast|permissions|review|scan|system-data|system-data-fast|systemdata-fast|systemdatafast|plan|plan-fast|planfast|large|large-fast|largefast|brokenlinks|brokenlinks-fast|brokenlinksfast|broken-links-fast|broken-linksfast|quarantine|quarantine-fast|quarantinefast|metadata|metadata-fast|metadatafast|quicklook|quicklook-fast|quicklookfast|fontcaches|fontcaches-fast|fontcachesfast|font-caches|font-caches-fast|font-cachesfast|webcaches|webcaches-fast|webcachesfast|web-caches|web-caches-fast|web-cachesfast|savedstate|savedstate-fast|savedstatefast|saved-state|saved-state-fast|saved-statefast|projectcaches|project-caches|projectcaches-fast|projectcachesfast|project-caches-fast|project-cachesfast|developer-fast|developerfast|updaters|updaters-fast|updatersfast|updater-caches|updater-caches-fast|updater-cachesfast|browsercaches|browser-caches|browsercaches-fast|browsercachesfast|browser-caches-fast|browser-cachesfast|duplicates|duplicates-fast|duplicatesfast|documents|documents-fast|documentsfast|desktop|desktop-fast|desktopfast|screenshots|screenshots-fast|screenshotsfast|archives|archives-fast|archivesfast|downloads|downloads-fast|downloadsfast|installers|nodes|nodes-fast|nodesfast|venvs|venvs-fast|venvsfast|virtualenvs|virtualenvs-fast|virtualenvsfast|apps|apps-fast|appsfast|uninstallers|appreview|aitools|aitools-fast|aitoolsfast|ai-tools|ai|appdata|appdata-fast|appdatafast|libraries|cloud|cloudfiles|cloudfiles-fast|cloudfilesfast|cloud-files|cloud-files-fast|cloud-filesfast|personal|communications|comms|browsers|leftovers|backups|backups-fast|backupsfast|xcode|xcode-fast|xcodefast|android|startup|startup-fast|startupfast|loginitems|loginitems-fast|loginitemsfast|trash|trash-fast|trashfast|caches|caches-instant|cachesinstant|caches-fast|cachesfast|diagnostics|packages|npm-cache|npmcache|yarn-cache|yarncache|pnpm-store|pnpmstore|cocoapods-cache|pod-cache|podcache|pip-cache|pipcache|receipts|homebrew|homebrew-cleanup|brewcleanup|toolchains|toolchains-fast|toolchainsfast|containers|containers-fast|containersfast|snapshots|report|report-fast|reportfast|clean|history|history-fast|historyfast|restore|interactive|doctor|doctor-fast|doctorfast|protect|protect-fast|protectfast|guard|rules|rules-fast|rulesfast|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -10161,6 +10216,7 @@ case "$ACTION" in
   aitools|ai-tools|ai) aitools ;;
   aitools-fast|aitoolsfast) aitools_fast ;;
   appdata) appdata ;;
+  appdata-fast|appdatafast) appdata_fast ;;
   libraries) libraries ;;
   cloud) cloud ;;
   cloudfiles|cloud-files) cloudfiles ;;
