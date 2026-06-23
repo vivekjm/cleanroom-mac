@@ -31,6 +31,30 @@ struct CommandResult {
     var status: Int32
 }
 
+private enum AppRunLimit {
+    static let quickSummary = 15.0
+    static let review = 45.0
+    static let cleanup = 300.0
+}
+
+private final class TimeoutFlag {
+    private let lock = NSLock()
+    private var value = false
+
+    func mark() {
+        lock.lock()
+        value = true
+        lock.unlock()
+    }
+
+    var isMarked: Bool {
+        lock.lock()
+        let current = value
+        lock.unlock()
+        return current
+    }
+}
+
 struct ReviewItem: Identifiable {
     let id = UUID()
     var title: String
@@ -195,7 +219,7 @@ final class AppState: ObservableObject {
         lastStatsRefresh = Date()
         let command = resolvedCommand(["dashboard", "--json"])
         Task.detached(priority: .background) {
-            let raw = await Self.exec(command.executable, command.arguments)
+            let raw = await Self.exec(command.executable, command.arguments, timeoutSeconds: AppRunLimit.quickSummary)
             await MainActor.run {
                 self.parseStats(raw.output)
                 self.status = "Storage summary updated"
@@ -211,7 +235,7 @@ final class AppState: ObservableObject {
         cleanupPlanNotes = []
         let command = resolvedCommand(["clean", "--preflight", "--json"])
         Task.detached(priority: .background) {
-            let result = await Self.exec(command.executable, command.arguments)
+            let result = await Self.exec(command.executable, command.arguments, timeoutSeconds: AppRunLimit.quickSummary)
             let parsed = Self.parseCleanupPlan(result.output)
             await MainActor.run {
                 self.cleanupPlanItems = parsed.items
@@ -340,7 +364,7 @@ final class AppState: ObservableObject {
         let commandArgs = appFacingArgs(action.args)
         let command = resolvedCommand(commandArgs)
         Task.detached(priority: .userInitiated) {
-            let result = await Self.exec(command.executable, command.arguments) { process in
+            let result = await Self.exec(command.executable, command.arguments, timeoutSeconds: self.timeoutSeconds(for: action)) { process in
                 Task { @MainActor in
                     if self.currentRunID == runID && self.running && process.isRunning {
                         self.currentProcess = process
@@ -358,6 +382,10 @@ final class AppState: ObservableObject {
                     self.status = "\(action.title) stopped"
                     self.activityMessage = "\(action.title) stopped. Open the summary to see where it paused."
                     self.output += "Review stopped.\n"
+                    self.outputOpen = true
+                } else if result.status == 124 {
+                    self.status = "\(action.title) paused"
+                    self.activityMessage = "\(action.title) took too long. Try a narrower review or run Health Check."
                     self.outputOpen = true
                 } else if result.status == 0 {
                     self.status = "\(action.title) complete"
@@ -385,6 +413,10 @@ final class AppState: ObservableObject {
         currentProcess = nil
         reviewItems = []
         process.terminate()
+    }
+
+    private func timeoutSeconds(for action: AppAction) -> Double {
+        action == .safeCleanup ? AppRunLimit.cleanup : AppRunLimit.review
     }
 
     func runLeftovers(_ query: String) {
@@ -969,21 +1001,38 @@ final class AppState: ObservableObject {
         }
     }
 
-    private static func exec(_ executable: String, _ arguments: [String], onStart: ((Process) -> Void)? = nil) async -> CommandResult {
+    private static func exec(_ executable: String, _ arguments: [String], timeoutSeconds: Double? = AppRunLimit.review, onStart: ((Process) -> Void)? = nil) async -> CommandResult {
         let p = Process()
         p.executableURL = URL(fileURLWithPath: executable)
         p.arguments = arguments
         let pipe = Pipe()
         p.standardOutput = pipe; p.standardError = pipe
+        let timedOut = TimeoutFlag()
+        let timeoutWork = timeoutSeconds.map { seconds in
+            DispatchWorkItem {
+                if p.isRunning {
+                    timedOut.mark()
+                    p.terminate()
+                }
+            }
+        }
         do {
             try p.run()
             onStart?(p)
+            if let timeoutWork, let timeoutSeconds {
+                DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + timeoutSeconds, execute: timeoutWork)
+            }
             let data = pipe.fileHandleForReading.readDataToEndOfFile()
             p.waitUntilExit()
+            timeoutWork?.cancel()
             let text = String(data: data, encoding: .utf8) ?? ""
             let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
             let isStructured = trimmed.hasPrefix("{") || trimmed.hasPrefix("[")
             let visibleText = isStructured && p.terminationStatus == 0 ? text : sanitizeForApp(text)
+            if timedOut.isMarked {
+                let fallback = visibleText.isEmpty ? "" : visibleText + "\n"
+                return CommandResult(output: fallback + "This review took too long and was paused. Try a narrower review or run Health Check.\n", status: 124)
+            }
             if p.terminationStatus == 0 {
                 return CommandResult(output: visibleText.isEmpty ? "Completed.\n" : visibleText, status: p.terminationStatus)
             }
