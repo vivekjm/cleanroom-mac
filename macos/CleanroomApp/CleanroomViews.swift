@@ -63,12 +63,12 @@ struct AppAction: Hashable {
     static let screenshots = AppAction(title: "Screenshots", args: ["screenshots-fast", "--limit", "30", "--days", "7"])
     static let caches = AppAction(title: "Caches", args: ["caches-fast"])
     static let developerFiles = AppAction(title: "Developer Files", args: ["developer-fast", "--limit", "30", "--days", "30"])
-    static let previewCache = AppAction(title: "Preview Cache", args: ["quicklook"])
-    static let fontCache = AppAction(title: "Font Cache", args: ["fontcaches"])
-    static let webCache = AppAction(title: "Web Cache", args: ["webcaches"])
-    static let windowState = AppAction(title: "Window State", args: ["savedstate"])
+    static let previewCache = AppAction(title: "Preview Cache", args: ["quicklook-fast"])
+    static let fontCache = AppAction(title: "Font Cache", args: ["fontcaches-fast"])
+    static let webCache = AppAction(title: "Web Cache", args: ["webcaches-fast"])
+    static let windowState = AppAction(title: "Window State", args: ["savedstate-fast"])
     static let projectCache = AppAction(title: "Project Cache", args: ["projectcaches-fast", "--limit", "40"])
-    static let updateCache = AppAction(title: "Update Cache", args: ["updaters"])
+    static let updateCache = AppAction(title: "Update Cache", args: ["updaters-fast"])
     static let browserCache = AppAction(title: "Browser Cache", args: ["browsercaches-fast"])
     static let aiTools = AppAction(title: "AI Tools", args: ["aitools"])
     static let javascriptPackages = AppAction(title: "JavaScript Packages", args: ["nodes-fast", "--limit", "30", "--days", "30"])
@@ -426,8 +426,8 @@ final class AppState: ObservableObject {
             "large-fast", "duplicates-fast", "brokenlinks", "brokenlinks-fast", "quarantine-fast", "metadata-fast",
             "developer-fast", "nodes-fast", "venvs-fast", "apps-fast",
             "downloads", "downloads-fast", "archives", "archives-fast", "screenshots", "screenshots-fast", "trash", "cloudfiles", "cloudfiles-fast", "caches-fast",
-            "quicklook", "fontcaches", "webcaches", "savedstate",
-            "projectcaches", "projectcaches-fast", "updaters", "browsercaches", "browsercaches-fast",
+            "quicklook", "quicklook-fast", "fontcaches", "fontcaches-fast", "webcaches", "webcaches-fast", "savedstate", "savedstate-fast",
+            "projectcaches", "projectcaches-fast", "updaters", "updaters-fast", "browsercaches", "browsercaches-fast",
             "aitools", "ai-tools", "ai",
             "xcode", "xcode-fast", "backups", "backups-fast", "system-data", "system-data-fast", "containers", "containers-fast", "toolchains", "toolchains-fast",
             "loginitems", "startup", "snapshot", "snapshot-fast", "state", "protect", "rules",

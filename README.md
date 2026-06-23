@@ -226,6 +226,7 @@ Review Quick Look thumbnail and preview caches:
 ```sh
 cleanroom quicklook
 cleanroom quicklook --json
+cleanroom quicklook-fast --json
 ```
 
 Review rebuildable user font cache databases:
@@ -233,6 +234,7 @@ Review rebuildable user font cache databases:
 ```sh
 cleanroom fontcaches
 cleanroom fontcaches --json
+cleanroom fontcaches-fast --json
 ```
 
 Review Safari and WebKit browser cache folders:
@@ -240,6 +242,7 @@ Review Safari and WebKit browser cache folders:
 ```sh
 cleanroom webcaches
 cleanroom webcaches --json
+cleanroom webcaches-fast --json
 ```
 
 Review saved app window/session state:
@@ -247,6 +250,7 @@ Review saved app window/session state:
 ```sh
 cleanroom savedstate
 cleanroom savedstate --json
+cleanroom savedstate-fast --json
 ```
 
 Review rebuildable project cache artifacts:
@@ -262,6 +266,7 @@ Review app updater cache/staging folders:
 ```sh
 cleanroom updaters
 cleanroom updaters --json
+cleanroom updaters-fast --json
 ```
 
 Review Chromium and Firefox browser cache folders:
@@ -895,17 +900,17 @@ Config files use simple `key=value` lines and are never executed as shell.
 
 `metadata` lists `.DS_Store`, AppleDouble `._*` files, `__MACOSX` folders, `Thumbs.db`, `Desktop.ini`, and similar cross-platform metadata clutter under Desktop, Documents, Downloads, or paths you provide. Its direct apply mode requires `--trash`.
 
-`quicklook` inventories rebuildable Quick Look thumbnail and preview caches that can contribute to System Data. Cleanup is opt-in with `cleanroom clean --include-quicklook`.
+`quicklook` inventories rebuildable Quick Look thumbnail and preview caches that can contribute to System Data. `quicklook-fast` skips deep sizing for responsive app reviews. Cleanup is opt-in with `cleanroom clean --include-quicklook`.
 
-`fontcaches` inventories rebuildable user font cache databases that can contribute to System Data or font rendering weirdness. Cleanup is opt-in with `cleanroom clean --include-font-caches`; actual font files stay protected.
+`fontcaches` inventories rebuildable user font cache databases that can contribute to System Data or font rendering weirdness. `fontcaches-fast` skips deep sizing for responsive app reviews. Cleanup is opt-in with `cleanroom clean --include-font-caches`; actual font files stay protected.
 
-`webcaches` inventories Safari and WebKit cache folders that can grow in System Data. Cleanup is opt-in with `cleanroom clean --include-web-caches`; browser history, cookies, bookmarks, website data, passwords, and profiles stay protected.
+`webcaches` inventories Safari and WebKit cache folders that can grow in System Data. `webcaches-fast` skips deep sizing for responsive app reviews. Cleanup is opt-in with `cleanroom clean --include-web-caches`; browser history, cookies, bookmarks, website data, passwords, and profiles stay protected.
 
-`savedstate` inventories saved application window/session state under `~/Library/Saved Application State`. Cleanup is opt-in with `cleanroom clean --include-saved-state`; documents and app profiles stay protected.
+`savedstate` inventories saved application window/session state under `~/Library/Saved Application State`. `savedstate-fast` skips deep sizing for responsive app reviews. Cleanup is opt-in with `cleanroom clean --include-saved-state`; documents and app profiles stay protected.
 
 `projectcaches` inventories known rebuildable project cache artifacts under Desktop, Documents, Downloads, or a provided folder. Cleanup is opt-in with `cleanroom clean --include-project-caches`; source, `.git`, `node_modules`, and virtualenv folders stay protected.
 
-`updaters` inventories rebuildable Sparkle and Squirrel app updater cache/staging folders. Cleanup is opt-in with `cleanroom clean --include-updater-caches`; apps, profiles, browser data, and passwords stay protected.
+`updaters` inventories rebuildable Sparkle and Squirrel app updater cache/staging folders. `updaters-fast` skips deep sizing for responsive app reviews. Cleanup is opt-in with `cleanroom clean --include-updater-caches`; apps, profiles, browser data, and passwords stay protected.
 
 `browsercaches` inventories Chromium and Firefox cache folders. Cleanup is opt-in with `cleanroom clean --include-browser-caches`; profiles, password databases, cookies, bookmarks, sessions, extensions, and settings stay protected.
 

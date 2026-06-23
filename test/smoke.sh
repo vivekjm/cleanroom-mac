@@ -750,6 +750,13 @@ grep '"id":"quicklook-thumbnail-cache"' "$quicklook_json" >/dev/null
 grep '"exists":true' "$quicklook_json" >/dev/null
 grep 'cleanroom clean --apply --trash --include-quicklook' "$quicklook_json" >/dev/null
 rm -f "$quicklook_json"
+quicklook_fast_json="$(mktemp)"
+"$BIN" quicklook-fast --json > "$quicklook_fast_json"
+python3 -m json.tool "$quicklook_fast_json" >/dev/null
+grep '"id":"quicklook-thumbnail-cache"' "$quicklook_fast_json" >/dev/null
+grep '"mode":"fast"' "$quicklook_fast_json" >/dev/null
+grep '"size":"Review"' "$quicklook_fast_json" >/dev/null
+rm -f "$quicklook_fast_json"
 quicklook_log="$TEST_HOME/quicklook-apply.log"
 "$BIN" clean --include-quicklook --apply --trash --yes --log "$quicklook_log" >/dev/null
 test ! -e "$TEST_HOME/Library/Containers/com.apple.QuickLook.thumbnailcache/Data/Library/Caches"
@@ -765,6 +772,12 @@ grep '"id":"ats-user-cache"' "$fontcaches_json" >/dev/null
 grep '"exists":true' "$fontcaches_json" >/dev/null
 grep 'cleanroom clean --apply --trash --include-font-caches' "$fontcaches_json" >/dev/null
 rm -f "$fontcaches_json"
+fontcaches_fast_json="$(mktemp)"
+"$BIN" fontcaches-fast --json > "$fontcaches_fast_json"
+python3 -m json.tool "$fontcaches_fast_json" >/dev/null
+grep '"id":"ats-user-cache"' "$fontcaches_fast_json" >/dev/null
+grep '"mode":"fast"' "$fontcaches_fast_json" >/dev/null
+rm -f "$fontcaches_fast_json"
 fontcaches_log="$TEST_HOME/fontcaches-apply.log"
 "$BIN" clean --include-font-caches --apply --trash --yes --log "$fontcaches_log" >/dev/null
 test ! -e "$TEST_HOME/Library/Caches/com.apple.ATS"
@@ -780,6 +793,12 @@ grep '"id":"safari-user-cache"' "$webcaches_json" >/dev/null
 grep '"exists":true' "$webcaches_json" >/dev/null
 grep 'cleanroom clean --apply --trash --include-web-caches' "$webcaches_json" >/dev/null
 rm -f "$webcaches_json"
+webcaches_fast_json="$(mktemp)"
+"$BIN" webcaches-fast --json > "$webcaches_fast_json"
+python3 -m json.tool "$webcaches_fast_json" >/dev/null
+grep '"id":"safari-user-cache"' "$webcaches_fast_json" >/dev/null
+grep '"mode":"fast"' "$webcaches_fast_json" >/dev/null
+rm -f "$webcaches_fast_json"
 webcaches_log="$TEST_HOME/webcaches-apply.log"
 "$BIN" clean --include-web-caches --apply --trash --yes --log "$webcaches_log" >/dev/null
 test ! -e "$TEST_HOME/Library/Caches/com.apple.Safari"
@@ -800,6 +819,12 @@ grep '"id":"saved-application-state"' "$savedstate_json" >/dev/null
 grep '"exists":true' "$savedstate_json" >/dev/null
 grep 'cleanroom clean --apply --trash --include-saved-state' "$savedstate_json" >/dev/null
 rm -f "$savedstate_json"
+savedstate_fast_json="$(mktemp)"
+"$BIN" savedstate-fast --json > "$savedstate_fast_json"
+python3 -m json.tool "$savedstate_fast_json" >/dev/null
+grep '"id":"saved-application-state"' "$savedstate_fast_json" >/dev/null
+grep '"mode":"fast"' "$savedstate_fast_json" >/dev/null
+rm -f "$savedstate_fast_json"
 savedstate_log="$TEST_HOME/savedstate-apply.log"
 "$BIN" clean --include-saved-state --apply --trash --yes --log "$savedstate_log" >/dev/null
 test ! -e "$TEST_HOME/Library/Saved Application State"
@@ -843,6 +868,12 @@ grep '"id":"sparkle-cache"' "$updaters_json" >/dev/null
 grep '"id":"squirrel-staging"' "$updaters_json" >/dev/null
 grep 'cleanroom clean --apply --trash --include-updater-caches' "$updaters_json" >/dev/null
 rm -f "$updaters_json"
+updaters_fast_json="$(mktemp)"
+"$BIN" updaters-fast --json > "$updaters_fast_json"
+python3 -m json.tool "$updaters_fast_json" >/dev/null
+grep '"id":"sparkle-cache"' "$updaters_fast_json" >/dev/null
+grep '"mode":"fast"' "$updaters_fast_json" >/dev/null
+rm -f "$updaters_fast_json"
 updaters_log="$TEST_HOME/updaters-apply.log"
 "$BIN" clean --include-updater-caches --apply --trash --yes --log "$updaters_log" >/dev/null
 test ! -e "$TEST_HOME/Library/Caches/Sparkle"

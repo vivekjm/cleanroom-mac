@@ -1,4 +1,4 @@
-.TH CLEANROOM 1 "June 2026" "cleanroom 1.37.0" "User Commands"
+.TH CLEANROOM 1 "June 2026" "cleanroom 1.38.0" "User Commands"
 .SH NAME
 cleanroom \- safe-by-default macOS storage cleaner
 .SH SYNOPSIS
@@ -69,13 +69,25 @@ cleanroom \- safe-by-default macOS storage cleaner
 .RI "quicklook [--json]"
 .br
 .B cleanroom
+.RI "quicklook-fast [--json]"
+.br
+.B cleanroom
 .RI "fontcaches [--json]"
+.br
+.B cleanroom
+.RI "fontcaches-fast [--json]"
 .br
 .B cleanroom
 .RI "webcaches [--json]"
 .br
 .B cleanroom
+.RI "webcaches-fast [--json]"
+.br
+.B cleanroom
 .RI "savedstate [--json]"
+.br
+.B cleanroom
+.RI "savedstate-fast [--json]"
 .br
 .B cleanroom
 .RI "projectcaches [path] [--limit n] [--json]"
@@ -88,6 +100,9 @@ cleanroom \- safe-by-default macOS storage cleaner
 .br
 .B cleanroom
 .RI "updaters [--json]"
+.br
+.B cleanroom
+.RI "updaters-fast [--json]"
 .br
 .B cleanroom
 .RI "browsercaches [--json]"
@@ -373,16 +388,28 @@ Quickly preview removable filesystem metadata clutter using Spotlight metadata.
 .B quicklook
 Inventory rebuildable Quick Look thumbnail and preview caches.
 .TP
+.B quicklook-fast
+Quickly review Quick Look cache locations without deep sizing.
+.TP
 .B fontcaches
 Inventory rebuildable user font cache databases without touching actual fonts.
+.TP
+.B fontcaches-fast
+Quickly review font cache locations without deep sizing.
 .TP
 .B webcaches
 Inventory Safari and WebKit cache folders without touching history, cookies,
 passwords, bookmarks, website data, or profiles.
 .TP
+.B webcaches-fast
+Quickly review Safari and WebKit cache locations without deep sizing.
+.TP
 .B savedstate
 Inventory saved app window/session restoration state without touching documents
 or app profiles.
+.TP
+.B savedstate-fast
+Quickly review saved app state locations without deep sizing.
 .TP
 .B projectcaches
 Inventory known rebuildable project cache artifacts such as __pycache__,
@@ -391,6 +418,9 @@ pytest, mypy, ruff, tox, nox, and coverage caches.
 .B updaters
 Inventory Sparkle and Squirrel app updater cache and staging folders without
 touching apps, app profiles, browser profiles, or passwords.
+.TP
+.B updaters-fast
+Quickly review app updater cache locations without deep sizing.
 .TP
 .B browsercaches
 Inventory Chromium and Firefox browser cache folders without touching profiles,
@@ -752,11 +782,16 @@ cleanroom browsers --json
 cleanroom metadata --json
 cleanroom metadata --apply --trash
 cleanroom quicklook --json
+cleanroom quicklook-fast --json
 cleanroom fontcaches --json
+cleanroom fontcaches-fast --json
 cleanroom webcaches --json
+cleanroom webcaches-fast --json
 cleanroom savedstate --json
+cleanroom savedstate-fast --json
 cleanroom projectcaches --json
 cleanroom updaters --json
+cleanroom updaters-fast --json
 cleanroom browsercaches --json
 cleanroom leftovers adobe --limit 50
 cleanroom leftovers adobe --apply --trash

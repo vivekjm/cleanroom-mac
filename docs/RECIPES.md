@@ -20,11 +20,16 @@ cleanroom brokenlinks
 cleanroom quarantine
 cleanroom metadata
 cleanroom quicklook
+cleanroom quicklook-fast
 cleanroom fontcaches
+cleanroom fontcaches-fast
 cleanroom webcaches
+cleanroom webcaches-fast
 cleanroom savedstate
+cleanroom savedstate-fast
 cleanroom projectcaches
 cleanroom updaters
+cleanroom updaters-fast
 cleanroom browsercaches
 cleanroom duplicates
 cleanroom downloads
@@ -87,11 +92,16 @@ cleanroom brokenlinks --json ~/Documents
 cleanroom quarantine --json ~/Downloads
 cleanroom metadata --json ~/Documents ~/Downloads
 cleanroom quicklook --json
+cleanroom quicklook-fast --json
 cleanroom fontcaches --json
+cleanroom fontcaches-fast --json
 cleanroom webcaches --json
+cleanroom webcaches-fast --json
 cleanroom savedstate --json
+cleanroom savedstate-fast --json
 cleanroom projectcaches --json
 cleanroom updaters --json
+cleanroom updaters-fast --json
 cleanroom browsercaches --json
 cleanroom duplicates --json ~/Documents
 cleanroom documents --json ~/Documents
@@ -175,11 +185,19 @@ cleanroom permissions --json
 
 `quicklook --json` emits rebuildable Quick Look thumbnail and preview cache buckets with path, size, existence, and matching cleanup commands.
 
+`quicklook-fast --json` emits the same known locations without deep sizing. Use it for desktop or automation refreshes where responsiveness matters more than exact byte counts.
+
 `fontcaches --json` emits rebuildable user font cache database buckets with path, size, existence, and matching cleanup commands. Actual font files are never targeted.
+
+`fontcaches-fast --json` emits the same known locations without deep sizing.
 
 `webcaches --json` emits Safari and WebKit cache buckets with path, size, existence, and matching cleanup commands. Browser history, cookies, bookmarks, passwords, website data, and profiles are never targeted.
 
+`webcaches-fast --json` emits the same known locations without deep sizing.
+
 `savedstate --json` emits saved application window/session state with path, size, existence, and matching cleanup commands. Documents and app profiles are never targeted.
+
+`savedstate-fast --json` emits the same known locations without deep sizing.
 
 `projectcaches --json` emits known rebuildable project cache artifacts such as `__pycache__`, pytest, mypy, ruff, tox, nox, and coverage caches. Source, `.git`, `node_modules`, and virtualenv folders are pruned.
 
@@ -409,6 +427,7 @@ Use this after unzipping archives, working with network shares, or copying files
 ```sh
 cleanroom quicklook
 cleanroom quicklook --json
+cleanroom quicklook-fast --json
 cleanroom clean --include-quicklook
 cleanroom clean --apply --trash --include-quicklook
 ```
@@ -420,6 +439,7 @@ Use this when System Data is large and Finder thumbnails/previews have accumulat
 ```sh
 cleanroom fontcaches
 cleanroom fontcaches --json
+cleanroom fontcaches-fast --json
 cleanroom clean --include-font-caches
 cleanroom clean --apply --trash --include-font-caches
 ```
@@ -431,6 +451,7 @@ Use this when font menus, previews, or rendering feel stale after installing or 
 ```sh
 cleanroom webcaches
 cleanroom webcaches --json
+cleanroom webcaches-fast --json
 cleanroom clean --include-web-caches
 cleanroom clean --apply --trash --include-web-caches
 ```
@@ -442,6 +463,7 @@ Use this when Safari or embedded web views have accumulated cache data. Cleanroo
 ```sh
 cleanroom savedstate
 cleanroom savedstate --json
+cleanroom savedstate-fast --json
 cleanroom clean --include-saved-state
 cleanroom clean --apply --trash --include-saved-state
 ```
@@ -463,11 +485,12 @@ Review and clean app updater cache/staging data:
 ```sh
 cleanroom updaters
 cleanroom updaters --json
+cleanroom updaters-fast --json
 cleanroom clean --include-updater-caches
 cleanroom clean --apply --trash --include-updater-caches
 ```
 
-`updaters` targets rebuildable Sparkle and Squirrel updater cache/staging folders only. It does not remove apps, app profiles, browser profiles, passwords, cookies, bookmarks, or settings.
+`updaters` targets rebuildable Sparkle and Squirrel updater cache/staging folders only. `updaters-fast` skips deep sizing for responsive app reviews. It does not remove apps, app profiles, browser profiles, passwords, cookies, bookmarks, or settings.
 
 Review and clean Chromium/Firefox browser cache folders:
 
