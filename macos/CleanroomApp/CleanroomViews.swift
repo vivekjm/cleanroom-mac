@@ -2233,35 +2233,29 @@ struct ReviewSummaryPanel: View {
             .background(DS.C.sidebarBg.opacity(0.96))
 
             if state.summaryOpen {
-                ScrollViewReader { proxy in
-                    ScrollView(showsIndicators: true) {
-                        VStack(alignment: .leading, spacing: DS.Sp.md) {
-                            if state.reviewItems.isEmpty {
-                                EmptyReportPanel(state: state)
-                            } else {
-                                HStack(alignment: .firstTextBaseline) {
-                                    Text(state.reviewTitle)
-                                        .font(DS.T.h3)
-                                        .foregroundColor(DS.C.textOnDark)
-                                    Spacer()
-                                    Text("\(state.reviewItems.count) items")
-                                        .font(DS.T.tag)
-                                        .foregroundColor(DS.C.textOnDark.opacity(0.52))
-                                }
-                                ForEach(state.reviewItems) { item in
-                                    ReviewResultRow(item: item)
-                                }
+                ScrollView(showsIndicators: true) {
+                    LazyVStack(alignment: .leading, spacing: DS.Sp.md) {
+                        if state.reviewItems.isEmpty {
+                            EmptyReportPanel(state: state)
+                        } else {
+                            HStack(alignment: .firstTextBaseline) {
+                                Text(state.reviewTitle)
+                                    .font(DS.T.h3)
+                                    .foregroundColor(DS.C.textOnDark)
+                                Spacer()
+                                Text("\(state.reviewItems.count) items")
+                                    .font(DS.T.tag)
+                                    .foregroundColor(DS.C.textOnDark.opacity(0.52))
+                            }
+                            ForEach(state.reviewItems) { item in
+                                ReviewResultRow(item: item)
                             }
                         }
-                        .padding(DS.Sp.lg)
-                        .id("bottom")
                     }
-                    .frame(height: DS.Layout.summaryH)
-                    .background(DS.C.summaryBg.opacity(0.98))
-                    .onReceive(state.$reviewSummary) { _ in
-                        withAnimation(DS.Ani.snap) { proxy.scrollTo("bottom", anchor: .bottom) }
-                    }
+                    .padding(DS.Sp.lg)
                 }
+                .frame(height: DS.Layout.summaryH)
+                .background(DS.C.summaryBg.opacity(0.98))
             }
         }
     }
