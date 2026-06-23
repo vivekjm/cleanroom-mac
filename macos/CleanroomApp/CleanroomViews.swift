@@ -549,6 +549,8 @@ final class AppState: ObservableObject {
     private func clearRecentResults() {
         clearReviewCache()
         cleanupPlanCache = nil
+        cleanupPlanItems = []
+        cleanupPlanNotes = []
     }
 
     func runLeftovers(_ query: String) {
