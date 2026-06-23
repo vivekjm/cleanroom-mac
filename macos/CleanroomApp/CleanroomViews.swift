@@ -664,8 +664,12 @@ final class AppState: ObservableObject {
         guard let data = trimmed.data(using: .utf8),
               let parsed = try? JSONSerialization.jsonObject(with: data),
               let items = jsonItems(from: parsed) else {
-            let clean = Self.sanitizeForApp(details)
-            return clean.isEmpty ? "\(title) finished. A report is available if you need it.\n" : clean
+            let items = textReviewItems(title: title, details: details)
+            let safeSuffix = action.args.contains("--apply") ? "" : " No files were changed."
+            if items.isEmpty {
+                return "\(title) finished.\(safeSuffix)\n"
+            }
+            return "\(title) finished with \(items.count) \(items.count == 1 ? "note" : "notes").\(safeSuffix)\n"
         }
 
         if items.isEmpty {
@@ -684,9 +688,121 @@ final class AppState: ObservableObject {
         guard let data = trimmed.data(using: .utf8),
               let parsed = try? JSONSerialization.jsonObject(with: data),
               let items = jsonItems(from: parsed) else {
-            return []
+            return textReviewItems(title: title, details: details)
         }
         return items.prefix(80).map { reviewItem(from: $0) }
+    }
+
+    private func textReviewItems(title: String, details: String) -> [ReviewItem] {
+        let cleaned = Self.sanitizeForApp(details)
+        let lines = cleaned
+            .split(separator: "\n", omittingEmptySubsequences: false)
+            .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
+        let items = lines.prefix(40).compactMap { line -> ReviewItem? in
+            guard let sentence = friendlySentence(line) else { return nil }
+            let badge = fallbackBadge(for: sentence)
+            if let size = leadingSize(in: sentence) {
+                let titleText = sentence
+                    .replacingOccurrences(of: "^[0-9]+(\\.[0-9]+)?\\s?(B|KB|MB|GB|TB)\\b\\s*", with: "", options: [.regularExpression, .caseInsensitive])
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                return ReviewItem(
+                    title: titleText.isEmpty ? title : friendlyLabel(titleText),
+                    detail: fallbackDetail(for: sentence),
+                    size: size,
+                    badge: badge,
+                    path: nil
+                )
+            }
+            return ReviewItem(
+                title: fallbackTitle(for: sentence, defaultTitle: title),
+                detail: fallbackDetail(for: sentence),
+                size: fallbackSize(for: sentence),
+                badge: badge,
+                path: nil
+            )
+        }
+
+        if !items.isEmpty {
+            return items
+        }
+        let clean = cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !clean.isEmpty else { return [] }
+        return [
+            ReviewItem(
+                title: title,
+                detail: "Review finished. No technical details need your attention.",
+                size: "Done",
+                badge: "Ready",
+                path: nil
+            )
+        ]
+    }
+
+    private func fallbackTitle(for sentence: String, defaultTitle: String) -> String {
+        let lower = sentence.lowercased()
+        if lower.contains("could not") || lower.contains("try again") || lower.contains("unavailable") {
+            return "Needs Attention"
+        }
+        if lower.contains("paused") || lower.contains("took too long") {
+            return "Review Paused"
+        }
+        if lower.contains("protected") || lower.contains("password") || lower.contains("profile") {
+            return "Protected Data"
+        }
+        if lower.contains("no files") || lower.contains("nothing") || lower.contains("empty") {
+            return "Nothing To Clean"
+        }
+        if lower.contains("trash") {
+            return "Trash Recovery"
+        }
+        return defaultTitle
+    }
+
+    private func fallbackDetail(for sentence: String) -> String {
+        let lower = sentence.lowercased()
+        if lower.contains("could not") || lower.contains("try again") || lower.contains("unavailable") {
+            return "The review could not finish. Try again, or run App Checkup."
+        }
+        if lower.contains("paused") || lower.contains("took too long") {
+            return "The review paused to keep the app responsive. Try a narrower area."
+        }
+        if lower.contains("protected") || lower.contains("password") || lower.contains("profile") {
+            return "Passwords, browser profiles, and personal app data stay protected."
+        }
+        if lower.contains("no files") || lower.contains("nothing") || lower.contains("empty") {
+            return "No files were changed."
+        }
+        return sentence
+    }
+
+    private func fallbackSize(for sentence: String) -> String {
+        let lower = sentence.lowercased()
+        if lower.contains("could not") || lower.contains("try again") || lower.contains("unavailable") {
+            return "Check"
+        }
+        if lower.contains("paused") || lower.contains("took too long") {
+            return "Paused"
+        }
+        if lower.contains("no files") || lower.contains("nothing") || lower.contains("empty") {
+            return "0"
+        }
+        return "Info"
+    }
+
+    private func fallbackBadge(for sentence: String) -> String {
+        let lower = sentence.lowercased()
+        if lower.contains("could not") || lower.contains("try again") || lower.contains("unavailable") {
+            return "Needs Attention"
+        }
+        if lower.contains("protected") || lower.contains("password") || lower.contains("profile") {
+            return "Protected"
+        }
+        if lower.contains("paused") || lower.contains("took too long") {
+            return "Review"
+        }
+        return "Ready"
     }
 
     private func jsonItems(from parsed: Any) -> [[String: Any]]? {
