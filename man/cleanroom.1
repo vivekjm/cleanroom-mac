@@ -1,4 +1,4 @@
-.TH CLEANROOM 1 "June 2026" "cleanroom 1.36.0" "User Commands"
+.TH CLEANROOM 1 "June 2026" "cleanroom 1.37.0" "User Commands"
 .SH NAME
 cleanroom \- safe-by-default macOS storage cleaner
 .SH SYNOPSIS
@@ -148,6 +148,9 @@ cleanroom \- safe-by-default macOS storage cleaner
 .br
 .B cleanroom
 .RI "appreview query... [--limit n] [--json]"
+.br
+.B cleanroom
+.RI "aitools [--json]"
 .br
 .B cleanroom
 .RI "appdata [--limit n] [--json]"
@@ -444,6 +447,10 @@ or removing them.
 Review matching app bundles, vendor uninstallers, package receipts, and leftover
 candidates in one read-only workflow.
 .TP
+.B aitools
+Review known AI-agent generated state, downloaded local models, and backend
+extensions. Cleanup remains split behind explicit AI workspace and model flags.
+.TP
 .B appdata
 Rank large app support, container, group-container, HTTP storage, WebKit, and
 saved-state folders with central guard status.
@@ -630,10 +637,12 @@ Remove nested app cache folders only.
 Remove heavy developer artifacts such as SDK components and simulator state.
 .TP
 .B --include-ai-workspaces
-Remove generated AI-agent workspace data.
+Remove generated AI-agent workspace data reviewed by
+.BR aitools .
 .TP
 .B --include-ai-models
-Remove downloaded local AI model stores.
+Remove downloaded local AI model stores and backend extensions reviewed by
+.BR aitools .
 .TP
 .B --include-containers
 Remove local container VM disks and image stores. This can remove containers,
@@ -732,6 +741,7 @@ cleanroom venvs ~/Documents --days 45 --limit 30
 cleanroom apps --limit 30
 cleanroom uninstallers --limit 50
 cleanroom appreview adobe --limit 50
+cleanroom aitools
 cleanroom appdata --limit 30
 cleanroom libraries --json
 cleanroom cloud --json

@@ -31,8 +31,8 @@ These categories are intentionally excluded from the default cleaner:
 - `--include-dev-heavy`: SDKs, simulator state, Android NDK/system images.
 - `--include-diagnostics`: old user diagnostic reports and CrashReporter files. These are usually disposable, but may be useful when debugging recent crashes.
 - `--include-toolchains`: rebuildable language/toolchain caches such as Go modules, pip, uv, Poetry, SwiftPM, Maven, Composer, RubyGems, and Bundler caches.
-- `--include-ai-workspaces`: generated AI-agent recordings, scratch folders, memory/brain folders, and local conversation caches where known.
-- `--include-ai-models`: downloaded local model files and AI backend extensions. These can be re-downloaded, but may be intentionally installed by the user.
+- `--include-ai-workspaces`: generated AI-agent recordings, scratch folders, memory/brain folders, implicit state, local conversation caches, and generated browser-profile rendering caches where known.
+- `--include-ai-models`: downloaded local model files and AI backend extensions from known stores such as LM Studio, Ollama, Hugging Face, ModelScope, torch hub, Whisper, llama.cpp, GPT4All, Jan, and AnythingLLM. These can be re-downloaded, but may be intentionally installed by the user.
 - `--include-containers`: local container VM disks and image stores for Docker Desktop, Colima, Lima, and Podman. This may remove containers, images, and volumes.
 
 Any new rule that can remove personal state, credentials, app profiles, project source, model downloads, or container volumes must be behind an explicit opt-in flag.

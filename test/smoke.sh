@@ -97,6 +97,24 @@ mkdir -p \
   "$TEST_HOME/Library/pnpm/store" \
   "$TEST_HOME/.cache" \
   "$TEST_HOME/.lmstudio/models" \
+  "$TEST_HOME/.lmstudio/extensions/backends" \
+  "$TEST_HOME/.lmstudio/.internal/temp-downloads" \
+  "$TEST_HOME/.ollama/models" \
+  "$TEST_HOME/.cache/huggingface/hub" \
+  "$TEST_HOME/.cache/modelscope" \
+  "$TEST_HOME/.cache/torch/hub" \
+  "$TEST_HOME/.cache/whisper" \
+  "$TEST_HOME/.cache/llama.cpp" \
+  "$TEST_HOME/.cache/gpt4all" \
+  "$TEST_HOME/Library/Application Support/nomic.ai/GPT4All" \
+  "$TEST_HOME/Library/Application Support/Jan/data/models" \
+  "$TEST_HOME/Library/Application Support/anythingllm-desktop/storage/models" \
+  "$TEST_HOME/.gemini/antigravity/browser_recordings" \
+  "$TEST_HOME/.gemini/antigravity/scratch" \
+  "$TEST_HOME/.gemini/antigravity/brain" \
+  "$TEST_HOME/.gemini/antigravity/implicit" \
+  "$TEST_HOME/.gemini/antigravity/conversations" \
+  "$TEST_HOME/.gemini/antigravity-browser-profile/ShaderCache" \
   "$TEST_HOME/.colima/default" \
   "$TEST_HOME/.lima/default" \
   "$TEST_HOME/.local/share/containers/storage" \
@@ -179,6 +197,24 @@ printf 'adb\n' >"$TEST_HOME/Library/Android/sdk/platform-tools/adb"
 printf 'sdkmanager\n' >"$TEST_HOME/Library/Android/sdk/cmdline-tools/latest/bin/sdkmanager"
 printf 'avd\n' >"$TEST_HOME/.android/avd/Test.avd/userdata-qemu.img"
 printf 'model\n' >"$TEST_HOME/.lmstudio/models/example.gguf"
+printf 'backend\n' >"$TEST_HOME/.lmstudio/extensions/backends/runtime.bin"
+printf 'partial model\n' >"$TEST_HOME/.lmstudio/.internal/temp-downloads/partial.gguf"
+printf 'ollama\n' >"$TEST_HOME/.ollama/models/manifest"
+printf 'huggingface\n' >"$TEST_HOME/.cache/huggingface/hub/model.bin"
+printf 'modelscope\n' >"$TEST_HOME/.cache/modelscope/model.bin"
+printf 'torch\n' >"$TEST_HOME/.cache/torch/hub/checkpoint.pt"
+printf 'whisper\n' >"$TEST_HOME/.cache/whisper/base.pt"
+printf 'llama\n' >"$TEST_HOME/.cache/llama.cpp/model.gguf"
+printf 'gpt4all cache\n' >"$TEST_HOME/.cache/gpt4all/model.gguf"
+printf 'gpt4all app\n' >"$TEST_HOME/Library/Application Support/nomic.ai/GPT4All/model.gguf"
+printf 'jan\n' >"$TEST_HOME/Library/Application Support/Jan/data/models/model.gguf"
+printf 'anythingllm\n' >"$TEST_HOME/Library/Application Support/anythingllm-desktop/storage/models/model.gguf"
+printf 'recording\n' >"$TEST_HOME/.gemini/antigravity/browser_recordings/session.json"
+printf 'scratch\n' >"$TEST_HOME/.gemini/antigravity/scratch/tmp.txt"
+printf 'brain\n' >"$TEST_HOME/.gemini/antigravity/brain/index.db"
+printf 'implicit\n' >"$TEST_HOME/.gemini/antigravity/implicit/state.db"
+printf 'conversation\n' >"$TEST_HOME/.gemini/antigravity/conversations/local.json"
+printf 'shader\n' >"$TEST_HOME/.gemini/antigravity-browser-profile/ShaderCache/cache.bin"
 printf 'colima disk\n' >"$TEST_HOME/.colima/default/disk.img"
 printf 'lima disk\n' >"$TEST_HOME/.lima/default/disk.img"
 printf 'podman image\n' >"$TEST_HOME/.local/share/containers/storage/image"
@@ -588,6 +624,7 @@ grep 'android-inventory' "$rules_json" >/dev/null
 grep 'loginitems-inventory' "$rules_json" >/dev/null
 grep 'uninstallers-inventory' "$rules_json" >/dev/null
 grep 'appreview-inventory' "$rules_json" >/dev/null
+grep 'aitools-inventory' "$rules_json" >/dev/null
 grep 'appdata-inventory' "$rules_json" >/dev/null
 grep 'cloud-inventory' "$rules_json" >/dev/null
 grep 'cloudfiles-inventory' "$rules_json" >/dev/null
@@ -992,6 +1029,19 @@ grep 'Cleanroom Test Uninstaller.app' "$appreview_json" >/dev/null
 grep 'com.cleanroom.test.pkg' "$appreview_json" >/dev/null
 grep 'CleanroomTestAdobe' "$appreview_json" >/dev/null
 rm -f "$appreview_json"
+"$BIN" aitools | grep 'cleanroom AI tools storage' >/dev/null
+"$BIN" aitools | grep 'LM Studio' >/dev/null
+"$BIN" aitools | grep 'Gemini / Antigravity' >/dev/null
+aitools_json="$(mktemp)"
+"$BIN" aitools --json > "$aitools_json"
+python3 -m json.tool "$aitools_json" >/dev/null
+grep '"app":"LM Studio"' "$aitools_json" >/dev/null
+grep '"app":"Ollama"' "$aitools_json" >/dev/null
+grep '"app":"Hugging Face"' "$aitools_json" >/dev/null
+grep '"app":"Gemini / Antigravity"' "$aitools_json" >/dev/null
+grep '"safety":"downloaded-models"' "$aitools_json" >/dev/null
+grep '"safety":"generated-workspace"' "$aitools_json" >/dev/null
+rm -f "$aitools_json"
 "$BIN" appdata --limit 20 | grep 'CleanroomTestAdobe' >/dev/null
 appdata_json="$(mktemp)"
 "$BIN" appdata --json --limit 20 > "$appdata_json"
@@ -1484,6 +1534,8 @@ grep '"id":"project-caches"' "$preflight_json" >/dev/null
 grep '"id":"updater-caches"' "$preflight_json" >/dev/null
 grep '"id":"browser-caches"' "$preflight_json" >/dev/null
 grep '"id":"device-backups"' "$preflight_json" >/dev/null
+grep '"id":"ai-workspaces"' "$preflight_json" >/dev/null
+grep '"id":"ai-models"' "$preflight_json" >/dev/null
 grep '"id":"user-trash"' "$preflight_json" >/dev/null
 grep '"safety":"irreversible"' "$preflight_json" >/dev/null
 grep 'Container cleanup can remove local containers' "$preflight_json" >/dev/null

@@ -748,6 +748,7 @@ cleanroom clean --apply --include-ai-workspaces
 Clean downloaded local AI models/backends:
 
 ```sh
+cleanroom aitools
 cleanroom clean --apply --include-ai-models
 ```
 
@@ -812,9 +813,11 @@ Config files use simple `key=value` lines and are never executed as shell.
 
 `--include-dev-heavy` can remove simulator app state and Android SDK components that may need to be reinstalled later.
 
-`--include-ai-workspaces` removes generated AI-agent state such as recordings, scratch folders, local brain/memory data, implicit data, and local conversation caches where known.
+`aitools` reviews known AI-agent state and local model stores without deleting anything. It covers generated Gemini/Antigravity state and common local model stores such as LM Studio, Ollama, Hugging Face, ModelScope, torch hub, Whisper, llama.cpp, GPT4All, Jan, and AnythingLLM.
 
-`--include-ai-models` removes downloaded local model files and backend extensions from known stores such as LM Studio, Ollama, Hugging Face cache, and similar caches. These can usually be downloaded again later, but they may be large.
+`--include-ai-workspaces` removes generated AI-agent state such as recordings, scratch folders, local brain/memory data, implicit data, local conversation caches, and generated browser-profile rendering caches where known.
+
+`--include-ai-models` removes downloaded local model files and backend extensions from known stores such as LM Studio, Ollama, Hugging Face, ModelScope, torch hub, Whisper, llama.cpp, GPT4All, Jan, AnythingLLM, and similar caches. These can usually be downloaded again later, but they may be large.
 
 `--include-containers` removes local container VM disks and image stores for known runtimes such as Docker Desktop, Colima, Lima, and Podman. This can remove local containers, images, and volumes.
 
@@ -921,6 +924,8 @@ Config files use simple `key=value` lines and are never executed as shell.
 `uninstallers` lists likely vendor uninstallers, remover apps, packages, and scripts from common application and Application Support locations, or a path you provide. It never runs or removes them; use these official tools before manual leftover cleanup.
 
 `appreview` combines matching app bundles, vendor uninstallers, package receipts, and leftover candidates into one read-only workflow. Use it before removing apps so official uninstallers and package records are visible before leftover cleanup.
+
+`aitools` inventories known AI-agent generated state and local AI model stores. Cleanup remains split into explicit opt-in flags: `--include-ai-workspaces` for generated workspace state and `--include-ai-models` for downloaded model stores/backends.
 
 `appdata` ranks top-level Application Support, Containers, Group Containers, HTTPStorages, WebKit, and saved-state folders. It is review-only and includes the central guard status so protected profiles and personal data stand out before you investigate with `leftovers APPNAME`.
 

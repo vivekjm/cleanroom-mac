@@ -70,6 +70,7 @@ struct AppAction: Hashable {
     static let projectCache = AppAction(title: "Project Cache", args: ["projectcaches-fast", "--limit", "40"])
     static let updateCache = AppAction(title: "Update Cache", args: ["updaters"])
     static let browserCache = AppAction(title: "Browser Cache", args: ["browsercaches-fast"])
+    static let aiTools = AppAction(title: "AI Tools", args: ["aitools"])
     static let javascriptPackages = AppAction(title: "JavaScript Packages", args: ["nodes-fast", "--limit", "30", "--days", "30"])
     static let pythonEnvironments = AppAction(title: "Python Environments", args: ["venvs-fast", "--limit", "30", "--days", "30"])
     static let apps = AppAction(title: "Apps", args: ["apps-fast", "--limit", "30"])
@@ -427,6 +428,7 @@ final class AppState: ObservableObject {
             "downloads", "downloads-fast", "archives", "archives-fast", "screenshots", "screenshots-fast", "trash", "cloudfiles", "cloudfiles-fast", "caches-fast",
             "quicklook", "fontcaches", "webcaches", "savedstate",
             "projectcaches", "projectcaches-fast", "updaters", "browsercaches", "browsercaches-fast",
+            "aitools", "ai-tools", "ai",
             "xcode", "xcode-fast", "backups", "backups-fast", "system-data", "system-data-fast", "containers", "containers-fast", "toolchains", "toolchains-fast",
             "loginitems", "startup", "snapshot", "snapshot-fast", "state", "protect", "rules",
             "map", "map-fast", "doctor", "leftovers", "appreview", "history", "report-fast"
@@ -1169,6 +1171,7 @@ struct SidebarView: View {
                             NavRow("chevron.left.forwardslash.chevron.right", "Project Cache", .run(.projectCache), state)
                             NavRow("arrow.clockwise.circle.fill", "Update Cache", .run(.updateCache), state)
                             NavRow("globe", "Browser Cache", .run(.browserCache), state)
+                            NavRow("sparkles", "AI Tools", .run(.aiTools), state)
                             NavRow("shippingbox.fill",        "JavaScript Packages",.run(.javascriptPackages), state)
                             NavRow("square.stack.3d.up.fill", "Python Environments", .run(.pythonEnvironments), state)
                             NavRow("apps.iphone",             "Apps",        .run(.apps), state)

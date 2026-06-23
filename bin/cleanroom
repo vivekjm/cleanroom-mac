@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.36.0"
+VERSION="1.37.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -110,6 +110,7 @@ Usage:
   cleanroom apps-fast [PATH] [--limit N] [--json]
   cleanroom uninstallers [PATH] [--limit N] [--json]
   cleanroom appreview QUERY... [--limit N] [--json]
+  cleanroom aitools [--json]
   cleanroom appdata [--limit N] [--json]
   cleanroom libraries [--json]
   cleanroom cloud [--json]
@@ -206,6 +207,7 @@ Actions:
   apps                 List largest app bundles for review without uninstalling.
   uninstallers         List vendor uninstallers and remover tools for review.
   appreview            Review app bundles, uninstallers, receipts, and leftovers.
+  aitools              Review AI-agent state, local models, and rebuildable AI caches.
   appdata              Rank large app support, container, and group container folders.
   libraries            Inventory protected media and creative libraries.
   cloud                Inventory protected cloud-sync storage locations.
@@ -255,7 +257,7 @@ Options:
   --yes                Do not prompt before --apply cleanup.
   --verbose            Print every path touched.
   --json               Emit JSON for dashboard, overview, map, map-fast, snapshot, snapshot-fast, diff, state, permissions, review, scan, system-data, system-data-fast, plan, large, brokenlinks, brokenlinks-fast, quarantine, metadata, quicklook, fontcaches, webcaches, savedstate, projectcaches, updaters, browsercaches, duplicates,
-                       documents, desktop, screenshots, archives, archives-fast, downloads, downloads-fast, installers, nodes, venvs, apps, uninstallers, appreview, appdata, libraries, cloud, cloudfiles, personal, communications,
+                       documents, desktop, screenshots, archives, archives-fast, downloads, downloads-fast, installers, nodes, venvs, apps, uninstallers, appreview, aitools, appdata, libraries, cloud, cloudfiles, personal, communications,
                        browsers, leftovers, startup, loginitems,
                        trash, backups, backups-fast, xcode, xcode-fast, caches, caches-fast, diagnostics, packages, npm-cache, yarn-cache, pnpm-store, cocoapods-cache, pip-cache, receipts, homebrew, homebrew-cleanup, toolchains, toolchains-fast,
                        containers, containers-fast, android, snapshots, history, report-fast, clean --preflight, doctor, protect, guard, or rules.
@@ -320,9 +322,12 @@ Options:
                        --apply --trash and is never enabled by presets.
   --include-ai-workspaces
                        Remove generated AI-agent workspace state: recordings, scratch, brain,
-                       implicit data, and local conversation caches where known.
+                       implicit data, local conversation caches, and generated browser caches
+                       where known. Review first with: cleanroom aitools.
   --include-ai-models  Remove downloaded local AI models/backends from LM Studio, Ollama,
-                       Hugging Face cache, and similar known stores.
+                       Hugging Face, ModelScope, torch hub, Whisper, llama.cpp, GPT4All,
+                       Jan, AnythingLLM, and similar known stores. Review first with:
+                       cleanroom aitools.
   --include-containers Remove local container VM disks and image stores for
                        Docker Desktop, Colima, Lima, and Podman. This can remove containers.
   --include-gemini     Alias for --include-ai-workspaces.
@@ -419,6 +424,8 @@ Examples:
   cleanroom uninstallers --json
   cleanroom appreview adobe
   cleanroom appreview zoom --json
+  cleanroom aitools
+  cleanroom aitools --json
   cleanroom appdata
   cleanroom appdata --json
   cleanroom libraries
@@ -2280,31 +2287,119 @@ clean_snapshots() {
 clean_ai_workspaces() {
   [[ "$INCLUDE_AI_WORKSPACES" -eq 1 || "$INCLUDE_GEMINI" -eq 1 ]] || return 0
   log "${BOLD}AI agent workspace data${RESET}"
-  local roots=(antigravity antigravity-backup antigravity-ide)
-  local root
-  for root in "${roots[@]}"; do
-    run_rm "~/.gemini/$root/browser_recordings"
-    run_rm "~/.gemini/$root/scratch"
-    run_rm "~/.gemini/$root/brain"
-    run_rm "~/.gemini/$root/implicit"
-    run_rm "~/.gemini/$root/conversations"
-  done
-  run_rm "~/.gemini/antigravity-browser-profile/GraphiteDawnCache"
-  run_rm "~/.gemini/antigravity-browser-profile/GrShaderCache"
-  run_rm "~/.gemini/antigravity-browser-profile/ShaderCache"
+  local id app kind safety path preview apply description
+  while IFS=$'\t' read -r id app kind safety path preview apply description; do
+    [[ -z "${path:-}" || "$safety" != "generated-workspace" ]] && continue
+    run_rm "$path"
+  done < <(ai_workspace_rows)
 }
 
 clean_ai_models() {
   [[ "$INCLUDE_AI_MODELS" -eq 1 || "$INCLUDE_LMSTUDIO" -eq 1 ]] || return 0
   log "${BOLD}Local AI models and backends${RESET}"
-  run_rm "~/.lmstudio/models"
-  run_rm "~/.lmstudio/extensions/backends"
-  run_rm "~/.lmstudio/.internal/temp-downloads"
-  run_rm "~/.ollama/models"
-  run_rm "~/.cache/huggingface/hub"
-  run_rm "~/.cache/modelscope"
-  run_rm "~/.cache/torch/hub"
-  run_rm "~/.cache/whisper"
+  local id app kind safety path preview apply description
+  while IFS=$'\t' read -r id app kind safety path preview apply description; do
+    [[ -z "${path:-}" || "$safety" != "downloaded-models" ]] && continue
+    run_rm "$path"
+  done < <(ai_model_rows)
+}
+
+ai_workspace_rows() {
+  local roots=(antigravity antigravity-backup antigravity-ide)
+  local root
+  for root in "${roots[@]}"; do
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "gemini-$root-recordings" "Gemini / Antigravity" "recordings" "generated-workspace" "~/.gemini/$root/browser_recordings" "cleanroom aitools" "cleanroom clean --apply --trash --include-ai-workspaces" "Generated browser recordings from AI-agent workspaces."
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "gemini-$root-scratch" "Gemini / Antigravity" "scratch" "generated-workspace" "~/.gemini/$root/scratch" "cleanroom aitools" "cleanroom clean --apply --trash --include-ai-workspaces" "Generated scratch files from AI-agent workspaces."
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "gemini-$root-brain" "Gemini / Antigravity" "brain" "generated-workspace" "~/.gemini/$root/brain" "cleanroom aitools" "cleanroom clean --apply --trash --include-ai-workspaces" "Generated local brain or memory data from AI-agent workspaces."
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "gemini-$root-implicit" "Gemini / Antigravity" "implicit" "generated-workspace" "~/.gemini/$root/implicit" "cleanroom aitools" "cleanroom clean --apply --trash --include-ai-workspaces" "Generated implicit state from AI-agent workspaces."
+    printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "gemini-$root-conversations" "Gemini / Antigravity" "conversations" "generated-workspace" "~/.gemini/$root/conversations" "cleanroom aitools" "cleanroom clean --apply --trash --include-ai-workspaces" "Generated local conversation cache for AI-agent workspaces."
+  done
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "gemini-browser-graphite-cache" "Gemini / Antigravity" "browser-cache" "generated-workspace" "~/.gemini/antigravity-browser-profile/GraphiteDawnCache" "cleanroom aitools" "cleanroom clean --apply --trash --include-ai-workspaces" "Rebuildable browser rendering cache inside the generated AI browser profile."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "gemini-browser-grshader-cache" "Gemini / Antigravity" "browser-cache" "generated-workspace" "~/.gemini/antigravity-browser-profile/GrShaderCache" "cleanroom aitools" "cleanroom clean --apply --trash --include-ai-workspaces" "Rebuildable browser shader cache inside the generated AI browser profile."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "gemini-browser-shader-cache" "Gemini / Antigravity" "browser-cache" "generated-workspace" "~/.gemini/antigravity-browser-profile/ShaderCache" "cleanroom aitools" "cleanroom clean --apply --trash --include-ai-workspaces" "Rebuildable browser shader cache inside the generated AI browser profile."
+}
+
+ai_model_rows() {
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "lmstudio-models" "LM Studio" "models" "downloaded-models" "~/.lmstudio/models" "cleanroom aitools" "cleanroom clean --apply --trash --include-ai-models" "Downloaded local model files. LM Studio can download them again."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "lmstudio-backends" "LM Studio" "backends" "downloaded-models" "~/.lmstudio/extensions/backends" "cleanroom aitools" "cleanroom clean --apply --trash --include-ai-models" "Downloaded backend runtimes and extensions. LM Studio can download them again."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "lmstudio-temp-downloads" "LM Studio" "temp-downloads" "downloaded-models" "~/.lmstudio/.internal/temp-downloads" "cleanroom aitools" "cleanroom clean --apply --trash --include-ai-models" "Interrupted or temporary model downloads."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "ollama-models" "Ollama" "models" "downloaded-models" "~/.ollama/models" "cleanroom aitools" "cleanroom clean --apply --trash --include-ai-models" "Downloaded Ollama model blobs and manifests."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "huggingface-hub" "Hugging Face" "models" "downloaded-models" "~/.cache/huggingface/hub" "cleanroom aitools" "cleanroom clean --apply --trash --include-ai-models" "Downloaded Hugging Face Hub model cache."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "modelscope-cache" "ModelScope" "models" "downloaded-models" "~/.cache/modelscope" "cleanroom aitools" "cleanroom clean --apply --trash --include-ai-models" "Downloaded ModelScope model cache."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "torch-hub" "PyTorch" "models" "downloaded-models" "~/.cache/torch/hub" "cleanroom aitools" "cleanroom clean --apply --trash --include-ai-models" "Downloaded torch hub checkpoints and repo cache."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "whisper-cache" "Whisper" "models" "downloaded-models" "~/.cache/whisper" "cleanroom aitools" "cleanroom clean --apply --trash --include-ai-models" "Downloaded Whisper model cache."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "llama-cpp-cache" "llama.cpp" "models" "downloaded-models" "~/.cache/llama.cpp" "cleanroom aitools" "cleanroom clean --apply --trash --include-ai-models" "Downloaded llama.cpp model and runtime cache."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "gpt4all-cache" "GPT4All" "models" "downloaded-models" "~/.cache/gpt4all" "cleanroom aitools" "cleanroom clean --apply --trash --include-ai-models" "Downloaded GPT4All cache."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "gpt4all-models" "GPT4All" "models" "downloaded-models" "~/Library/Application Support/nomic.ai/GPT4All" "cleanroom aitools" "cleanroom clean --apply --trash --include-ai-models" "Downloaded GPT4All application model store."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "jan-models" "Jan" "models" "downloaded-models" "~/Library/Application Support/Jan/data/models" "cleanroom aitools" "cleanroom clean --apply --trash --include-ai-models" "Downloaded Jan local model store."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "anythingllm-models" "AnythingLLM" "models" "downloaded-models" "~/Library/Application Support/anythingllm-desktop/storage/models" "cleanroom aitools" "cleanroom clean --apply --trash --include-ai-models" "Downloaded AnythingLLM desktop model store."
+}
+
+aitool_rows() {
+  local id app kind safety path preview apply description expanded kb
+  while IFS=$'\t' read -r id app kind safety path preview apply description; do
+    [[ -z "${id:-}" ]] && continue
+    expanded="$(expand_path "$path")"
+    kb="$(size_kb "$expanded")"
+    printf '%012d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$kb" "$id" "$app" "$kind" "$safety" "$expanded" "$preview" "$apply" "$description"
+  done < <(ai_workspace_rows; ai_model_rows) | sort -rn
+}
+
+aitools_total_kb() {
+  aitool_rows | tab_rows_total_kb
+}
+
+aitools() {
+  local rows
+  rows="$(aitool_rows)"
+
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '['
+    local first=1 kb id app kind safety path preview apply description kb_num present
+    while IFS=$'\t' read -r kb id app kind safety path preview apply description; do
+      [[ -z "${id:-}" ]] && continue
+      kb_num="$(printf '%s\n' "$kb" | sed 's/^0*//; s/^$/0/')"
+      if [[ "$kb_num" -gt 0 ]]; then
+        present=true
+      else
+        present=false
+      fi
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '{"id":"%s","app":"%s","kind":"%s","safety":"%s","path":"%s","present":%s,"size_kb":%s,"size":"%s","preview_command":"%s","apply_command":"%s","description":"%s"}' \
+        "$(printf '%s' "$id" | json_escape)" \
+        "$(printf '%s' "$app" | json_escape)" \
+        "$(printf '%s' "$kind" | json_escape)" \
+        "$(printf '%s' "$safety" | json_escape)" \
+        "$(printf '%s' "$path" | json_escape)" \
+        "$present" \
+        "$kb_num" \
+        "$(human_kb "${kb:-0}" | json_escape)" \
+        "$(printf '%s' "$preview" | json_escape)" \
+        "$(printf '%s' "$apply" | json_escape)" \
+        "$(printf '%s' "$description" | json_escape)"
+    done <<<"$rows"
+    printf ']\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}cleanroom AI tools storage${RESET}"
+  printf 'Review-only inventory for generated AI-agent state and downloaded local models.\n'
+  printf 'Cleanup is opt-in: use --include-ai-workspaces for generated state and --include-ai-models for downloaded model stores.\n\n'
+  if [[ -z "$rows" ]]; then
+    printf 'No known AI tool storage locations found.\n'
+    return 0
+  fi
+  printf '%-10s %-22s %-18s %-20s %s\n' "size" "app" "kind" "safety" "path"
+  local kb id app kind safety path preview apply description
+  while IFS=$'\t' read -r kb id app kind safety path preview apply description; do
+    [[ -z "${id:-}" ]] && continue
+    [[ "${kb:-0}" == "000000000000" ]] && continue
+    printf '%-10s %-22s %-18s %-20s %s\n' "$(human_kb "$kb")" "$app" "$kind" "$safety" "$path"
+    printf '  apply: %s\n' "$apply"
+    printf '  %s\n' "$description"
+  done <<<"$rows"
+  printf '\nPasswords, browser profiles, cookies, bookmarks, Keychains, and broad app profiles stay protected.\n'
 }
 
 clean_containers() {
@@ -8371,8 +8466,8 @@ plan_rows() {
     "~/Library/Android/sdk/system-images" "~/Library/Android/sdk/.downloadIntermediates" \
     "~/Library/Android/sdk/.temp")"
   diagnostics="$(sum_existing_kb "~/Library/DiagnosticReports" "~/Library/Application Support/CrashReporter")"
-  ai_workspaces="$(sum_existing_kb "~/.gemini")"
-  ai_models="$(sum_existing_kb "~/.lmstudio/models" "~/.lmstudio/extensions/backends" "~/.ollama/models" "~/.cache/huggingface/hub" "~/.cache/modelscope" "~/.cache/torch/hub" "~/.cache/whisper")"
+  ai_workspaces="$(ai_workspace_rows | while IFS=$'\t' read -r id app kind safety path preview apply description; do [[ "$safety" == "generated-workspace" ]] && printf '%012d\t%s\n' "$(size_kb "$path")" "$path"; done | tab_rows_total_kb)"
+  ai_models="$(ai_model_rows | while IFS=$'\t' read -r id app kind safety path preview apply description; do [[ "$safety" == "downloaded-models" ]] && printf '%012d\t%s\n' "$(size_kb "$path")" "$path"; done | tab_rows_total_kb)"
   containers="$(container_total_kb)"
   user_trash="$(trash_total_kb)"
 
@@ -8397,8 +8492,8 @@ plan_rows() {
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$venv" "venv-stale" "Stale Python virtualenvs" "cleanroom venvs --days $DAYS" "cleanroom clean --apply --trash --include-venv-stale --days $DAYS" "Python virtualenv folders older than $DAYS days under Desktop, Documents, and Downloads."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$dev" "dev-heavy" "Heavy SDK and simulator artifacts" "cleanroom clean --include-dev-heavy" "cleanroom clean --apply --trash --include-dev-heavy" "Opt-in cleanup that may require re-downloading SDKs or resetting simulator app data."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$diagnostics" "diagnostics" "Old diagnostic reports" "cleanroom diagnostics" "cleanroom clean --apply --trash --include-diagnostics --days $DAYS" "Opt-in cleanup for user diagnostic reports and CrashReporter files older than $DAYS days."
-  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$ai_workspaces" "ai-workspaces" "Generated AI workspace state" "cleanroom clean --include-ai-workspaces" "cleanroom clean --apply --trash --include-ai-workspaces" "Generated recordings, scratch, brain, implicit data, and conversation caches where known."
-  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$ai_models" "ai-models" "Downloaded local AI models" "cleanroom clean --include-ai-models" "cleanroom clean --apply --trash --include-ai-models" "Large model stores and backend extensions that may need to be downloaded again."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$ai_workspaces" "ai-workspaces" "Generated AI workspace state" "cleanroom aitools" "cleanroom clean --apply --trash --include-ai-workspaces" "Generated AI-agent recordings, scratch, brain/memory, implicit data, and conversation caches where known."
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$ai_models" "ai-models" "Downloaded local AI models" "cleanroom aitools" "cleanroom clean --apply --trash --include-ai-models" "Large local model stores and backend extensions that may need to be downloaded again."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$containers" "containers" "Container VM disks and stores" "cleanroom containers" "cleanroom clean --apply --trash --include-containers" "High-impact opt-in cleanup that can remove local containers, images, and volumes."
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$user_trash" "user-trash" "Current user Trash" "cleanroom trash" "cleanroom clean --include-user-trash --apply" "Already-deleted user Trash contents. Emptying Trash is explicit and irreversible."
 }
@@ -9094,13 +9189,13 @@ Default safe cleanup:
   Xcode device support, unavailable simulators, simulator app data, Android NDK,
   and Android system images.
 
---include-ai-workspaces:
+  --include-ai-workspaces:
   Generated AI-agent recordings, scratch data, local brain/memory, implicit data,
-  and local conversation caches where known.
+  local conversation caches, and generated browser-profile rendering caches where known.
 
 --include-ai-models:
-  Downloaded local AI model stores such as LM Studio, Ollama, Hugging Face, torch hub,
-  ModelScope, and Whisper cache.
+  Downloaded local AI model stores such as LM Studio, Ollama, Hugging Face, ModelScope,
+  torch hub, Whisper, llama.cpp, GPT4All, Jan, and AnythingLLM.
 
 --include-containers:
   Local container VM disks and image stores for Docker Desktop, Colima, Lima, and
@@ -9117,6 +9212,7 @@ Default safe cleanup:
 Presets:
   safe  default cleanup only
   dev   safe + app caches + package/toolchain stores + stale node_modules + stale virtualenvs
+  ai    generated AI workspace state + downloaded local AI models/backends
   deep  dev + heavy SDKs + snapshots + AI workspaces
 EOF
 }
@@ -9206,7 +9302,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  dashboard|overview|map|map-fast|mapfast|snapshot|snapshot-fast|snapshotfast|diff|state|permissions|review|scan|system-data|system-data-fast|systemdata-fast|systemdatafast|plan|large|large-fast|largefast|brokenlinks|brokenlinks-fast|brokenlinksfast|broken-links-fast|broken-linksfast|quarantine|quarantine-fast|quarantinefast|metadata|metadata-fast|metadatafast|quicklook|fontcaches|font-caches|webcaches|web-caches|savedstate|saved-state|projectcaches|project-caches|projectcaches-fast|projectcachesfast|project-caches-fast|project-cachesfast|developer-fast|developerfast|updaters|updater-caches|browsercaches|browser-caches|browsercaches-fast|browsercachesfast|browser-caches-fast|browser-cachesfast|duplicates|duplicates-fast|duplicatesfast|documents|desktop|screenshots|screenshots-fast|screenshotsfast|archives|archives-fast|archivesfast|downloads|downloads-fast|downloadsfast|installers|nodes|nodes-fast|nodesfast|venvs|venvs-fast|venvsfast|virtualenvs|virtualenvs-fast|virtualenvsfast|apps|apps-fast|appsfast|uninstallers|appreview|appdata|libraries|cloud|cloudfiles|cloudfiles-fast|cloudfilesfast|cloud-files|cloud-files-fast|cloud-filesfast|personal|communications|comms|browsers|leftovers|backups|backups-fast|backupsfast|xcode|xcode-fast|xcodefast|android|startup|loginitems|trash|caches|caches-fast|cachesfast|diagnostics|packages|npm-cache|npmcache|yarn-cache|yarncache|pnpm-store|pnpmstore|cocoapods-cache|pod-cache|podcache|pip-cache|pipcache|receipts|homebrew|homebrew-cleanup|brewcleanup|toolchains|toolchains-fast|toolchainsfast|containers|containers-fast|containersfast|snapshots|report|report-fast|reportfast|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
+  dashboard|overview|map|map-fast|mapfast|snapshot|snapshot-fast|snapshotfast|diff|state|permissions|review|scan|system-data|system-data-fast|systemdata-fast|systemdatafast|plan|large|large-fast|largefast|brokenlinks|brokenlinks-fast|brokenlinksfast|broken-links-fast|broken-linksfast|quarantine|quarantine-fast|quarantinefast|metadata|metadata-fast|metadatafast|quicklook|fontcaches|font-caches|webcaches|web-caches|savedstate|saved-state|projectcaches|project-caches|projectcaches-fast|projectcachesfast|project-caches-fast|project-cachesfast|developer-fast|developerfast|updaters|updater-caches|browsercaches|browser-caches|browsercaches-fast|browsercachesfast|browser-caches-fast|browser-cachesfast|duplicates|duplicates-fast|duplicatesfast|documents|desktop|screenshots|screenshots-fast|screenshotsfast|archives|archives-fast|archivesfast|downloads|downloads-fast|downloadsfast|installers|nodes|nodes-fast|nodesfast|venvs|venvs-fast|venvsfast|virtualenvs|virtualenvs-fast|virtualenvsfast|apps|apps-fast|appsfast|uninstallers|appreview|aitools|ai-tools|ai|appdata|libraries|cloud|cloudfiles|cloudfiles-fast|cloudfilesfast|cloud-files|cloud-files-fast|cloud-filesfast|personal|communications|comms|browsers|leftovers|backups|backups-fast|backupsfast|xcode|xcode-fast|xcodefast|android|startup|loginitems|trash|caches|caches-fast|cachesfast|diagnostics|packages|npm-cache|npmcache|yarn-cache|yarncache|pnpm-store|pnpmstore|cocoapods-cache|pod-cache|podcache|pip-cache|pipcache|receipts|homebrew|homebrew-cleanup|brewcleanup|toolchains|toolchains-fast|toolchainsfast|containers|containers-fast|containersfast|snapshots|report|report-fast|reportfast|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -9366,6 +9462,7 @@ case "$ACTION" in
   apps-fast|appsfast) apps_fast ;;
   uninstallers) uninstallers ;;
   appreview) appreview ;;
+  aitools|ai-tools|ai) aitools ;;
   appdata) appdata ;;
   libraries) libraries ;;
   cloud) cloud ;;

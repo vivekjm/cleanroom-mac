@@ -634,6 +634,13 @@ This can remove simulator app state and SDK components that may need to be downl
 
 ## AI Tools
 
+Review known AI tool storage first:
+
+```sh
+cleanroom aitools
+cleanroom aitools --json
+```
+
 Generated AI-agent workspaces:
 
 ```sh
@@ -647,6 +654,10 @@ Downloaded local models:
 cleanroom clean --include-ai-models
 cleanroom clean --include-ai-models --apply
 ```
+
+`--include-ai-workspaces` covers generated Gemini/Antigravity recordings, scratch folders, brain or memory data, implicit state, local conversation caches, and generated browser-profile rendering caches where known.
+
+`--include-ai-models` covers downloaded model stores and backend extensions from LM Studio, Ollama, Hugging Face, ModelScope, torch hub, Whisper, llama.cpp, GPT4All, Jan, AnythingLLM, and similar known stores.
 
 Model cleanup is intentionally separate because model files are often large but intentionally installed.
 
