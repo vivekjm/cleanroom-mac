@@ -205,6 +205,7 @@ final class AppState: ObservableObject {
     ]
 
     var enginePath = ""
+    private var didPrepare = false
     private var lastStatsRefresh: Date? = nil
     private var statsGeneration = UUID()
     private var currentProcess: Process? = nil
@@ -231,6 +232,8 @@ final class AppState: ObservableObject {
     }
 
     func prepareForUse() {
+        guard !didPrepare else { return }
+        didPrepare = true
         resolveEngine()
         status = "Ready"
         activityMessage = "Choose an area to review, or analyze storage when you want updated numbers."
@@ -461,7 +464,7 @@ final class AppState: ObservableObject {
                 self.reviewSummary = displayOutput
                 if result.status == 15 {
                     self.status = "\(action.title) stopped"
-                    self.activityMessage = "\(action.title) stopped. Open the report to see where it paused."
+                    self.activityMessage = "\(action.title) stopped. Show details to see where it paused."
                     self.reviewSummary += "Review stopped.\n"
                     self.summaryOpen = true
                 } else if result.status == 124 {
@@ -475,7 +478,7 @@ final class AppState: ObservableObject {
                     self.storeCachedReview(title: action.title, summary: displayOutput, items: self.reviewItems, for: action)
                 } else {
                     self.status = "\(action.title) needs attention"
-                    self.activityMessage = "\(action.title) needs attention. Open the report for what happened."
+                    self.activityMessage = "\(action.title) needs attention. Show details for what happened."
                     self.summaryOpen = true
                 }
                 if action == .safeCleanup {
