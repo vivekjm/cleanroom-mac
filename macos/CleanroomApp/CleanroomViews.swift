@@ -537,7 +537,7 @@ final class AppState: ObservableObject {
     }
 
     func runLeftovers(_ query: String) {
-        run(.appReview(query: query))
+        openReview(.appReview(query: query))
     }
 
     func copyDetails() {
@@ -1757,7 +1757,7 @@ struct HeaderStats: View {
                 Spacer()
                 // Navigation arrows — key visual from reference images 1 & 4
                 HStack(spacing: DS.Sp.sm) {
-                    NavArrow(icon: "arrow.left") { state.run(.pastCleanups) }
+                    NavArrow(icon: "arrow.left") { state.openReview(.pastCleanups) }
                     NavArrow(icon: "arrow.right") { state.showApplyConfirm = true }
                 }
             }
@@ -2349,12 +2349,16 @@ struct ApplyConfirmSheet: View {
                     .foregroundColor(DS.C.textSecondary)
                 Spacer()
                 PillBtn("Preview", style: .ghost) {
-                    state.run(.safetyPlan)
-                    dismiss()
+                    if !state.running {
+                        state.openReview(.safetyPlan)
+                        dismiss()
+                    }
                 }
                 PillBtn("Clean Now", style: .primary) {
-                    state.run(.safeCleanup)
-                    dismiss()
+                    if !state.running {
+                        state.run(.safeCleanup)
+                        dismiss()
+                    }
                 }
             }
         }
