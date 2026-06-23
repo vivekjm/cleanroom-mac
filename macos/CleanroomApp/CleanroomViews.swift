@@ -664,11 +664,67 @@ final class AppState: ObservableObject {
     private func appFacingItems(_ items: [[String: Any]]) -> [[String: Any]] {
         items.map { item in
             var cleaned = item
-            for key in cleaned.keys where key.lowercased().contains("command") {
+            for key in cleaned.keys where shouldHideAppField(key) {
                 cleaned.removeValue(forKey: key)
+            }
+            for key in Array(cleaned.keys) {
+                guard let text = stringValue(cleaned[key]) else { continue }
+                if shouldHideAppValue(text) {
+                    cleaned.removeValue(forKey: key)
+                } else if shouldNormalizeAppTextField(key) {
+                    cleaned[key] = normalizeAppText(text)
+                }
             }
             return cleaned
         }
+    }
+
+    private func shouldHideAppField(_ key: String) -> Bool {
+        let lower = key.lowercased()
+        return lower.contains("command") ||
+            lower == "mode" ||
+            lower == "raw" ||
+            lower == "hash" ||
+            lower == "quarantine" ||
+            lower == "executable"
+    }
+
+    private func shouldNormalizeAppTextField(_ key: String) -> Bool {
+        let lower = key.lowercased()
+        return lower == "summary" ||
+            lower == "guidance" ||
+            lower == "description" ||
+            lower == "detail" ||
+            lower == "reason" ||
+            lower == "recoverability" ||
+            lower == "status" ||
+            lower == "safety" ||
+            lower == "category" ||
+            lower == "kind" ||
+            lower == "type" ||
+            lower == "size" ||
+            lower == "value"
+    }
+
+    private func shouldHideAppValue(_ text: String) -> Bool {
+        let lower = text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return lower.hasPrefix("cleanroom ") ||
+            lower.hasPrefix("open -r") ||
+            lower.hasPrefix("--") ||
+            lower.contains(" --apply") ||
+            lower.contains(" --trash") ||
+            lower.contains(" --json") ||
+            lower.contains(" --include") ||
+            lower.contains(" --preflight")
+    }
+
+    private func normalizeAppText(_ text: String) -> String {
+        friendlyLabelIfBackendToken(
+            text.replacingOccurrences(of: "dry-run", with: "review", options: .caseInsensitive)
+                .replacingOccurrences(of: "opt-in", with: "optional", options: .caseInsensitive)
+                .replacingOccurrences(of: "--apply", with: "Clean Now", options: .caseInsensitive)
+                .replacingOccurrences(of: "--trash", with: "Trash recovery", options: .caseInsensitive)
+        )
     }
 
     private func summaryLine(for item: [String: Any]) -> String {
@@ -744,6 +800,14 @@ final class AppState: ObservableObject {
     }
 
     private func friendlySentence(_ raw: String) -> String? {
+        let note = Self.friendlyCleanupNote(raw)
+        if note != raw {
+            return note
+        }
+        let recovery = Self.friendlyRecovery(raw)
+        if recovery != raw {
+            return recovery
+        }
         let sanitized = Self.sanitizeForApp(raw)
             .trimmingCharacters(in: .whitespacesAndNewlines)
         let text = (sanitized.isEmpty ? raw : sanitized)
@@ -762,6 +826,27 @@ final class AppState: ObservableObject {
     }
 
     private func friendlyLabelIfBackendToken(_ text: String) -> String {
+        let exact = text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let exactLabels: [String: String] = [
+            "downloaded-models": "Downloaded models",
+            "generated-workspace": "Generated AI data",
+            "review-only": "Review only",
+            "review": "Review",
+            "allowed": "Ready",
+            "refused-protected": "Protected",
+            "refused-dangerous": "Protected",
+            "large-opt-in": "Large optional cleanup",
+            "destructive-opt-in": "Optional cleanup",
+            "system-tool": "System managed",
+            "app-cache": "App cache",
+            "low-risk": "Low risk",
+            "high-impact": "High impact",
+            "rebuildable": "Rebuildable",
+            "not found": "Not found"
+        ]
+        if let label = exactLabels[exact] {
+            return label
+        }
         if text.range(of: "^[a-z0-9_.-]+$", options: .regularExpression) != nil {
             return friendlyLabel(text)
         }
@@ -788,6 +873,7 @@ final class AppState: ObservableObject {
             "cc": "CC",
             "cli": "Tools",
             "db": "DB",
+            "gpu": "GPU",
             "ios": "iOS",
             "json": "JSON",
             "lm": "LM",
@@ -953,6 +1039,11 @@ final class AppState: ObservableObject {
 
     nonisolated private static func friendlyRecovery(_ raw: String?) -> String {
         guard let raw else { return "Moved to Trash where possible." }
+        if raw.localizedCaseInsensitiveContains("--apply") ||
+            raw.localizedCaseInsensitiveContains("--trash") ||
+            raw.localizedCaseInsensitiveContains("dry-run") {
+            return "Review first; cleaning only happens after confirmation."
+        }
         if raw.localizedCaseInsensitiveContains("Trash mode can recover") {
             return "Moved to Trash where possible."
         }
@@ -970,9 +1061,6 @@ final class AppState: ObservableObject {
         }
         if raw.localizedCaseInsensitiveContains("Dependencies may need") {
             return "Can be reinstalled from the project manifest."
-        }
-        if raw.contains("--") || raw.localizedCaseInsensitiveContains("dry-run") {
-            return "Review first; cleaning only happens after confirmation."
         }
         return raw
             .replacingOccurrences(of: "dry-run", with: "review", options: .caseInsensitive)
@@ -1026,8 +1114,12 @@ final class AppState: ObservableObject {
             "Useful next commands",
             "Review-only inventory",
             "Cleanup commands are dry-runs",
+            "Commands shown are",
             "Use the deeper",
             "Use Apps when",
+            "Fast review.",
+            "Limit:",
+            "Path:",
         ]
         let hiddenPrefixes = [
             "reveal:",
@@ -1055,6 +1147,7 @@ final class AppState: ObservableObject {
                     lowerTrimmed.contains("preview command") ||
                     lowerTrimmed.contains("apply command") ||
                     lowerTrimmed.contains("review command") ||
+                    lowerTrimmed.contains("copyable commands") ||
                     lowerTrimmed.contains("next steps") {
                     return nil
                 }
@@ -1065,6 +1158,7 @@ final class AppState: ObservableObject {
                     lowerTrimmed.contains(" --json") ||
                     lowerTrimmed.contains(" --trash") ||
                     lowerTrimmed.contains(" --preflight") ||
+                    lowerTrimmed.contains(" --include") ||
                     lowerTrimmed.hasPrefix("--") {
                     return nil
                 }
