@@ -485,6 +485,9 @@ final class AppState: ObservableObject {
         if action == "clean", args.contains("--preflight"), !args.contains("--json") {
             return args + ["--json"]
         }
+        if action == "clean", args.contains("--apply"), !args.contains("--json") {
+            return args + ["--json"]
+        }
         return args
     }
 

@@ -1712,6 +1712,18 @@ grep 'Container cleanup can remove local containers' "$preflight_json" >/dev/nul
 grep 'User Trash cleanup is irreversible' "$preflight_json" >/dev/null
 rm -f "$preflight_json"
 
+clean_apply_json="$(mktemp)"
+"$BIN" clean --apply --trash --yes --json > "$clean_apply_json"
+python3 -m json.tool "$clean_apply_json" >/dev/null
+grep '"title":"Safe Cleanup"' "$clean_apply_json" >/dev/null
+grep '"status":"Complete"' "$clean_apply_json" >/dev/null
+grep '"trash":true' "$clean_apply_json" >/dev/null
+if grep -E 'log_path|Restore with|cleanroom restore|--apply|--trash' "$clean_apply_json" >/dev/null; then
+  echo "clean apply JSON should stay app-facing" >&2
+  exit 1
+fi
+rm -f "$clean_apply_json"
+
 deep_output="$("$BIN" clean --include-ai-workspaces --include-ai-models --include-containers 2>&1)"
 grep 'Dry-run mode' <<<"$deep_output" >/dev/null
 

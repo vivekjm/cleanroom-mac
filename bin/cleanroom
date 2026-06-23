@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.61.0"
+VERSION="1.62.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -10201,21 +10201,7 @@ Presets:
 EOF
 }
 
-clean() {
-  if [[ "$PREFLIGHT" -eq 1 ]]; then
-    preflight
-    return 0
-  fi
-  if [[ "$APPLY" -eq 1 ]]; then
-    warn "Apply mode enabled."
-    [[ "$TRASH" -eq 1 ]] && warn "Trash mode enabled."
-  else
-    warn "Dry-run mode. Pass --apply to actually delete."
-  fi
-  confirm_apply
-  ensure_apply_log
-  [[ "$APPLY" -eq 1 ]] && warn "Apply log: $LOG_FILE"
-  disk_line
+clean_run_selected() {
   safe_clean
   clean_logs
   clean_diagnostics
@@ -10243,6 +10229,85 @@ clean() {
   clean_ai_models
   clean_containers
   clean_user_trash
+}
+
+clean_apply_summary_json() {
+  local stats entries moved deleted emptied refused failed other total_kb status summary
+  stats="$(awk -F '\t' '
+    /^#/ || /^version=/ || /^run_id=/ || /^mode=/ || /^started_at=/ || $1 == "timestamp" { next }
+    NF >= 4 {
+      entries += 1
+      size += ($4 + 0)
+      if ($3 == "ok" && $2 == "trash") moved += 1
+      else if ($3 == "ok" && $2 == "delete") deleted += 1
+      else if ($3 == "ok" && $2 == "empty-trash") emptied += 1
+      else if ($3 ~ /^refused/) refused += 1
+      else if ($3 == "failed") failed += 1
+      else other += 1
+    }
+    END {
+      printf "%d\t%d\t%d\t%d\t%d\t%d\t%d\t%d\n", entries, moved, deleted, emptied, refused, failed, other, size
+    }
+  ' "$LOG_FILE" 2>/dev/null || printf '0\t0\t0\t0\t0\t0\t0\t0\n')"
+  IFS=$'\t' read -r entries moved deleted emptied refused failed other total_kb <<<"$stats"
+  if [[ "${failed:-0}" -gt 0 ]]; then
+    status="Needs review"
+    summary="Cleanup finished, but some items could not be changed."
+  elif [[ "${entries:-0}" -eq 0 ]]; then
+    status="Complete"
+    summary="No eligible cleanup items were found."
+  elif [[ "$TRASH" -eq 1 ]]; then
+    status="Complete"
+    summary="Eligible items were moved to Trash where possible."
+  else
+    status="Complete"
+    summary="Eligible cleanup items were removed."
+  fi
+
+  printf '{"items":['
+  printf '{"title":"Safe Cleanup","size":"%s","status":"%s","summary":"%s","moved":%s,"removed":%s,"emptied":%s,"protected":%s,"failed":%s,"mode":"app"}' \
+    "$(human_kb "${total_kb:-0}" | json_escape)" \
+    "$(printf '%s' "$status" | json_escape)" \
+    "$(printf '%s' "$summary" | json_escape)" \
+    "${moved:-0}" \
+    "${deleted:-0}" \
+    "${emptied:-0}" \
+    "${refused:-0}" \
+    "${failed:-0}"
+  printf '],"summary":"%s","changed":%s,"trash":%s}\n' \
+    "$(printf '%s' "$summary" | json_escape)" \
+    "$(if [[ "${entries:-0}" -gt 0 ]]; then echo true; else echo false; fi)" \
+    "$(if [[ "$TRASH" -eq 1 ]]; then echo true; else echo false; fi)"
+}
+
+clean_apply_json() {
+  [[ "$APPLY" -eq 1 ]] || die "clean --json apply summary requires --apply"
+  confirm_apply
+  ensure_apply_log
+  clean_run_selected >/dev/null 2>&1
+  clean_apply_summary_json
+}
+
+clean() {
+  if [[ "$PREFLIGHT" -eq 1 ]]; then
+    preflight
+    return 0
+  fi
+  if [[ "$JSON" -eq 1 && "$APPLY" -eq 1 ]]; then
+    clean_apply_json
+    return 0
+  fi
+  if [[ "$APPLY" -eq 1 ]]; then
+    warn "Apply mode enabled."
+    [[ "$TRASH" -eq 1 ]] && warn "Trash mode enabled."
+  else
+    warn "Dry-run mode. Pass --apply to actually delete."
+  fi
+  confirm_apply
+  ensure_apply_log
+  [[ "$APPLY" -eq 1 ]] && warn "Apply log: $LOG_FILE"
+  disk_line
+  clean_run_selected
   printf '\n%s\n' "${BOLD}After${RESET}"
   disk_line
   [[ "$APPLY" -eq 1 && "$TRASH" -eq 1 ]] && warn "Review ~/.Trash/cleanroom-$RUN_ID before emptying Trash."
