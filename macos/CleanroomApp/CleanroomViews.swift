@@ -210,6 +210,7 @@ final class AppState: ObservableObject {
     private var currentRunID = UUID()
     private var reviewCache: [String: CachedReview] = [:]
     private var cleanupPlanCache: CachedCleanupPlan? = nil
+    private var cleanupPlanGeneration = UUID()
     private let reviewCacheTTL: TimeInterval = 120
 
     func resolveEngine() {
@@ -285,11 +286,13 @@ final class AppState: ObservableObject {
         cleanupPlanLoading = true
         cleanupPlanItems = []
         cleanupPlanNotes = []
+        let generation = cleanupPlanGeneration
         let command = resolvedCommand(["plan-fast", "--json"])
         Task.detached(priority: .background) {
             let result = await Self.exec(command.executable, command.arguments, timeoutSeconds: AppRunLimit.quickSummary)
             let parsed = Self.parseCleanupPlan(result.output)
             await MainActor.run {
+                guard self.cleanupPlanGeneration == generation else { return }
                 self.cleanupPlanItems = parsed.items
                 self.cleanupPlanNotes = parsed.notes
                 if result.status == 0 {
@@ -549,6 +552,8 @@ final class AppState: ObservableObject {
     private func clearRecentResults() {
         clearReviewCache()
         cleanupPlanCache = nil
+        cleanupPlanGeneration = UUID()
+        cleanupPlanLoading = false
         cleanupPlanItems = []
         cleanupPlanNotes = []
     }
