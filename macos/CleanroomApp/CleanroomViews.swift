@@ -585,8 +585,14 @@ final class AppState: ObservableObject {
 
     private func appFacingSummaryText() -> String {
         guard !reviewItems.isEmpty else {
-            let clean = Self.sanitizeForApp(reviewSummary)
-            return clean.isEmpty ? "No review report available yet.\n" : clean
+            return [
+                reviewTitle == "Review Report" ? "Cleanroom" : reviewTitle,
+                activityMessage,
+                status
+            ]
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: "\n") + "\n"
         }
         var lines = ["\(reviewTitle) — \(reviewItems.count) \(reviewItems.count == 1 ? "item" : "items")"]
         for item in reviewItems {
@@ -2231,12 +2237,7 @@ struct ReviewSummaryPanel: View {
                     ScrollView(showsIndicators: true) {
                         VStack(alignment: .leading, spacing: DS.Sp.md) {
                             if state.reviewItems.isEmpty {
-                                Text(state.reviewSummary)
-                                    .font(DS.T.bodySm)
-                                    .lineSpacing(3)
-                                    .foregroundColor(DS.C.textOnDark.opacity(0.88))
-                                    .textSelection(.enabled)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                EmptyReportPanel(state: state)
                             } else {
                                 HStack(alignment: .firstTextBaseline) {
                                     Text(state.reviewTitle)
@@ -2263,6 +2264,83 @@ struct ReviewSummaryPanel: View {
                 }
             }
         }
+    }
+}
+
+struct EmptyReportPanel: View {
+    @ObservedObject var state: AppState
+
+    var body: some View {
+        HStack(alignment: .top, spacing: DS.Sp.md) {
+            ZStack {
+                Circle()
+                    .fill(iconColor.opacity(0.18))
+                    .frame(width: 34, height: 34)
+                Image(systemName: icon)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(iconColor)
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(title)
+                    .font(DS.T.h3)
+                    .foregroundColor(DS.C.textOnDark)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                Text(detail)
+                    .font(DS.T.bodySm)
+                    .foregroundColor(DS.C.textOnDark.opacity(0.68))
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(state.status)
+                    .font(DS.T.tag)
+                    .foregroundColor(DS.C.textOnDark.opacity(0.46))
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(DS.Sp.lg)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: DS.R.sm)
+                .fill(Color.white.opacity(0.055))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: DS.R.sm)
+                .stroke(DS.C.dividerOnDark, lineWidth: 1)
+        )
+    }
+
+    private var title: String {
+        if state.running { return "Review In Progress" }
+        if state.statsLoading { return "Storage Analysis In Progress" }
+        if state.status.localizedCaseInsensitiveContains("attention") { return "Needs Attention" }
+        if state.status.localizedCaseInsensitiveContains("copied") { return "Report Copied" }
+        if state.reviewTitle != "Review Report" { return state.reviewTitle }
+        return "Ready When You Are"
+    }
+
+    private var detail: String {
+        if state.running {
+            return "Cleanroom is checking this area and will show clear review rows when it finishes."
+        }
+        if state.statsLoading {
+            return "Cleanroom is measuring storage without changing files."
+        }
+        let clean = state.activityMessage.trimmingCharacters(in: .whitespacesAndNewlines)
+        return clean.isEmpty ? "Choose a review area to see what can be safely cleaned." : clean
+    }
+
+    private var icon: String {
+        if state.running || state.statsLoading { return "clock.arrow.circlepath" }
+        if state.status.localizedCaseInsensitiveContains("attention") { return "exclamationmark.triangle.fill" }
+        if state.status.localizedCaseInsensitiveContains("copied") { return "doc.on.clipboard.fill" }
+        return "checkmark.shield.fill"
+    }
+
+    private var iconColor: Color {
+        if state.status.localizedCaseInsensitiveContains("attention") { return DS.C.ctaOrange }
+        if state.running || state.statsLoading { return DS.C.ctaOrange }
+        return DS.C.positive
     }
 }
 
