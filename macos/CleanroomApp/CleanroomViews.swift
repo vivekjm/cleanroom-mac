@@ -148,7 +148,7 @@ final class AppState: ObservableObject {
 
     @Published var dest:             NavDest = .dashboard
     @Published var filter:           String  = "all"
-    @Published var reviewSummary:    String  = "Choose a review to see a summary here.\n"
+    @Published var reviewSummary:    String  = "Choose a review to see a report here.\n"
     @Published var running:          Bool    = false
     @Published var status:           String  = "Ready"
     @Published var activityMessage:  String  = "Choose a review or cleanup to begin."
@@ -156,7 +156,7 @@ final class AppState: ObservableObject {
     @Published var showLeftovers:    Bool    = false
     @Published var showApplyConfirm: Bool    = false
     @Published var cardOffset:       Int     = 0
-    @Published var reviewTitle:      String  = "Review Summary"
+    @Published var reviewTitle:      String  = "Review Report"
     @Published var reviewItems:      [ReviewItem] = []
     @Published var cleanupPlanItems: [CleanupPlanItem] = []
     @Published var cleanupPlanNotes: [String] = []
@@ -415,7 +415,7 @@ final class AppState: ObservableObject {
                 self.reviewSummary = displayOutput
                 if result.status == 15 {
                     self.status = "\(action.title) stopped"
-                    self.activityMessage = "\(action.title) stopped. Open the summary to see where it paused."
+                    self.activityMessage = "\(action.title) stopped. Open the report to see where it paused."
                     self.reviewSummary += "Review stopped.\n"
                     self.summaryOpen = true
                 } else if result.status == 124 {
@@ -429,7 +429,7 @@ final class AppState: ObservableObject {
                     self.storeCachedReview(title: action.title, summary: displayOutput, items: self.reviewItems, for: action)
                 } else {
                     self.status = "\(action.title) needs attention"
-                    self.activityMessage = "\(action.title) needs attention. Open the summary for what happened."
+                    self.activityMessage = "\(action.title) needs attention. Open the report for what happened."
                     self.summaryOpen = true
                 }
                 self.running = false
@@ -516,8 +516,8 @@ final class AppState: ObservableObject {
     }
 
     func clearSummary() {
-        reviewSummary = "Choose a review to see a summary here.\n"
-        reviewTitle = "Review Summary"
+        reviewSummary = "Choose a review to see a report here.\n"
+        reviewTitle = "Review Report"
         reviewItems = []
         status = "Ready"
         activityMessage = "Report cleared. Choose a review when you are ready."
@@ -527,7 +527,7 @@ final class AppState: ObservableObject {
     private func appFacingSummaryText() -> String {
         guard !reviewItems.isEmpty else {
             let clean = Self.sanitizeForApp(reviewSummary)
-            return clean.isEmpty ? "No review summary available yet.\n" : clean
+            return clean.isEmpty ? "No review report available yet.\n" : clean
         }
         var lines = ["\(reviewTitle) — \(reviewItems.count) \(reviewItems.count == 1 ? "item" : "items")"]
         for item in reviewItems {
@@ -597,7 +597,7 @@ final class AppState: ObservableObject {
         if rows.count > 0 {
             return "\(title) found \(rows.count) review items. No files were changed."
         }
-        return "\(title) finished. A summary is available if you need it."
+        return "\(title) finished. A report is available if you need it."
     }
 
     private func presentableDetails(title: String, action: AppAction, details: String) -> String {
@@ -606,7 +606,7 @@ final class AppState: ObservableObject {
               let parsed = try? JSONSerialization.jsonObject(with: data),
               let items = jsonItems(from: parsed) else {
             let clean = Self.sanitizeForApp(details)
-            return clean.isEmpty ? "\(title) finished. A summary is available if you need it.\n" : clean
+            return clean.isEmpty ? "\(title) finished. A report is available if you need it.\n" : clean
         }
 
         if items.isEmpty {
