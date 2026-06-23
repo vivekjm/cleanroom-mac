@@ -160,7 +160,7 @@ final class AppState: ObservableObject {
 
     @Published var dest:             NavDest = .dashboard
     @Published var filter:           String  = "all"
-    @Published var reviewSummary:    String  = "Choose a review to see details here.\n"
+    @Published var reviewSummary:    String  = "Choose a review to see the report here.\n"
     @Published var running:          Bool    = false
     @Published var statsLoading:     Bool    = false
     @Published var status:           String  = "Ready"
@@ -169,7 +169,7 @@ final class AppState: ObservableObject {
     @Published var showLeftovers:    Bool    = false
     @Published var showApplyConfirm: Bool    = false
     @Published var cardOffset:       Int     = 0
-    @Published var reviewTitle:      String  = "Review Details"
+    @Published var reviewTitle:      String  = "Review Report"
     @Published var reviewItems:      [ReviewItem] = []
     @Published var cleanupPlanItems: [CleanupPlanItem] = []
     @Published var cleanupPlanNotes: [String] = []
@@ -473,7 +473,7 @@ final class AppState: ObservableObject {
                 self.reviewSummary = presented.summary
                 if result.status == 15 {
                     self.status = "\(action.title) stopped"
-                    self.activityMessage = "\(action.title) stopped. Show details to see where it paused."
+                    self.activityMessage = "\(action.title) stopped. Open the report to see where it paused."
                     self.reviewSummary += "Review stopped.\n"
                     self.summaryOpen = true
                 } else if result.status == 124 {
@@ -487,7 +487,7 @@ final class AppState: ObservableObject {
                     self.storeCachedReview(title: action.title, summary: presented.summary, items: self.reviewItems, for: action)
                 } else {
                     self.status = "\(action.title) needs attention"
-                    self.activityMessage = "\(action.title) needs attention. Show details for what happened."
+                    self.activityMessage = "\(action.title) needs attention. Open the report for what happened."
                     self.summaryOpen = true
                 }
                 if action == .safeCleanup {
@@ -582,23 +582,23 @@ final class AppState: ObservableObject {
     func copyDetails() {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(appFacingSummaryText(), forType: .string)
-        status = "Details copied"
-        activityMessage = "Review details copied."
+        status = "Report copied"
+        activityMessage = "Review report copied."
     }
 
     func clearSummary() {
-        reviewSummary = "Choose a review to see details here.\n"
-        reviewTitle = "Review Details"
+        reviewSummary = "Choose a review to see the report here.\n"
+        reviewTitle = "Review Report"
         reviewItems = []
         status = "Ready"
-        activityMessage = "Details cleared. Choose a review when you are ready."
+        activityMessage = "Report cleared. Choose a review when you are ready."
         summaryOpen = false
     }
 
     private func appFacingSummaryText() -> String {
         guard !reviewItems.isEmpty else {
             return [
-                reviewTitle == "Review Details" ? "Cleanroom" : reviewTitle,
+                reviewTitle == "Review Report" ? "Cleanroom" : reviewTitle,
                 activityMessage,
                 status
             ]
@@ -672,7 +672,7 @@ final class AppState: ObservableObject {
             let size = items[0].size
             return "\(title) found \(items.count) review items, largest starts at \(size). No files were changed."
         }
-        return "\(title) finished. Details are available if you need them."
+        return "\(title) finished. Open the report if you need more context."
     }
 
     private func presentableReview(title: String, action: AppAction, details: String) -> PresentableReview {
@@ -744,7 +744,7 @@ final class AppState: ObservableObject {
         return [
             ReviewItem(
                 title: title,
-                detail: "Review finished. No extra details need your attention.",
+                detail: "Review finished. No extra report notes need your attention.",
                 size: "Done",
                 badge: "Ready",
                 path: nil
@@ -2210,16 +2210,16 @@ struct ReviewSummaryPanel: View {
                     IconBtn(icon: "doc.on.clipboard", dark: true) {
                         state.copyDetails()
                     }
-                    .help("Copy details")
+                    .help("Copy report")
                     IconBtn(icon: "xmark", dark: true) {
                         state.clearSummary()
                     }
-                    .help("Clear details")
+                    .help("Clear report")
                 }
                 IconBtn(icon: state.summaryOpen ? "chevron.down" : "chevron.up", dark: true) {
                     withAnimation(DS.Ani.std) { state.summaryOpen.toggle() }
                 }
-                .help(state.summaryOpen ? "Hide details" : "Show details")
+                .help(state.summaryOpen ? "Hide report" : "Show report")
             }
             .padding(.horizontal, DS.Sp.lg)
             .padding(.vertical, DS.Sp.sm)
@@ -2301,8 +2301,8 @@ struct EmptyReportPanel: View {
         if state.running { return "Review In Progress" }
         if state.statsLoading { return "Storage Analysis In Progress" }
         if state.status.localizedCaseInsensitiveContains("attention") { return "Needs Attention" }
-        if state.status.localizedCaseInsensitiveContains("copied") { return "Details Copied" }
-        if state.reviewTitle != "Review Details" { return state.reviewTitle }
+        if state.status.localizedCaseInsensitiveContains("copied") { return "Report Copied" }
+        if state.reviewTitle != "Review Report" { return state.reviewTitle }
         return "Ready When You Are"
     }
 
