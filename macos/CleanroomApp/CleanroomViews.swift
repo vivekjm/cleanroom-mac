@@ -76,7 +76,7 @@ struct AppAction: Hashable {
     let title: String
     let args: [String]
 
-    static let healthCheck = AppAction(title: "Health Check", args: ["doctor-fast"])
+    static let healthCheck = AppAction(title: "App Checkup", args: ["doctor-fast"])
     static let storageOverview = AppAction(title: "Storage Overview", args: ["map-fast"])
     static let largeFiles = AppAction(title: "Large Files", args: ["large-fast", "--limit", "30", "--min-mb", "500"])
     static let duplicates = AppAction(title: "Duplicates", args: ["duplicates-fast", "--limit", "20", "--min-mb", "100"])
@@ -100,25 +100,25 @@ struct AppAction: Hashable {
     static let aiTools = AppAction(title: "AI Tools", args: ["aitools-fast"])
     static let appData = AppAction(title: "App Data", args: ["appdata-fast", "--limit", "40"])
     static let mediaLibraries = AppAction(title: "Media Libraries", args: ["libraries-fast"])
-    static let javascriptPackages = AppAction(title: "JavaScript Packages", args: ["nodes-fast", "--limit", "30", "--days", "30"])
-    static let pythonEnvironments = AppAction(title: "Python Environments", args: ["venvs-fast", "--limit", "30", "--days", "30"])
+    static let javascriptPackages = AppAction(title: "Project Dependencies", args: ["nodes-fast", "--limit", "30", "--days", "30"])
+    static let pythonEnvironments = AppAction(title: "Python Project Data", args: ["venvs-fast", "--limit", "30", "--days", "30"])
     static let apps = AppAction(title: "Apps", args: ["apps-fast", "--limit", "30"])
     static let trash = AppAction(title: "Trash", args: ["trash-fast"])
     static let cloudFiles = AppAction(title: "Cloud Files", args: ["cloudfiles-fast", "--min-mb", "250", "--limit", "40"])
-    static let xcode = AppAction(title: "Xcode", args: ["xcode-fast"])
+    static let xcode = AppAction(title: "Apple Developer Storage", args: ["xcode-fast"])
     static let backups = AppAction(title: "Backups", args: ["backups-fast"])
     static let systemData = AppAction(title: "System Data", args: ["system-data-fast"])
-    static let containers = AppAction(title: "Containers", args: ["containers-fast"])
-    static let developerTools = AppAction(title: "Developer Tools", args: ["toolchains-fast"])
+    static let containers = AppAction(title: "Container Storage", args: ["containers-fast"])
+    static let developerTools = AppAction(title: "Developer Caches", args: ["toolchains-fast"])
     static let loginItems = AppAction(title: "Login Items", args: ["loginitems-fast"])
-    static let startup = AppAction(title: "Startup", args: ["startup-fast"])
-    static let storageRecord = AppAction(title: "Storage Record", args: ["snapshot-fast"])
+    static let startup = AppAction(title: "Startup Items", args: ["startup-fast"])
+    static let storageRecord = AppAction(title: "Storage Snapshot", args: ["snapshot-fast"])
     static let restoreHistory = AppAction(title: "Restore History", args: ["state-fast"])
-    static let safetyCheck = AppAction(title: "Cleanup Check", args: ["clean", "--preset", "dev", "--preflight"])
-    static let privacyReport = AppAction(title: "Privacy Report", args: ["report-fast", "--redact"])
-    static let pastCleanups = AppAction(title: "Past Cleanups", args: ["history-fast"])
-    static let protectedItems = AppAction(title: "Protected Items", args: ["protect-fast"])
-    static let safetyPolicy = AppAction(title: "Safety Policy", args: ["rules-fast"])
+    static let safetyCheck = AppAction(title: "Cleanup Preview", args: ["clean", "--preset", "dev", "--preflight"])
+    static let privacyReport = AppAction(title: "Shareable Report", args: ["report-fast", "--redact"])
+    static let pastCleanups = AppAction(title: "Recent Cleanups", args: ["history-fast"])
+    static let protectedItems = AppAction(title: "Protected Data", args: ["protect-fast"])
+    static let safetyPolicy = AppAction(title: "Safety Rules", args: ["rules-fast"])
     static let safetyPlan = AppAction(title: "Cleaning Preview", args: ["clean", "--preflight"])
     static let safeCleanup = AppAction(title: "Safe Cleanup", args: ["clean", "--apply", "--trash", "--yes"])
 
@@ -164,11 +164,11 @@ final class AppState: ObservableObject {
 
     @Published var categories: [CleanCategory] = [
         CleanCategory(title: "Caches",       tagline: "App & system caches accumulating silently",      icon: "xmark.bin.fill",        color: DS.C.cardForest,   action: .caches),
-        CleanCategory(title: "JavaScript Packages", tagline: "Old project dependencies and package caches", icon: "shippingbox.fill",      color: DS.C.cardViolet,   action: .javascriptPackages),
+        CleanCategory(title: "Project Dependencies", tagline: "Old project packages and rebuildable caches", icon: "shippingbox.fill",      color: DS.C.cardViolet,   action: .javascriptPackages),
         CleanCategory(title: "Downloads",    tagline: "Old downloads, DMGs, and forgotten installers",  icon: "arrow.down.to.line",    color: DS.C.cardAmber,    action: .downloads),
         CleanCategory(title: "Large Files",  tagline: "Files over 500 MB that may no longer be needed", icon: "doc.fill",              color: DS.C.cardSlate,    action: .largeFiles),
         CleanCategory(title: "Archives",     tagline: "Old zip archives, tar files, and disk images",   icon: "archivebox.fill",       color: DS.C.cardRose,     action: .archives),
-        CleanCategory(title: "Developer Files", tagline: "Build artifacts, environments, and SDK caches", icon: "hammer.fill",           color: DS.C.cardTeal,     action: .developerFiles),
+        CleanCategory(title: "Developer Files", tagline: "Build artifacts and SDK caches", icon: "hammer.fill",           color: DS.C.cardTeal,     action: .developerFiles),
         CleanCategory(title: "Screenshots",  tagline: "Old screenshots accumulating on Desktop",        icon: "camera.viewfinder",     color: DS.C.cardBark,     action: .screenshots),
         CleanCategory(title: "Trash",        tagline: "Files waiting in macOS Trash",                   icon: "trash.fill",            color: DS.C.cardCharcoal, action: .trash),
     ]
@@ -390,7 +390,7 @@ final class AppState: ObservableObject {
                     self.summaryOpen = true
                 } else if result.status == 124 {
                     self.status = "\(action.title) paused"
-                    self.activityMessage = "\(action.title) took too long. Try a narrower review or run Health Check."
+                    self.activityMessage = "\(action.title) took too long. Try a narrower review or run App Checkup."
                     self.summaryOpen = true
                 } else if result.status == 0 {
                     self.status = "\(action.title) complete"
@@ -1046,7 +1046,7 @@ final class AppState: ObservableObject {
     func filteredCategories() -> [CleanCategory] {
         switch filter {
         case "caches":    return categories.filter { $0.title == "Caches" }
-        case "dev":       return categories.filter { ["JavaScript Packages", "Developer Files"].contains($0.title) }
+        case "dev":       return categories.filter { ["Project Dependencies", "Developer Files"].contains($0.title) }
         case "downloads": return categories.filter { ["Downloads", "Archives"].contains($0.title) }
         case "files":     return categories.filter { $0.title == "Large Files" }
         case "archives":  return categories.filter { $0.title == "Archives" }
@@ -1084,7 +1084,7 @@ final class AppState: ObservableObject {
             let visibleText = isStructured && p.terminationStatus == 0 ? text : sanitizeForApp(text)
             if timedOut.isMarked {
                 let fallback = visibleText.isEmpty ? "" : visibleText + "\n"
-                return CommandResult(output: fallback + "This review took too long and was paused. Try a narrower review or run Health Check.\n", status: 124)
+                return CommandResult(output: fallback + "This review took too long and was paused. Try a narrower review or run App Checkup.\n", status: 124)
             }
             if p.terminationStatus == 0 {
                 return CommandResult(output: visibleText.isEmpty ? "Completed.\n" : visibleText, status: p.terminationStatus)
@@ -1093,9 +1093,9 @@ final class AppState: ObservableObject {
                 return CommandResult(output: visibleText, status: p.terminationStatus)
             }
             let fallback = visibleText.isEmpty ? "" : visibleText + "\n"
-            return CommandResult(output: fallback + "This review could not finish. Please try again or run Health Check.\n", status: p.terminationStatus)
+            return CommandResult(output: fallback + "This review could not finish. Please try again or run App Checkup.\n", status: p.terminationStatus)
         } catch {
-            return CommandResult(output: "This review could not start. Reopen the app and try again, or run Health Check.\n", status: -1)
+            return CommandResult(output: "This review could not start. Reopen the app and try again, or run App Checkup.\n", status: -1)
         }
     }
 
@@ -1434,7 +1434,7 @@ struct SidebarView: View {
                     VStack(alignment: .leading, spacing: 0) {
                         SidebarSection("OVERVIEW") {
                             NavRow("square.grid.2x2.fill",    "Dashboard",   .dashboard, state)
-                            NavRow("heart.text.square.fill",  "Health Check", .run(.healthCheck), state)
+                            NavRow("heart.text.square.fill",  "App Checkup", .run(.healthCheck), state)
                             NavRow("chart.bar.fill",          "Storage Overview", .run(.storageOverview), state)
                             NavRow("magnifyingglass",         "Refresh Summary", .dashboard, state, onTap: { state.refreshStats(force: true) })
                             NavRow("text.badge.checkmark",    "Review",      .dashboard, state, onTap: { state.filter = "all"; state.refreshStats(force: true) })
@@ -1465,30 +1465,30 @@ struct SidebarView: View {
                             NavRow("sparkles", "AI Tools", .run(.aiTools), state)
                             NavRow("internaldrive.fill",      "App Data",    .run(.appData), state)
                             NavRow("photo.fill",              "Media Libraries", .run(.mediaLibraries), state)
-                            NavRow("shippingbox.fill",        "JavaScript Packages",.run(.javascriptPackages), state)
-                            NavRow("square.stack.3d.up.fill", "Python Environments", .run(.pythonEnvironments), state)
+                            NavRow("shippingbox.fill",        "Project Dependencies",.run(.javascriptPackages), state)
+                            NavRow("square.stack.3d.up.fill", "Python Project Data", .run(.pythonEnvironments), state)
                             NavRow("apps.iphone",             "Apps",        .run(.apps), state)
                             NavRow("app.badge.checkmark.fill","App Review",  .dashboard, state, onTap: { state.showLeftovers = true })
                             NavRow("trash.fill",              "Trash",       .run(.trash), state)
                             NavRow("icloud.fill",             "Cloud Files", .run(.cloudFiles), state)
                         }
                         SidebarSection("SYSTEM") {
-                            NavRow("hammer.fill",             "Xcode",       .run(.xcode), state)
+                            NavRow("hammer.fill",             "Apple Developer Storage", .run(.xcode), state)
                             NavRow("clock.arrow.circlepath",  "Backups",     .run(.backups), state)
                             NavRow("externaldrive.fill",      "System Data", .run(.systemData), state)
-                            NavRow("shippingbox.fill",        "Containers",  .run(.containers), state)
-                            NavRow("wrench.and.screwdriver",  "Developer Tools", .run(.developerTools), state)
+                            NavRow("shippingbox.fill",        "Container Storage", .run(.containers), state)
+                            NavRow("wrench.and.screwdriver",  "Developer Caches", .run(.developerTools), state)
                             NavRow("person.crop.circle",      "Login Items", .run(.loginItems), state)
-                            NavRow("bolt.fill",               "Startup",     .run(.startup), state)
+                            NavRow("bolt.fill",               "Startup Items", .run(.startup), state)
                         }
                         SidebarSection("SAFETY") {
-                            NavRow("camera.fill",             "Storage Record", .run(.storageRecord), state)
+                            NavRow("camera.fill",             "Storage Snapshot", .run(.storageRecord), state)
                             NavRow("clock.badge.checkmark.fill", "Restore History", .run(.restoreHistory), state)
-                            NavRow("checkmark.shield.fill",   "Cleanup Check",    .run(.safetyCheck), state)
-                            NavRow("doc.text.fill",           "Privacy Report",   .run(.privacyReport), state)
-                            NavRow("clock.fill",              "Past Cleanups",    .run(.pastCleanups), state)
-                            NavRow("shield.fill",             "Protected Items", .run(.protectedItems), state)
-                            NavRow("flag.fill",               "Safety Policy", .run(.safetyPolicy), state)
+                            NavRow("checkmark.shield.fill",   "Cleanup Preview", .run(.safetyCheck), state)
+                            NavRow("doc.text.fill",           "Shareable Report", .run(.privacyReport), state)
+                            NavRow("clock.fill",              "Recent Cleanups", .run(.pastCleanups), state)
+                            NavRow("shield.fill",             "Protected Data", .run(.protectedItems), state)
+                            NavRow("flag.fill",               "Safety Rules", .run(.safetyPolicy), state)
                         }
                     }
                     .padding(.bottom, DS.Sp.xxl)
