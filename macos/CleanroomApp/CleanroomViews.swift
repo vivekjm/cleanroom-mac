@@ -79,6 +79,12 @@ private struct CachedReview {
     var createdAt: Date
 }
 
+private struct CachedCleanupPlan {
+    var items: [CleanupPlanItem]
+    var notes: [String]
+    var createdAt: Date
+}
+
 struct AppAction: Hashable {
     let title: String
     let args: [String]
@@ -202,6 +208,7 @@ final class AppState: ObservableObject {
     private var currentProcess: Process? = nil
     private var currentRunID = UUID()
     private var reviewCache: [String: CachedReview] = [:]
+    private var cleanupPlanCache: CachedCleanupPlan? = nil
     private let reviewCacheTTL: TimeInterval = 120
 
     func resolveEngine() {
@@ -230,7 +237,7 @@ final class AppState: ObservableObject {
     func refreshStats(force: Bool = false) {
         guard !running else { return }
         if force {
-            clearReviewCache()
+            clearRecentResults()
         }
         if !force,
            let lastStatsRefresh,
@@ -255,6 +262,13 @@ final class AppState: ObservableObject {
 
     func refreshCleanupPlan() {
         guard !cleanupPlanLoading else { return }
+        if let cached = cleanupPlanCache,
+           Date().timeIntervalSince(cached.createdAt) < reviewCacheTTL {
+            cleanupPlanItems = cached.items
+            cleanupPlanNotes = cached.notes
+            return
+        }
+        cleanupPlanCache = nil
         cleanupPlanLoading = true
         cleanupPlanItems = []
         cleanupPlanNotes = []
@@ -265,6 +279,13 @@ final class AppState: ObservableObject {
             await MainActor.run {
                 self.cleanupPlanItems = parsed.items
                 self.cleanupPlanNotes = parsed.notes
+                if result.status == 0 {
+                    self.cleanupPlanCache = CachedCleanupPlan(
+                        items: parsed.items,
+                        notes: parsed.notes,
+                        createdAt: Date()
+                    )
+                }
                 self.cleanupPlanLoading = false
             }
         }
@@ -434,7 +455,7 @@ final class AppState: ObservableObject {
                 }
                 self.running = false
                 if action == .safeCleanup {
-                    self.clearReviewCache()
+                    self.clearRecentResults()
                     self.refreshStats(force: true)
                 }
             }
@@ -502,6 +523,11 @@ final class AppState: ObservableObject {
 
     private func clearReviewCache() {
         reviewCache.removeAll()
+    }
+
+    private func clearRecentResults() {
+        clearReviewCache()
+        cleanupPlanCache = nil
     }
 
     func runLeftovers(_ query: String) {
