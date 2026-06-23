@@ -614,7 +614,7 @@ final class AppState: ObservableObject {
 
     private func summaryLine(for item: [String: Any]) -> String {
         let size = stringValue(item["size"]) ?? stringValue(item["value"]) ?? stringValue(item["potential_reclaim"]) ?? "Review"
-        let title = stringValue(item["title"]) ?? stringValue(item["name"]) ?? stringValue(item["kind"]) ?? stringValue(item["runtime"]) ?? stringValue(item["id"]) ?? "Item"
+        let title = friendlyTitle(from: item)
         if let location = friendlyLocationHint(from: item) {
             return "\(size)  \(title)  \(location)"
         }
@@ -623,25 +623,43 @@ final class AppState: ObservableObject {
 
     private func reviewItem(from item: [String: Any]) -> ReviewItem {
         let size = stringValue(item["size"]) ?? stringValue(item["value"]) ?? stringValue(item["potential_reclaim"]) ?? stringValue(item["total"]) ?? "Review"
-        let title = stringValue(item["title"]) ??
+        let title = friendlyTitle(from: item)
+        let badge = friendlyBadge(from: item)
+        let path = displayPath(from: item)
+        let detail = friendlyDetail(from: item) ??
+            friendlyLocationHint(from: item) ??
+            "Review before cleaning."
+        return ReviewItem(title: title, detail: detail, size: size, badge: badge, path: path)
+    }
+
+    private func friendlyTitle(from item: [String: Any]) -> String {
+        let raw = stringValue(item["title"]) ??
             stringValue(item["name"]) ??
             stringValue(item["kind"]) ??
             stringValue(item["runtime"]) ??
             stringValue(item["id"]) ??
+            stringValue(item["type"]) ??
             "Review item"
-        let badge = friendlyBadge(from: item)
-        let path = displayPath(from: item)
-        let detail = stringValue(item["summary"]) ??
-            stringValue(item["guidance"]) ??
-            stringValue(item["description"]) ??
-            stringValue(item["detail"]) ??
-            stringValue(item["reason"]) ??
-            stringValue(item["recoverability"]) ??
-            stringValue(item["modified"]) ??
-            stringValue(item["last_modified"]) ??
-            friendlyLocationHint(from: item) ??
-            "Review before cleaning."
-        return ReviewItem(title: title, detail: detail, size: size, badge: badge, path: path)
+        return friendlyLabel(raw)
+    }
+
+    private func friendlyDetail(from item: [String: Any]) -> String? {
+        let candidates = [
+            stringValue(item["summary"]),
+            stringValue(item["guidance"]),
+            stringValue(item["description"]),
+            stringValue(item["detail"]),
+            stringValue(item["reason"]),
+            stringValue(item["recoverability"]),
+            stringValue(item["modified"]),
+            stringValue(item["last_modified"])
+        ]
+        for candidate in candidates {
+            guard let candidate,
+                  let cleaned = friendlySentence(candidate) else { continue }
+            return cleaned
+        }
+        return nil
     }
 
     private func friendlyBadge(from item: [String: Any]) -> String {
@@ -651,17 +669,87 @@ final class AppState: ObservableObject {
             stringValue(item["type"]) ??
             stringValue(item["status"]) ??
             "Review"
-        return raw
-            .replacingOccurrences(of: "-", with: " ")
-            .replacingOccurrences(of: "_", with: " ")
-            .capitalized
+        return friendlyLabel(raw)
     }
 
     private func displayPath(from item: [String: Any]) -> String? {
         if let path = stringValue(item["path"]) { return path }
         if let paths = item["paths"] as? [String], let first = paths.first { return first }
-        if let paths = stringValue(item["paths"]) { return paths }
+        if let paths = stringValue(item["paths"]) {
+            return paths
+                .components(separatedBy: CharacterSet(charactersIn: ";\n"))
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .first { !$0.isEmpty }
+        }
         return nil
+    }
+
+    private func friendlySentence(_ raw: String) -> String? {
+        let sanitized = Self.sanitizeForApp(raw)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let text = (sanitized.isEmpty ? raw : sanitized)
+            .replacingOccurrences(of: "`", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return nil }
+        let lower = text.lowercased()
+        if lower.contains("cleanroom ") ||
+            lower.contains(" --") ||
+            lower.hasPrefix("--") ||
+            lower.contains("preview command") ||
+            lower.contains("apply command") {
+            return nil
+        }
+        return friendlyLabelIfBackendToken(text)
+    }
+
+    private func friendlyLabelIfBackendToken(_ text: String) -> String {
+        if text.range(of: "^[a-z0-9_.-]+$", options: .regularExpression) != nil {
+            return friendlyLabel(text)
+        }
+        return text
+            .replacingOccurrences(of: "dry-run", with: "review", options: .caseInsensitive)
+            .replacingOccurrences(of: "opt-in", with: "optional", options: .caseInsensitive)
+    }
+
+    private func friendlyLabel(_ raw: String) -> String {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "Review item" }
+        if trimmed.contains("/") {
+            let last = URL(fileURLWithPath: trimmed).lastPathComponent
+            if !last.isEmpty { return friendlyLabel(last) }
+        }
+        let expanded = trimmed
+            .replacingOccurrences(of: "cleanroom ", with: "", options: .caseInsensitive)
+            .replacingOccurrences(of: "_", with: " ")
+            .replacingOccurrences(of: "-", with: " ")
+            .replacingOccurrences(of: ".", with: " ")
+        let known: [String: String] = [
+            "ai": "AI",
+            "api": "API",
+            "cc": "CC",
+            "cli": "Tools",
+            "db": "DB",
+            "ios": "iOS",
+            "json": "JSON",
+            "lm": "LM",
+            "ndk": "NDK",
+            "npm": "NPM",
+            "pnpm": "PNPM",
+            "sdk": "SDK",
+            "sql": "SQL",
+            "ui": "UI",
+            "xcode": "Xcode"
+        ]
+        let words = expanded
+            .split(whereSeparator: { $0.isWhitespace })
+            .map { word -> String in
+                let lower = word.lowercased()
+                if let replacement = known[lower] { return replacement }
+                if lower == "nodejs" { return "Node.js" }
+                return lower.prefix(1).uppercased() + lower.dropFirst()
+            }
+        let label = words.joined(separator: " ")
+        return label.isEmpty ? "Review item" : label
     }
 
     private func friendlyLocationHint(from item: [String: Any]) -> String? {
