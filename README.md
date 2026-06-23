@@ -181,6 +181,8 @@ cleanroom review --json
 Get ranked cleanup recommendations:
 
 ```sh
+cleanroom plan-fast
+cleanroom plan-fast --json
 cleanroom plan
 cleanroom plan --json
 ```

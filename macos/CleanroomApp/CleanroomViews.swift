@@ -67,6 +67,7 @@ struct ReviewItem: Identifiable {
 struct CleanupPlanItem: Identifiable {
     let id = UUID()
     var title: String
+    var estimate: String
     var safety: String
     var recovery: String
 }
@@ -233,7 +234,7 @@ final class AppState: ObservableObject {
         cleanupPlanLoading = true
         cleanupPlanItems = []
         cleanupPlanNotes = []
-        let command = resolvedCommand(["clean", "--preflight", "--json"])
+        let command = resolvedCommand(["plan-fast", "--json"])
         Task.detached(priority: .background) {
             let result = await Self.exec(command.executable, command.arguments, timeoutSeconds: AppRunLimit.quickSummary)
             let parsed = Self.parseCleanupPlan(result.output)
@@ -463,7 +464,7 @@ final class AppState: ObservableObject {
             "aitools", "ai-tools", "ai",
             "xcode", "xcode-fast", "backups", "backups-fast", "system-data", "system-data-fast", "containers", "containers-fast", "toolchains", "toolchains-fast",
             "loginitems", "startup", "snapshot", "snapshot-fast", "state", "protect", "rules",
-            "map", "map-fast", "doctor", "leftovers", "appreview", "history", "report-fast"
+            "map", "map-fast", "plan-fast", "doctor", "leftovers", "appreview", "history", "report-fast"
         ]
         if jsonActions.contains(action), !args.contains("--json") {
             return args + ["--json"]
@@ -1049,9 +1050,36 @@ final class AppState: ObservableObject {
     nonisolated private static func parseCleanupPlan(_ raw: String) -> (items: [CleanupPlanItem], notes: [String]) {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let data = trimmed.data(using: .utf8),
-              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+              let parsed = try? JSONSerialization.jsonObject(with: data) else {
             return ([], ["The safety plan could not be loaded. You can still review before cleaning."])
         }
+
+        if let array = parsed as? [[String: Any]] {
+            let items = array.map { item -> CleanupPlanItem in
+                let title = cleanupPlanTitle(
+                    title: stringField("title", in: item),
+                    id: stringField("id", in: item)
+                )
+                let estimate = stringField("estimate", in: item) ?? "Review"
+                let safety = friendlySafety(stringField("safety", in: item))
+                let recovery = friendlyRecovery(
+                    stringField("description", in: item) ??
+                    stringField("summary", in: item) ??
+                    stringField("recoverability", in: item)
+                )
+                return CleanupPlanItem(title: title, estimate: estimate, safety: safety, recovery: recovery)
+            }
+            return (items, [
+                "Quick estimates are shown first; detailed reviews stay available for each area.",
+                "Passwords, browser profiles, Photos, Mail, Messages, and cloud folders stay protected.",
+                "Clean Now still requires confirmation and moves eligible files to Trash where possible."
+            ])
+        }
+
+        guard let object = parsed as? [String: Any] else {
+            return ([], ["The safety plan could not be loaded. You can still review before cleaning."])
+        }
+
         let categories = object["categories"] as? [[String: Any]] ?? []
         let items = categories.map { item -> CleanupPlanItem in
             let title = cleanupPlanTitle(
@@ -1060,7 +1088,7 @@ final class AppState: ObservableObject {
             )
             let safety = friendlySafety(stringField("safety", in: item))
             let recovery = friendlyRecovery(stringField("recoverability", in: item))
-            return CleanupPlanItem(title: title, safety: safety, recovery: recovery)
+            return CleanupPlanItem(title: title, estimate: "Selected", safety: safety, recovery: recovery)
         }
         let rawWarnings = object["warnings"] as? [String] ?? []
         let notes = rawWarnings.map(friendlyCleanupNote)
@@ -1134,10 +1162,18 @@ final class AppState: ObservableObject {
             return "Low risk"
         case "opt-in":
             return "Optional"
+        case "optional":
+            return "Optional"
         case "high-impact":
+            return "High impact"
+        case "high impact":
             return "High impact"
         case "irreversible":
             return "Irreversible"
+        case "large-opt-in", "large optional cleanup":
+            return "Large optional cleanup"
+        case "review":
+            return "Review"
         default:
             return "Protected"
         }
@@ -2176,6 +2212,9 @@ struct CleanupPlanRow: View {
                         .font(DS.T.body.weight(.semibold))
                         .foregroundColor(DS.C.textPrimary)
                     Spacer()
+                    Text(item.estimate)
+                        .font(DS.T.tag)
+                        .foregroundColor(DS.C.textMuted)
                     Text(item.safety)
                         .font(DS.T.tag)
                         .foregroundColor(color)
@@ -2195,7 +2234,7 @@ struct CleanupPlanRow: View {
         switch item.safety {
         case "High impact", "Irreversible":
             return DS.C.negative
-        case "Optional":
+        case "Optional", "Large optional cleanup", "Review":
             return DS.C.caution
         default:
             return DS.C.positive
@@ -2206,7 +2245,7 @@ struct CleanupPlanRow: View {
         switch item.safety {
         case "High impact", "Irreversible":
             return "exclamationmark.triangle.fill"
-        case "Optional":
+        case "Optional", "Large optional cleanup", "Review":
             return "questionmark.circle.fill"
         default:
             return "checkmark.circle.fill"

@@ -665,6 +665,17 @@ grep 'cleanroom clean --apply --trash --include-download-artifacts --days 30' "$
 grep 'cleanroom clean --apply --trash --include-screenshots --days 30' "$plan_json" >/dev/null
 grep 'cleanroom clean --apply --include-cleanroom-state --days 30' "$plan_json" >/dev/null
 rm -f "$plan_json"
+"$BIN" plan-fast | grep 'cleanroom fast cleanup plan' >/dev/null
+plan_fast_json="$(mktemp)"
+"$BIN" plan-fast --json > "$plan_fast_json"
+python3 -m json.tool "$plan_fast_json" >/dev/null
+grep '"mode":"fast"' "$plan_fast_json" >/dev/null
+grep '"title":"Recommended safe cleanup"' "$plan_fast_json" >/dev/null
+if grep 'cleanroom clean --apply' "$plan_fast_json" >/dev/null; then
+  echo "plan-fast JSON should not expose apply commands" >&2
+  exit 1
+fi
+rm -f "$plan_fast_json"
 "$BIN" large "$HOME/Downloads" --min-mb 1 --limit 5 | grep 'big-test.bin' >/dev/null
 large_json="$(mktemp)"
 "$BIN" large --json "$HOME/Downloads" --min-mb 1 --limit 5 > "$large_json"

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.41.0"
+VERSION="1.42.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -73,6 +73,7 @@ Usage:
   cleanroom system-data [--json]
   cleanroom system-data-fast [--json]
   cleanroom plan [--json]
+  cleanroom plan-fast [--json]
   cleanroom large [PATH] [--min-mb N] [--limit N] [--json]
   cleanroom large-fast [PATH] [--min-mb N] [--limit N] [--json]
   cleanroom brokenlinks [PATH] [--limit N] [--json]
@@ -266,7 +267,7 @@ Options:
   --trash              Move deleted files to ~/.Trash/cleanroom-* instead of rm -rf.
   --yes                Do not prompt before --apply cleanup.
   --verbose            Print every path touched.
-  --json               Emit JSON for dashboard, overview, map, map-fast, snapshot, snapshot-fast, diff, state, permissions, review, scan, system-data, system-data-fast, plan, large, brokenlinks, brokenlinks-fast, quarantine, metadata, quicklook, quicklook-fast, fontcaches, fontcaches-fast, webcaches, webcaches-fast, savedstate, savedstate-fast, projectcaches, updaters, updaters-fast, browsercaches, duplicates,
+  --json               Emit JSON for dashboard, overview, map, map-fast, snapshot, snapshot-fast, diff, state, permissions, review, scan, system-data, system-data-fast, plan, plan-fast, large, brokenlinks, brokenlinks-fast, quarantine, metadata, quicklook, quicklook-fast, fontcaches, fontcaches-fast, webcaches, webcaches-fast, savedstate, savedstate-fast, projectcaches, updaters, updaters-fast, browsercaches, duplicates,
                        documents, desktop, screenshots, archives, archives-fast, downloads, downloads-fast, installers, nodes, venvs, apps, uninstallers, appreview, aitools, appdata, libraries, cloud, cloudfiles, personal, communications,
                        browsers, leftovers, startup, loginitems,
                        trash, backups, backups-fast, xcode, xcode-fast, caches, caches-fast, diagnostics, packages, npm-cache, yarn-cache, pnpm-store, cocoapods-cache, pip-cache, receipts, homebrew, homebrew-cleanup, toolchains, toolchains-fast,
@@ -8667,6 +8668,88 @@ plan() {
   done <<<"$rows"
 }
 
+plan_fast_rows() {
+  local caches downloads archives screenshots cleanroom_state metadata quicklook fontcache webcache savedstate projectcache updater node venv user_trash
+  caches="$(caches_fast_rows | tab_rows_total_kb)"
+  downloads="$(downloads_fast_rows | tab_rows_total_kb)"
+  archives="$(archive_fast_rows | tab_rows_total_kb)"
+  screenshots="$(screenshots_fast_rows | tab_rows_total_kb)"
+  cleanroom_state="$(cleanroom_state_cleanup_total_kb)"
+  metadata="$(metadata_fast_rows | tab_rows_total_kb)"
+  quicklook="$(quicklook_total_kb)"
+  fontcache="$(fontcache_total_kb)"
+  webcache="$(webcache_total_kb)"
+  savedstate="$(savedstate_total_kb)"
+  projectcache="$(projectcache_fast_rows | tab_rows_total_kb)"
+  updater="$(updatercache_total_kb)"
+  node="$(node_fast_rows 2>/dev/null | tab_rows_total_kb)"
+  venv="$(venv_fast_rows 2>/dev/null | tab_rows_total_kb)"
+  user_trash="$(trash_total_kb)"
+
+  printf '%s\t%s\t%s\t%s\t%s\n' "$caches" "safe" "Recommended safe cleanup" "Rebuildable" "Fast estimate from known cache and log areas. Personal data stays protected."
+  printf '%s\t%s\t%s\t%s\t%s\n' "$downloads" "download-artifacts" "Old downloads" "Optional" "Old downloadable artifacts in Downloads. Documents and folders stay untouched."
+  printf '%s\t%s\t%s\t%s\t%s\n' "$archives" "old-archives" "Old archives" "Review" "Archive and disk-image files should be reviewed before removal."
+  printf '%s\t%s\t%s\t%s\t%s\n' "$screenshots" "screenshots" "Old screenshots" "Optional" "Known screenshot and screen-recording files older than the selected age."
+  printf '%s\t%s\t%s\t%s\t%s\n' "$cleanroom_state" "cleanroom-state" "Old Cleanroom history" "Low risk" "Old run logs, snapshots, and recoverable Cleanroom Trash folders."
+  printf '%s\t%s\t%s\t%s\t%s\n' "$metadata" "metadata" "Finder clutter" "Low risk" "Finder metadata files such as .DS_Store and Thumbs.db."
+  printf '%s\t%s\t%s\t%s\t%s\n' "$quicklook" "quicklook" "Preview cache" "Rebuildable" "Thumbnail and preview caches macOS can rebuild."
+  printf '%s\t%s\t%s\t%s\t%s\n' "$fontcache" "font-caches" "Font cache" "Rebuildable" "Font cache databases. Actual font files stay protected."
+  printf '%s\t%s\t%s\t%s\t%s\n' "$webcache" "web-caches" "Web cache" "Rebuildable" "Safari and WebKit cache folders. History, cookies, bookmarks, and passwords stay protected."
+  printf '%s\t%s\t%s\t%s\t%s\n' "$savedstate" "saved-state" "Window state" "Rebuildable" "App window/session restoration state. Documents and profiles stay protected."
+  printf '%s\t%s\t%s\t%s\t%s\n' "$projectcache" "project-caches" "Project caches" "Rebuildable" "Known project cache folders and files. Source code stays protected."
+  printf '%s\t%s\t%s\t%s\t%s\n' "$updater" "updater-caches" "Update cache" "Rebuildable" "Sparkle and Squirrel updater cache and staging data."
+  printf '%s\t%s\t%s\t%s\t%s\n' "$node" "node-stale" "Old JavaScript packages" "Rebuildable" "Stale node_modules folders found through a bounded quick review."
+  printf '%s\t%s\t%s\t%s\t%s\n' "$venv" "venv-stale" "Old Python environments" "Rebuildable" "Stale Python virtualenv folders found through a bounded quick review."
+  printf '0\t%s\t%s\t%s\t%s\n' "ai-workspaces" "Generated AI data" "Optional" "Generated AI-agent recordings, scratch, memory, implicit data, and local conversations where known."
+  printf '0\t%s\t%s\t%s\t%s\n' "ai-models" "Downloaded AI models" "Large optional cleanup" "Local model stores and backend extensions can be downloaded again if needed."
+  printf '0\t%s\t%s\t%s\t%s\n' "containers" "Container storage" "High impact" "Container cleanup can remove local containers, images, volumes, and VM disks."
+  printf '%s\t%s\t%s\t%s\t%s\n' "$user_trash" "user-trash" "Current Trash" "Irreversible" "Already-deleted user Trash contents. Emptying Trash is explicit and irreversible."
+}
+
+plan_fast() {
+  local rows
+  rows="$(plan_fast_rows | sort -rn)"
+
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '['
+    local first=1 kb id title safety description kb_num estimate
+    while IFS=$'\t' read -r kb id title safety description; do
+      [[ -z "${id:-}" ]] && continue
+      kb_num="$(printf '%s\n' "${kb:-0}" | sed 's/^0*//; s/^$/0/')"
+      if [[ "$kb_num" -gt 0 ]]; then
+        estimate="$(human_kb "$kb_num")"
+      else
+        estimate="Review"
+      fi
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '{"id":"%s","title":"%s","safety":"%s","estimate_kb":%s,"estimate":"%s","description":"%s","mode":"fast"}' \
+        "$(printf '%s' "$id" | json_escape)" \
+        "$(printf '%s' "$title" | json_escape)" \
+        "$(printf '%s' "$safety" | json_escape)" \
+        "$kb_num" \
+        "$(printf '%s' "$estimate" | json_escape)" \
+        "$(printf '%s' "$description" | json_escape)"
+    done <<<"$rows"
+    printf ']\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}cleanroom fast cleanup plan${RESET}"
+  printf 'Fast read-only plan for app startup and quick reviews. Nothing is deleted.\n\n'
+  printf '%-10s %-18s %-28s %s\n' "estimate" "safety" "area" "summary"
+  local kb id title safety description display
+  while IFS=$'\t' read -r kb id title safety description; do
+    [[ -z "${id:-}" ]] && continue
+    if [[ "${kb:-0}" -gt 0 ]]; then
+      display="$(human_kb "${kb:-0}")"
+    else
+      display="Review"
+    fi
+    printf '%-10s %-18s %-28s %s\n' "$display" "$safety" "$title" "$description"
+  done <<<"$rows"
+}
+
 report_body() {
   local now
   now="$(date '+%Y-%m-%d %H:%M:%S %Z')"
@@ -9437,7 +9520,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  dashboard|overview|map|map-fast|mapfast|snapshot|snapshot-fast|snapshotfast|diff|state|permissions|review|scan|system-data|system-data-fast|systemdata-fast|systemdatafast|plan|large|large-fast|largefast|brokenlinks|brokenlinks-fast|brokenlinksfast|broken-links-fast|broken-linksfast|quarantine|quarantine-fast|quarantinefast|metadata|metadata-fast|metadatafast|quicklook|quicklook-fast|quicklookfast|fontcaches|fontcaches-fast|fontcachesfast|font-caches|font-caches-fast|font-cachesfast|webcaches|webcaches-fast|webcachesfast|web-caches|web-caches-fast|web-cachesfast|savedstate|savedstate-fast|savedstatefast|saved-state|saved-state-fast|saved-statefast|projectcaches|project-caches|projectcaches-fast|projectcachesfast|project-caches-fast|project-cachesfast|developer-fast|developerfast|updaters|updaters-fast|updatersfast|updater-caches|updater-caches-fast|updater-cachesfast|browsercaches|browser-caches|browsercaches-fast|browsercachesfast|browser-caches-fast|browser-cachesfast|duplicates|duplicates-fast|duplicatesfast|documents|desktop|screenshots|screenshots-fast|screenshotsfast|archives|archives-fast|archivesfast|downloads|downloads-fast|downloadsfast|installers|nodes|nodes-fast|nodesfast|venvs|venvs-fast|venvsfast|virtualenvs|virtualenvs-fast|virtualenvsfast|apps|apps-fast|appsfast|uninstallers|appreview|aitools|ai-tools|ai|appdata|libraries|cloud|cloudfiles|cloudfiles-fast|cloudfilesfast|cloud-files|cloud-files-fast|cloud-filesfast|personal|communications|comms|browsers|leftovers|backups|backups-fast|backupsfast|xcode|xcode-fast|xcodefast|android|startup|loginitems|trash|caches|caches-fast|cachesfast|diagnostics|packages|npm-cache|npmcache|yarn-cache|yarncache|pnpm-store|pnpmstore|cocoapods-cache|pod-cache|podcache|pip-cache|pipcache|receipts|homebrew|homebrew-cleanup|brewcleanup|toolchains|toolchains-fast|toolchainsfast|containers|containers-fast|containersfast|snapshots|report|report-fast|reportfast|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
+  dashboard|overview|map|map-fast|mapfast|snapshot|snapshot-fast|snapshotfast|diff|state|permissions|review|scan|system-data|system-data-fast|systemdata-fast|systemdatafast|plan|plan-fast|planfast|large|large-fast|largefast|brokenlinks|brokenlinks-fast|brokenlinksfast|broken-links-fast|broken-linksfast|quarantine|quarantine-fast|quarantinefast|metadata|metadata-fast|metadatafast|quicklook|quicklook-fast|quicklookfast|fontcaches|fontcaches-fast|fontcachesfast|font-caches|font-caches-fast|font-cachesfast|webcaches|webcaches-fast|webcachesfast|web-caches|web-caches-fast|web-cachesfast|savedstate|savedstate-fast|savedstatefast|saved-state|saved-state-fast|saved-statefast|projectcaches|project-caches|projectcaches-fast|projectcachesfast|project-caches-fast|project-cachesfast|developer-fast|developerfast|updaters|updaters-fast|updatersfast|updater-caches|updater-caches-fast|updater-cachesfast|browsercaches|browser-caches|browsercaches-fast|browsercachesfast|browser-caches-fast|browser-cachesfast|duplicates|duplicates-fast|duplicatesfast|documents|desktop|screenshots|screenshots-fast|screenshotsfast|archives|archives-fast|archivesfast|downloads|downloads-fast|downloadsfast|installers|nodes|nodes-fast|nodesfast|venvs|venvs-fast|venvsfast|virtualenvs|virtualenvs-fast|virtualenvsfast|apps|apps-fast|appsfast|uninstallers|appreview|aitools|ai-tools|ai|appdata|libraries|cloud|cloudfiles|cloudfiles-fast|cloudfilesfast|cloud-files|cloud-files-fast|cloud-filesfast|personal|communications|comms|browsers|leftovers|backups|backups-fast|backupsfast|xcode|xcode-fast|xcodefast|android|startup|loginitems|trash|caches|caches-fast|cachesfast|diagnostics|packages|npm-cache|npmcache|yarn-cache|yarncache|pnpm-store|pnpmstore|cocoapods-cache|pod-cache|podcache|pip-cache|pipcache|receipts|homebrew|homebrew-cleanup|brewcleanup|toolchains|toolchains-fast|toolchainsfast|containers|containers-fast|containersfast|snapshots|report|report-fast|reportfast|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -9560,6 +9643,7 @@ case "$ACTION" in
   system-data) system_data ;;
   system-data-fast|systemdata-fast|systemdatafast) system_data_fast ;;
   plan) plan ;;
+  plan-fast|planfast) plan_fast ;;
   large) large ;;
   large-fast|largefast) large_fast ;;
   brokenlinks) brokenlinks ;;

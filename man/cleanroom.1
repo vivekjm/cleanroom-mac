@@ -1,4 +1,4 @@
-.TH CLEANROOM 1 "June 2026" "cleanroom 1.41.0" "User Commands"
+.TH CLEANROOM 1 "June 2026" "cleanroom 1.42.0" "User Commands"
 .SH NAME
 cleanroom \- safe-by-default macOS storage cleaner
 .SH SYNOPSIS
@@ -43,6 +43,9 @@ cleanroom \- safe-by-default macOS storage cleaner
 .br
 .B cleanroom
 .RI "plan [--json]"
+.br
+.B cleanroom
+.RI "plan-fast [--json]"
 .br
 .B cleanroom
 .RI "large [path] [--min-mb n] [--limit n] [--json]"
@@ -357,6 +360,9 @@ Show a quick desktop-app System Data summary without deep Library sizing.
 .TP
 .B plan
 Rank safe cleanup opportunities and show copyable commands.
+.TP
+.B plan-fast
+Show a fast app-friendly cleanup plan with quick estimates and no command details in JSON.
 .TP
 .B large
 Deep-scan large files for review without deleting anything.
@@ -752,6 +758,7 @@ cleanroom permissions --json
 cleanroom scan
 cleanroom system-data
 cleanroom system-data-fast --json
+cleanroom plan-fast --json
 cleanroom plan --json
 cleanroom large ~/Documents --min-mb 250 --limit 30
 cleanroom brokenlinks-fast ~/Documents --limit 50
