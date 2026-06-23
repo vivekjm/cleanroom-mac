@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.35.0"
+VERSION="1.36.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -98,6 +98,7 @@ Usage:
   cleanroom screenshots [PATH] [--days N] [--limit N] [--json]
   cleanroom archives [PATH] [--days N] [--limit N] [--json]
   cleanroom archives-fast [PATH] [--days N] [--limit N] [--json]
+  cleanroom screenshots-fast [PATH] [--days N] [--limit N] [--json]
   cleanroom downloads [--days N] [--limit N] [--json]
   cleanroom downloads-fast [--days N] [--limit N] [--json]
   cleanroom installers [--days N] [--limit N] [--json]
@@ -194,6 +195,7 @@ Actions:
   documents            Rank top-level user folders/files for review without deleting anything.
   desktop              Rank top-level Desktop folders/files for review without deleting anything.
   screenshots          List screenshot and screen recording files for review.
+  screenshots-fast     Quickly review screenshot files using Spotlight.
   archives             List archive and disk image files for review.
   archives-fast        Quickly preview old archives and disk images.
   downloads            List old Downloads files for manual review.
@@ -3760,6 +3762,88 @@ screenshots() {
   done <<<"$rows"
   printf '\nPreview cleanup with: cleanroom clean --include-screenshots --days %s\n' "$DAYS"
   printf 'Apply cleanup with: cleanroom clean --apply --trash --include-screenshots --days %s\n' "$DAYS"
+}
+
+screenshots_fast_rows() {
+  command -v mdfind >/dev/null 2>&1 || return 2
+  local now root path name bytes kb epoch age_days
+  now="$(date '+%s')"
+  while IFS= read -r root; do
+    [[ -d "$root" ]] || continue
+    mdfind -onlyin "$root" '(kMDItemFSName == "Screenshot*" || kMDItemFSName == "Screen Shot*" || kMDItemFSName == "CleanShot*" || kMDItemFSName == "Kap*" || kMDItemFSName == "Screen Recording*" || kMDItemFSName == "screen-recording*")' 2>/dev/null || true
+  done < <(screenshot_roots) |
+    sort -u |
+    while IFS= read -r path; do
+      [[ -f "$path" ]] || continue
+      name="$(basename "$path")"
+      screenshot_name_matches "$name" || continue
+      case "$name" in
+        *.png|*.jpg|*.jpeg|*.heic|*.tiff|*.gif|*.mov|*.mp4) ;;
+        *) continue ;;
+      esac
+      epoch="$(path_mtime_epoch "$path")"
+      if [[ "$epoch" -gt 0 && "$now" -ge "$epoch" ]]; then
+        age_days=$(((now - epoch) / 86400))
+      else
+        age_days=0
+      fi
+      [[ "$age_days" -gt "$DAYS" ]] || continue
+      bytes="$(stat -f '%z' "$path" 2>/dev/null || stat -c '%s' "$path" 2>/dev/null || true)"
+      [[ "$bytes" =~ ^[0-9]+$ ]] || bytes=0
+      kb=$(((bytes + 1023) / 1024))
+      printf '%012d\t%s\t%s\t%s\n' "$kb" "$epoch" "$age_days" "$path"
+    done |
+    sort -rn |
+    head -n "$LIMIT" || true
+}
+
+screenshots_fast() {
+  local rows available=1
+  rows="$(screenshots_fast_rows)" || available=0
+
+  if [[ "$JSON" -eq 1 ]]; then
+    if [[ "$available" -eq 0 ]]; then
+      printf '{"available":false,"reason":"spotlight_unavailable","items":[]}\n'
+      return 0
+    fi
+    printf '{"available":true,"items":['
+    local first=1 kb epoch age_days path kb_num
+    while IFS=$'\t' read -r kb epoch age_days path; do
+      [[ -z "${path:-}" ]] && continue
+      kb_num="$(printf '%s\n' "$kb" | sed 's/^0*//; s/^$/0/')"
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '{"path":"%s","name":"%s","size_kb":%s,"size":"%s","modified_epoch":%s,"modified":"%s","age_days":%s,"mode":"fast","guidance":"%s"}' \
+        "$(printf '%s' "$path" | json_escape)" \
+        "$(basename "$path" | json_escape)" \
+        "$kb_num" \
+        "$(human_kb "${kb:-0}" | json_escape)" \
+        "${epoch:-0}" \
+        "$(file_mtime_iso "${epoch:-0}" | json_escape)" \
+        "${age_days:-0}" \
+        "$(printf '%s' "Review old screenshots and recordings before cleanup. Cleaning moves eligible files to Trash." | json_escape)"
+    done <<<"$rows"
+    printf ']}\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}quick screenshots review${RESET}"
+  printf 'Fast Spotlight-backed review. cleanroom does not delete screenshots or recordings.\n'
+  printf 'Older than: %s days  Limit: %s\n\n' "$DAYS" "$LIMIT"
+  if [[ "$available" -eq 0 ]]; then
+    printf 'Spotlight search is not available. Use Screenshots when you want a deeper review.\n'
+    return 0
+  fi
+  if [[ -z "$rows" ]]; then
+    printf 'No old screenshots or screen recordings found in the Spotlight index.\n'
+    return 0
+  fi
+  printf '%-10s %-8s %s\n' "size" "age" "file"
+  local kb epoch age_days path
+  while IFS=$'\t' read -r kb epoch age_days path; do
+    [[ -z "${path:-}" ]] && continue
+    printf '%-10s %-8s %s\n' "$(human_kb "$kb")" "${age_days}d" "$(basename "$path")"
+  done <<<"$rows"
 }
 
 screenshot_total_kb() {
@@ -9122,7 +9206,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  dashboard|overview|map|map-fast|mapfast|snapshot|snapshot-fast|snapshotfast|diff|state|permissions|review|scan|system-data|system-data-fast|systemdata-fast|systemdatafast|plan|large|large-fast|largefast|brokenlinks|brokenlinks-fast|brokenlinksfast|broken-links-fast|broken-linksfast|quarantine|quarantine-fast|quarantinefast|metadata|metadata-fast|metadatafast|quicklook|fontcaches|font-caches|webcaches|web-caches|savedstate|saved-state|projectcaches|project-caches|projectcaches-fast|projectcachesfast|project-caches-fast|project-cachesfast|developer-fast|developerfast|updaters|updater-caches|browsercaches|browser-caches|browsercaches-fast|browsercachesfast|browser-caches-fast|browser-cachesfast|duplicates|duplicates-fast|duplicatesfast|documents|desktop|screenshots|archives|archives-fast|archivesfast|downloads|downloads-fast|downloadsfast|installers|nodes|nodes-fast|nodesfast|venvs|venvs-fast|venvsfast|virtualenvs|virtualenvs-fast|virtualenvsfast|apps|apps-fast|appsfast|uninstallers|appreview|appdata|libraries|cloud|cloudfiles|cloudfiles-fast|cloudfilesfast|cloud-files|cloud-files-fast|cloud-filesfast|personal|communications|comms|browsers|leftovers|backups|backups-fast|backupsfast|xcode|xcode-fast|xcodefast|android|startup|loginitems|trash|caches|caches-fast|cachesfast|diagnostics|packages|npm-cache|npmcache|yarn-cache|yarncache|pnpm-store|pnpmstore|cocoapods-cache|pod-cache|podcache|pip-cache|pipcache|receipts|homebrew|homebrew-cleanup|brewcleanup|toolchains|toolchains-fast|toolchainsfast|containers|containers-fast|containersfast|snapshots|report|report-fast|reportfast|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
+  dashboard|overview|map|map-fast|mapfast|snapshot|snapshot-fast|snapshotfast|diff|state|permissions|review|scan|system-data|system-data-fast|systemdata-fast|systemdatafast|plan|large|large-fast|largefast|brokenlinks|brokenlinks-fast|brokenlinksfast|broken-links-fast|broken-linksfast|quarantine|quarantine-fast|quarantinefast|metadata|metadata-fast|metadatafast|quicklook|fontcaches|font-caches|webcaches|web-caches|savedstate|saved-state|projectcaches|project-caches|projectcaches-fast|projectcachesfast|project-caches-fast|project-cachesfast|developer-fast|developerfast|updaters|updater-caches|browsercaches|browser-caches|browsercaches-fast|browsercachesfast|browser-caches-fast|browser-cachesfast|duplicates|duplicates-fast|duplicatesfast|documents|desktop|screenshots|screenshots-fast|screenshotsfast|archives|archives-fast|archivesfast|downloads|downloads-fast|downloadsfast|installers|nodes|nodes-fast|nodesfast|venvs|venvs-fast|venvsfast|virtualenvs|virtualenvs-fast|virtualenvsfast|apps|apps-fast|appsfast|uninstallers|appreview|appdata|libraries|cloud|cloudfiles|cloudfiles-fast|cloudfilesfast|cloud-files|cloud-files-fast|cloud-filesfast|personal|communications|comms|browsers|leftovers|backups|backups-fast|backupsfast|xcode|xcode-fast|xcodefast|android|startup|loginitems|trash|caches|caches-fast|cachesfast|diagnostics|packages|npm-cache|npmcache|yarn-cache|yarncache|pnpm-store|pnpmstore|cocoapods-cache|pod-cache|podcache|pip-cache|pipcache|receipts|homebrew|homebrew-cleanup|brewcleanup|toolchains|toolchains-fast|toolchainsfast|containers|containers-fast|containersfast|snapshots|report|report-fast|reportfast|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -9220,7 +9304,7 @@ while [[ "$#" -gt 0 ]]; do
     -h|--help) usage; exit 0 ;;
     -v|--version) echo "$VERSION"; exit 0 ;;
     *)
-      if [[ "$ACTION" == "guard" || "$ACTION" == "diff" || "$ACTION" == "large" || "$ACTION" == "large-fast" || "$ACTION" == "largefast" || "$ACTION" == "brokenlinks" || "$ACTION" == "brokenlinks-fast" || "$ACTION" == "brokenlinksfast" || "$ACTION" == "broken-links-fast" || "$ACTION" == "broken-linksfast" || "$ACTION" == "quarantine" || "$ACTION" == "quarantine-fast" || "$ACTION" == "quarantinefast" || "$ACTION" == "metadata" || "$ACTION" == "metadata-fast" || "$ACTION" == "metadatafast" || "$ACTION" == "projectcaches" || "$ACTION" == "project-caches" || "$ACTION" == "projectcaches-fast" || "$ACTION" == "projectcachesfast" || "$ACTION" == "project-caches-fast" || "$ACTION" == "project-cachesfast" || "$ACTION" == "developer-fast" || "$ACTION" == "developerfast" || "$ACTION" == "duplicates" || "$ACTION" == "duplicates-fast" || "$ACTION" == "duplicatesfast" || "$ACTION" == "documents" || "$ACTION" == "screenshots" || "$ACTION" == "archives" || "$ACTION" == "archives-fast" || "$ACTION" == "archivesfast" || "$ACTION" == "nodes" || "$ACTION" == "nodes-fast" || "$ACTION" == "nodesfast" || "$ACTION" == "venvs" || "$ACTION" == "venvs-fast" || "$ACTION" == "venvsfast" || "$ACTION" == "virtualenvs" || "$ACTION" == "virtualenvs-fast" || "$ACTION" == "virtualenvsfast" || "$ACTION" == "apps" || "$ACTION" == "apps-fast" || "$ACTION" == "appsfast" || "$ACTION" == "uninstallers" || "$ACTION" == "appreview" || "$ACTION" == "cloudfiles" || "$ACTION" == "cloudfiles-fast" || "$ACTION" == "cloudfilesfast" || "$ACTION" == "cloud-files" || "$ACTION" == "cloud-files-fast" || "$ACTION" == "cloud-filesfast" || "$ACTION" == "leftovers" ]]; then
+      if [[ "$ACTION" == "guard" || "$ACTION" == "diff" || "$ACTION" == "large" || "$ACTION" == "large-fast" || "$ACTION" == "largefast" || "$ACTION" == "brokenlinks" || "$ACTION" == "brokenlinks-fast" || "$ACTION" == "brokenlinksfast" || "$ACTION" == "broken-links-fast" || "$ACTION" == "broken-linksfast" || "$ACTION" == "quarantine" || "$ACTION" == "quarantine-fast" || "$ACTION" == "quarantinefast" || "$ACTION" == "metadata" || "$ACTION" == "metadata-fast" || "$ACTION" == "metadatafast" || "$ACTION" == "projectcaches" || "$ACTION" == "project-caches" || "$ACTION" == "projectcaches-fast" || "$ACTION" == "projectcachesfast" || "$ACTION" == "project-caches-fast" || "$ACTION" == "project-cachesfast" || "$ACTION" == "developer-fast" || "$ACTION" == "developerfast" || "$ACTION" == "duplicates" || "$ACTION" == "duplicates-fast" || "$ACTION" == "duplicatesfast" || "$ACTION" == "documents" || "$ACTION" == "screenshots" || "$ACTION" == "screenshots-fast" || "$ACTION" == "screenshotsfast" || "$ACTION" == "archives" || "$ACTION" == "archives-fast" || "$ACTION" == "archivesfast" || "$ACTION" == "nodes" || "$ACTION" == "nodes-fast" || "$ACTION" == "nodesfast" || "$ACTION" == "venvs" || "$ACTION" == "venvs-fast" || "$ACTION" == "venvsfast" || "$ACTION" == "virtualenvs" || "$ACTION" == "virtualenvs-fast" || "$ACTION" == "virtualenvsfast" || "$ACTION" == "apps" || "$ACTION" == "apps-fast" || "$ACTION" == "appsfast" || "$ACTION" == "uninstallers" || "$ACTION" == "appreview" || "$ACTION" == "cloudfiles" || "$ACTION" == "cloudfiles-fast" || "$ACTION" == "cloudfilesfast" || "$ACTION" == "cloud-files" || "$ACTION" == "cloud-files-fast" || "$ACTION" == "cloud-filesfast" || "$ACTION" == "leftovers" ]]; then
         PATH_ARGS+=("$1")
       else
         die "Unknown option: $1"
@@ -9268,6 +9352,7 @@ case "$ACTION" in
   documents) documents ;;
   desktop) desktop ;;
   screenshots) screenshots ;;
+  screenshots-fast|screenshotsfast) screenshots_fast ;;
   archives) archives ;;
   archives-fast|archivesfast) archives_fast ;;
   downloads) downloads ;;

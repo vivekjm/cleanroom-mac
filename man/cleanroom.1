@@ -1,4 +1,4 @@
-.TH CLEANROOM 1 "June 2026" "cleanroom 1.35.0" "User Commands"
+.TH CLEANROOM 1 "June 2026" "cleanroom 1.36.0" "User Commands"
 .SH NAME
 cleanroom \- safe-by-default macOS storage cleaner
 .SH SYNOPSIS
@@ -106,6 +106,9 @@ cleanroom \- safe-by-default macOS storage cleaner
 .br
 .B cleanroom
 .RI "screenshots [path] [--days n] [--limit n] [--json]"
+.br
+.B cleanroom
+.RI "screenshots-fast [path] [--days n] [--limit n] [--json]"
 .br
 .B cleanroom
 .RI "archives [path] [--days n] [--limit n] [--json]"
@@ -405,6 +408,9 @@ Rank top-level files and folders on ~/Desktop with guard status.
 .B screenshots
 List screenshot and screen recording files for review. Cleanup is opt-in and
 limited to known screenshot/recording filenames.
+.TP
+.B screenshots-fast
+Quickly list screenshot and screen recording files using Spotlight.
 .TP
 .B archives
 List archive and disk image files for review without deleting anything.

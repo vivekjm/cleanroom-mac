@@ -60,7 +60,7 @@ struct AppAction: Hashable {
     static let finderClutter = AppAction(title: "Finder Clutter", args: ["metadata-fast", "--limit", "40"])
     static let downloads = AppAction(title: "Downloads", args: ["downloads-fast", "--limit", "30", "--days", "30"])
     static let archives = AppAction(title: "Archives", args: ["archives-fast", "--limit", "30", "--days", "7"])
-    static let screenshots = AppAction(title: "Screenshots", args: ["screenshots", "--limit", "30", "--days", "7"])
+    static let screenshots = AppAction(title: "Screenshots", args: ["screenshots-fast", "--limit", "30", "--days", "7"])
     static let caches = AppAction(title: "Caches", args: ["caches-fast"])
     static let developerFiles = AppAction(title: "Developer Files", args: ["developer-fast", "--limit", "30", "--days", "30"])
     static let previewCache = AppAction(title: "Preview Cache", args: ["quicklook"])
@@ -424,7 +424,7 @@ final class AppState: ObservableObject {
         let jsonActions: Set<String> = [
             "large-fast", "duplicates-fast", "brokenlinks", "brokenlinks-fast", "quarantine-fast", "metadata-fast",
             "developer-fast", "nodes-fast", "venvs-fast", "apps-fast",
-            "downloads", "downloads-fast", "archives", "archives-fast", "screenshots", "trash", "cloudfiles", "cloudfiles-fast", "caches-fast",
+            "downloads", "downloads-fast", "archives", "archives-fast", "screenshots", "screenshots-fast", "trash", "cloudfiles", "cloudfiles-fast", "caches-fast",
             "quicklook", "fontcaches", "webcaches", "savedstate",
             "projectcaches", "projectcaches-fast", "updaters", "browsercaches", "browsercaches-fast",
             "xcode", "xcode-fast", "backups", "backups-fast", "system-data", "system-data-fast", "containers", "containers-fast", "toolchains", "toolchains-fast",

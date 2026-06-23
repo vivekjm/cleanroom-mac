@@ -885,6 +885,11 @@ grep '"age_days"' "$screenshots_json" >/dev/null
 grep 'open -R' "$screenshots_json" >/dev/null
 grep 'cleanroom clean --apply --trash --include-screenshots --days 7' "$screenshots_json" >/dev/null
 rm -f "$screenshots_json"
+screenshots_fast_json="$(mktemp)"
+"$BIN" screenshots-fast --json "$HOME/Desktop" --days 7 --limit 10 > "$screenshots_fast_json"
+python3 -m json.tool "$screenshots_fast_json" >/dev/null
+grep '"items":' "$screenshots_fast_json" >/dev/null
+rm -f "$screenshots_fast_json"
 "$BIN" archives "$HOME/Downloads" --days 7 --limit 10 | grep 'old-archive.zip' >/dev/null
 archives_json="$(mktemp)"
 "$BIN" archives --json "$HOME/Downloads" --days 7 --limit 10 > "$archives_json"
