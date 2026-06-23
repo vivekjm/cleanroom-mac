@@ -396,6 +396,12 @@ final class AppState: ObservableObject {
         return value >= 10 ? String(format: "%.0f%@", value, units[index]) : String(format: "%.1f%@", value, units[index])
     }
 
+    func openReview(_ action: AppAction) {
+        if running { return }
+        dest = .run(action)
+        run(action)
+    }
+
     func run(_ action: AppAction) {
         guard !running else { return }
         if let cached = cachedReview(for: action) {
@@ -1658,8 +1664,11 @@ struct NavRow: View {
     var body: some View {
         Button {
             if let tap = onTap { tap(); return }
-            withAnimation(DS.Ani.snap) { state.dest = nav }
-            if case .run(let action) = nav { state.run(action) }
+            if case .run(let action) = nav {
+                withAnimation(DS.Ani.snap) { state.openReview(action) }
+            } else {
+                withAnimation(DS.Ani.snap) { state.dest = nav }
+            }
         } label: {
             HStack(spacing: DS.Sp.sm) {
                 Image(systemName: icon)
@@ -1943,8 +1952,7 @@ struct CategoryCardView: View {
             HStack {
                 Spacer()
                 Button {
-                    state.dest = .run(category.action)
-                    state.run(category.action)
+                    state.openReview(category.action)
                 } label: {
                     HStack(spacing: 5) {
                         Text("Review")
