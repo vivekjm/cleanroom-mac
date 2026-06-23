@@ -484,6 +484,8 @@ cleanroom startup-fast
 cleanroom startup-fast --json
 cleanroom loginitems
 cleanroom loginitems --json
+cleanroom loginitems-fast
+cleanroom loginitems-fast --json
 ```
 
 Review current Trash:
@@ -973,7 +975,7 @@ Config files use simple `key=value` lines and are never executed as shell.
 
 `trash` inventories current user Trash contents without emptying Trash. `trash-fast` counts top-level Trash items without deep-sizing deleted folders, so the desktop app stays responsive even when Trash contains large folders.
 
-`loginitems` lists user Login Items reported by macOS System Events, including hidden status and app path when available. It never disables or removes anything; manage entries in System Settings > General > Login Items. macOS may ask for automation permission before returning results.
+`loginitems` lists user Login Items reported by macOS System Events, including hidden status and app path when available. It never disables or removes anything; manage entries in System Settings > General > Login Items. macOS may ask for automation permission before returning results. `loginitems-fast` avoids automation prompts and gives desktop users a high-level review entry.
 
 `trash` inventories current `~/.Trash` contents. `--include-user-trash` empties Trash only when explicitly requested, and it is intentionally not included in presets.
 

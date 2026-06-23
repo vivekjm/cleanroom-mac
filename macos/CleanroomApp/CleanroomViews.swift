@@ -106,7 +106,7 @@ struct AppAction: Hashable {
     static let systemData = AppAction(title: "System Data", args: ["system-data-fast"])
     static let containers = AppAction(title: "Containers", args: ["containers-fast"])
     static let developerTools = AppAction(title: "Developer Tools", args: ["toolchains-fast"])
-    static let loginItems = AppAction(title: "Login Items", args: ["loginitems"])
+    static let loginItems = AppAction(title: "Login Items", args: ["loginitems-fast"])
     static let startup = AppAction(title: "Startup", args: ["startup-fast"])
     static let storageRecord = AppAction(title: "Storage Record", args: ["snapshot-fast"])
     static let restoreHistory = AppAction(title: "Restore History", args: ["state"])
@@ -472,7 +472,7 @@ final class AppState: ObservableObject {
             "projectcaches", "projectcaches-fast", "updaters", "updaters-fast", "browsercaches", "browsercaches-fast",
             "aitools", "aitools-fast", "ai-tools", "ai",
             "xcode", "xcode-fast", "backups", "backups-fast", "system-data", "system-data-fast", "containers", "containers-fast", "toolchains", "toolchains-fast",
-            "loginitems", "startup", "startup-fast", "snapshot", "snapshot-fast", "state", "protect", "protect-fast", "rules", "rules-fast",
+            "loginitems", "loginitems-fast", "startup", "startup-fast", "snapshot", "snapshot-fast", "state", "protect", "protect-fast", "rules", "rules-fast",
             "map", "map-fast", "plan-fast", "doctor", "leftovers", "appreview", "history", "report-fast"
         ]
         if jsonActions.contains(action), !args.contains("--json") {

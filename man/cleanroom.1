@@ -1,4 +1,4 @@
-.TH CLEANROOM 1 "June 2026" "cleanroom 1.50.0" "User Commands"
+.TH CLEANROOM 1 "June 2026" "cleanroom 1.51.0" "User Commands"
 .SH NAME
 cleanroom \- safe-by-default macOS storage cleaner
 .SH SYNOPSIS
@@ -223,6 +223,9 @@ cleanroom \- safe-by-default macOS storage cleaner
 .br
 .B cleanroom
 .RI "loginitems [--json]"
+.br
+.B cleanroom
+.RI "loginitems-fast [--json]"
 .br
 .B cleanroom
 .RI "trash [--json]"
@@ -567,6 +570,9 @@ Quickly summarize startup item locations without parsing every plist.
 List user Login Items reported by macOS System Events without disabling or
 removing anything.
 .TP
+.B loginitems-fast
+Quickly review Login Items without requesting macOS automation permission.
+.TP
 .B trash
 Inventory current user Trash contents without emptying Trash.
 .TP
@@ -846,6 +852,7 @@ cleanroom android --json
 cleanroom startup --json
 cleanroom startup-fast --json
 cleanroom loginitems --json
+cleanroom loginitems-fast --json
 cleanroom trash --json
 cleanroom trash-fast --json
 cleanroom caches --json

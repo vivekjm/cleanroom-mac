@@ -1260,6 +1260,14 @@ grep '"name":"Cleanroom Login Helper"' "$loginitems_json" >/dev/null
 grep '"hidden":"false"' "$loginitems_json" >/dev/null
 grep '"present":true' "$loginitems_json" >/dev/null
 rm -f "$loginitems_json"
+"$BIN" loginitems-fast | grep 'quick Login Items review' >/dev/null
+loginitems_fast_json="$(mktemp)"
+"$BIN" loginitems-fast --json > "$loginitems_fast_json"
+python3 -m json.tool "$loginitems_fast_json" >/dev/null
+grep '"id":"login-items"' "$loginitems_fast_json" >/dev/null
+grep '"mode":"fast"' "$loginitems_fast_json" >/dev/null
+grep '"safety":"Review only"' "$loginitems_fast_json" >/dev/null
+rm -f "$loginitems_fast_json"
 "$BIN" trash | grep 'old-trash.txt' >/dev/null
 trash_json="$(mktemp)"
 "$BIN" trash --json > "$trash_json"
