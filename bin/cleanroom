@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.34.0"
+VERSION="1.35.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -8196,7 +8196,7 @@ dashboard() {
 }
 
 dashboard_card_rows() {
-  local cache cache_value cache_detail downloads large archives developer screenshots trash node
+  local cache cache_value cache_detail
   cache="$(paths_present_count "~/.cache" "~/Library/Logs" "~/.npm/_cacache" "~/.yarn/cache" "~/Library/pnpm/store")"
   if [[ "$cache" -gt 0 ]]; then
     cache_value="Review"
@@ -8205,27 +8205,15 @@ dashboard_card_rows() {
     cache_value="Clear"
     cache_detail="No common cache locations found."
   fi
-  downloads=0
-  archives=0
-  screenshots=0
-  trash="$(trash_total_kb)"
-  large=0
-  node=0
-  developer=0
-  if command -v mdfind >/dev/null 2>&1; then
-    large="$(large_fast_rows "$HOME" | tab_rows_total_kb)"
-    node="$(node_fast_rows | tab_rows_total_kb)"
-    developer="$(developer_fast_rows | tab_rows_total_kb)"
-  fi
 
   printf '0\t%s\t%s\t%s\t%s\n' "caches" "Caches" "$cache_value" "$cache_detail"
-  printf '%s\t%s\t%s\t%s\t%s\n' "$node" "node-modules" "Node Modules" "$(human_kb "$node")" "Stale dependency folders"
-  printf '%s\t%s\t%s\t%s\t%s\n' "$downloads" "downloads" "Downloads" "Review" "Old downloadable artifacts"
-  printf '%s\t%s\t%s\t%s\t%s\n' "$large" "large-files" "Large Files" "$(human_kb "$large")" "Large files found quickly"
-  printf '%s\t%s\t%s\t%s\t%s\n' "$archives" "archives" "Archives" "Review" "Old archives and disk images"
-  printf '%s\t%s\t%s\t%s\t%s\n' "$developer" "developer" "Developer" "$(human_kb "$developer")" "Stale developer dependency folders"
-  printf '%s\t%s\t%s\t%s\t%s\n' "$screenshots" "screenshots" "Screenshots" "Review" "Old screenshots and recordings"
-  printf '%s\t%s\t%s\t%s\t%s\n' "$trash" "trash" "Trash" "$(human_kb "$trash")" "Current Trash contents"
+  printf '0\t%s\t%s\t%s\t%s\n' "node-modules" "Node Modules" "Review" "Open JavaScript Packages for stale dependency folders."
+  printf '0\t%s\t%s\t%s\t%s\n' "downloads" "Downloads" "Review" "Open Downloads for old downloadable artifacts."
+  printf '0\t%s\t%s\t%s\t%s\n' "large-files" "Large Files" "Review" "Open Large Files for a focused large-file review."
+  printf '0\t%s\t%s\t%s\t%s\n' "archives" "Archives" "Review" "Open Archives for old archives and disk images."
+  printf '0\t%s\t%s\t%s\t%s\n' "developer" "Developer" "Review" "Open Developer Files for build artifacts and SDK caches."
+  printf '0\t%s\t%s\t%s\t%s\n' "screenshots" "Screenshots" "Review" "Open Screenshots for old screenshots and recordings."
+  printf '0\t%s\t%s\t%s\t%s\n' "trash" "Trash" "Review" "Open Trash for current Trash contents."
 }
 
 snapshots() {
