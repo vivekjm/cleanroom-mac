@@ -1016,6 +1016,8 @@ final class AppState: ObservableObject {
             "destructive-opt-in": "Optional cleanup",
             "system-tool": "System managed",
             "app-cache": "App cache",
+            "cli": "Developer tools",
+            "json": "Data file",
             "low-risk": "Low risk",
             "high-impact": "High impact",
             "rebuildable": "Rebuildable",
@@ -1046,20 +1048,20 @@ final class AppState: ObservableObject {
             .replacingOccurrences(of: ".", with: " ")
         let known: [String: String] = [
             "ai": "AI",
-            "api": "API",
+            "api": "App connection",
             "cc": "CC",
-            "cli": "Tools",
-            "db": "DB",
+            "cli": "Developer tools",
+            "db": "Database",
             "gpu": "GPU",
             "ios": "iOS",
-            "json": "JSON",
+            "json": "Data file",
             "lm": "LM",
             "ndk": "NDK",
             "npm": "NPM",
             "pnpm": "PNPM",
             "sdk": "SDK",
             "sql": "SQL",
-            "ui": "UI",
+            "ui": "Interface",
             "xcode": "Xcode"
         ]
         let words = expanded
