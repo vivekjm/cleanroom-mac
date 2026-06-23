@@ -112,7 +112,7 @@ struct AppAction: Hashable {
     static let restoreHistory = AppAction(title: "Restore History", args: ["state-fast"])
     static let safetyCheck = AppAction(title: "Safety Check", args: ["clean", "--preset", "dev", "--preflight"])
     static let privacyReport = AppAction(title: "Privacy Report", args: ["report-fast", "--redact"])
-    static let pastCleanups = AppAction(title: "Past Cleanups", args: ["history"])
+    static let pastCleanups = AppAction(title: "Past Cleanups", args: ["history-fast"])
     static let protectedItems = AppAction(title: "Protected Items", args: ["protect-fast"])
     static let safetyPolicy = AppAction(title: "Safety Policy", args: ["rules-fast"])
     static let safetyPlan = AppAction(title: "Safety Plan", args: ["clean", "--preflight"])
@@ -473,7 +473,7 @@ final class AppState: ObservableObject {
             "aitools", "aitools-fast", "ai-tools", "ai",
             "xcode", "xcode-fast", "backups", "backups-fast", "system-data", "system-data-fast", "containers", "containers-fast", "toolchains", "toolchains-fast",
             "loginitems", "loginitems-fast", "startup", "startup-fast", "snapshot", "snapshot-fast", "state", "state-fast", "protect", "protect-fast", "rules", "rules-fast",
-            "map", "map-fast", "plan-fast", "doctor", "doctor-fast", "leftovers", "appreview", "history", "report-fast"
+            "map", "map-fast", "plan-fast", "doctor", "doctor-fast", "leftovers", "appreview", "history", "history-fast", "report-fast"
         ]
         if jsonActions.contains(action), !args.contains("--json") {
             return args + ["--json"]

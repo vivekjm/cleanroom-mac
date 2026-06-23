@@ -1530,6 +1530,14 @@ grep 'CloudStorage' "$guard_json" >/dev/null
 grep 'Messages' "$guard_json" >/dev/null
 rm -f "$guard_json"
 "$BIN" history 2>&1 | grep 'No cleanroom history found' >/dev/null
+"$BIN" history-fast | grep 'quick cleanup history' >/dev/null
+history_fast_json="$(mktemp)"
+"$BIN" history-fast --json > "$history_fast_json"
+python3 -m json.tool "$history_fast_json" >/dev/null
+grep '"id":"cleanup-history"' "$history_fast_json" >/dev/null
+grep '"mode":"fast"' "$history_fast_json" >/dev/null
+grep '"safety":"Review only"' "$history_fast_json" >/dev/null
+rm -f "$history_fast_json"
 
 config_file="$(mktemp)"
 rm -f "$config_file"

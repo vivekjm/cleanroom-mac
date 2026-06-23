@@ -817,6 +817,7 @@ List recent cleanup runs:
 
 ```sh
 cleanroom history
+cleanroom history-fast
 ```
 
 Preview or apply restore from a Trash-mode run:

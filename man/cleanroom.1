@@ -1,4 +1,4 @@
-.TH CLEANROOM 1 "June 2026" "cleanroom 1.53.0" "User Commands"
+.TH CLEANROOM 1 "June 2026" "cleanroom 1.54.0" "User Commands"
 .SH NAME
 cleanroom \- safe-by-default macOS storage cleaner
 .SH SYNOPSIS
@@ -301,6 +301,9 @@ cleanroom \- safe-by-default macOS storage cleaner
 .br
 .B cleanroom
 .RI "history [--limit n]"
+.br
+.B cleanroom
+.RI "history-fast [--json]"
 .br
 .B cleanroom
 .RI "restore [--log path] [--apply]"
@@ -656,6 +659,9 @@ scanning or deleting files.
 .TP
 .B history
 List recent apply logs.
+.TP
+.B history-fast
+Quickly summarize recent cleanups without log paths.
 .TP
 .B restore
 Restore files moved by --trash from an apply log. Dry-run by default.
