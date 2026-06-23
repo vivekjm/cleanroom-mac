@@ -705,6 +705,14 @@ python3 -m json.tool "$large_fast_json" >/dev/null
 grep '"available":true' "$large_fast_json" >/dev/null
 grep 'big-test.bin' "$large_fast_json" >/dev/null
 rm -f "$large_fast_json"
+"$BIN" documents-fast "$HOME/Documents" --limit 10 | grep 'quick Documents review' >/dev/null
+documents_fast_json="$(mktemp)"
+"$BIN" documents-fast --json "$HOME/Documents" --limit 10 > "$documents_fast_json"
+python3 -m json.tool "$documents_fast_json" >/dev/null
+grep '"mode":"fast"' "$documents_fast_json" >/dev/null
+grep '"name":"media-project"' "$documents_fast_json" >/dev/null
+grep '"size":"Open folder"' "$documents_fast_json" >/dev/null
+rm -f "$documents_fast_json"
 "$BIN" brokenlinks "$HOME/Documents" --limit 10 | grep 'broken-link' >/dev/null
 brokenlinks_json="$(mktemp)"
 "$BIN" brokenlinks --json "$HOME/Documents" --limit 10 > "$brokenlinks_json"

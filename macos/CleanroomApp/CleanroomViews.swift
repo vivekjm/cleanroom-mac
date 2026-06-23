@@ -83,6 +83,7 @@ struct AppAction: Hashable {
     static let missingFiles = AppAction(title: "Missing Files", args: ["brokenlinks-fast", "~/Downloads", "--limit", "40"])
     static let downloadWarnings = AppAction(title: "Download Warnings", args: ["quarantine-fast", "--limit", "40"])
     static let finderClutter = AppAction(title: "Finder Clutter", args: ["metadata-fast", "--limit", "40"])
+    static let documents = AppAction(title: "Documents", args: ["documents-fast", "--limit", "40"])
     static let downloads = AppAction(title: "Downloads", args: ["downloads-fast", "--limit", "30", "--days", "30"])
     static let archives = AppAction(title: "Archives", args: ["archives-fast", "--limit", "30", "--days", "7"])
     static let screenshots = AppAction(title: "Screenshots", args: ["screenshots-fast", "--limit", "30", "--days", "7"])
@@ -467,7 +468,7 @@ final class AppState: ObservableObject {
         let jsonActions: Set<String> = [
             "large-fast", "duplicates-fast", "brokenlinks", "brokenlinks-fast", "quarantine-fast", "metadata-fast",
             "developer-fast", "nodes-fast", "venvs-fast", "apps-fast",
-            "downloads", "downloads-fast", "archives", "archives-fast", "screenshots", "screenshots-fast", "trash", "trash-fast", "cloudfiles", "cloudfiles-fast", "caches-instant", "caches-fast",
+            "documents", "documents-fast", "downloads", "downloads-fast", "archives", "archives-fast", "screenshots", "screenshots-fast", "trash", "trash-fast", "cloudfiles", "cloudfiles-fast", "caches-instant", "caches-fast",
             "quicklook", "quicklook-fast", "fontcaches", "fontcaches-fast", "webcaches", "webcaches-fast", "savedstate", "savedstate-fast",
             "projectcaches", "projectcaches-fast", "updaters", "updaters-fast", "browsercaches", "browsercaches-fast",
             "aitools", "aitools-fast", "ai-tools", "ai",
@@ -1442,6 +1443,7 @@ struct SidebarView: View {
                             NavRow("magnifyingglass.circle.fill","Leftovers", .dashboard, state, onTap: { state.showLeftovers = true })
                         }
                         SidebarSection("CATEGORIES") {
+                            NavRow("folder.fill",             "Documents",   .run(.documents), state)
                             NavRow("arrow.down.to.line",      "Downloads",   .run(.downloads), state)
                             NavRow("archivebox.fill",         "Archives",    .run(.archives), state)
                             NavRow("camera.viewfinder",       "Screenshots", .run(.screenshots), state)

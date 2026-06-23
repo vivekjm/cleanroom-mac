@@ -295,6 +295,7 @@ Break down Documents or any folder by top-level item:
 cleanroom documents
 cleanroom documents ~/Documents --limit 40
 cleanroom documents --json
+cleanroom documents-fast --json
 ```
 
 Break down Desktop clutter:
@@ -893,7 +894,7 @@ Config files use simple `key=value` lines and are never executed as shell.
 
 `system-data` breaks common macOS System Data locations into focused buckets such as Application Support, caches, Developer data, container storage, diagnostics, MobileSync backups, Group Containers, HTTPStorages, and saved app state. It is review-only and points to the safest next command for each bucket.
 
-`documents` ranks the top-level files and folders inside `~/Documents` or a provided directory. It is review-only, includes each item's guard status, and prints follow-up `documents` and `large` commands so you can drill down safely.
+`documents` ranks the top-level files and folders inside `~/Documents` or a provided directory. It is review-only, includes each item's guard status, and prints follow-up `documents` and `large` commands so you can drill down safely. `documents-fast` is the responsive desktop-app version: it shows exact sizes for loose files and labels folders as "Open folder" instead of deep-scanning them.
 
 `desktop` is a convenience shortcut for the same guarded top-level inventory on `~/Desktop`, useful when screenshots, exports, archives, and loose project folders have piled up.
 

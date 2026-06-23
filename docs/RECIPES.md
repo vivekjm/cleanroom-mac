@@ -203,7 +203,7 @@ cleanroom permissions --json
 
 `duplicates --json [PATH]` emits exact duplicate groups with SHA-256 hashes, paths, and estimated possible reclaim. It is intentionally review-only and does not delete anything.
 
-`documents --json [PATH]` emits top-level file/folder sizes with kind, guard status, and follow-up commands. It is intentionally review-only and helps explain a large Documents storage category before deleting anything.
+`documents --json [PATH]` emits top-level file/folder sizes with kind, guard status, and follow-up commands. It is intentionally review-only and helps explain a large Documents storage category before deleting anything. Use `documents-fast --json [PATH]` for desktop apps and quick reviews; it avoids deep folder sizing and prompts users to open a folder only when they want detail.
 
 `desktop --json` emits the same guarded top-level inventory for `~/Desktop`. It is intentionally review-only and useful for screenshot/export/project clutter.
 
