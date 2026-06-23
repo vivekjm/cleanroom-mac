@@ -556,6 +556,14 @@ grep '"id":"run-logs"' "$state_json" >/dev/null
 grep '"id":"snapshots"' "$state_json" >/dev/null
 grep '"id":"recoverable-trash"' "$state_json" >/dev/null
 rm -f "$state_json"
+"$BIN" state-fast | grep 'quick restore history' >/dev/null
+state_fast_json="$(mktemp)"
+"$BIN" state-fast --json > "$state_fast_json"
+python3 -m json.tool "$state_fast_json" >/dev/null
+grep '"mode":"fast"' "$state_fast_json" >/dev/null
+grep '"id":"recoverable-trash"' "$state_fast_json" >/dev/null
+grep '"safety":"Review only"' "$state_fast_json" >/dev/null
+rm -f "$state_fast_json"
 "$BIN" permissions | grep 'cleanroom permissions' >/dev/null
 permissions_json="$(mktemp)"
 "$BIN" permissions --json > "$permissions_json"

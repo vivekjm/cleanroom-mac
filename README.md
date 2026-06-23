@@ -153,6 +153,7 @@ cleanroom snapshot --output ~/Desktop/cleanroom-before.json
 cleanroom snapshot --json
 cleanroom diff ~/Desktop/cleanroom-before.json ~/Desktop/cleanroom-after.json
 cleanroom state
+cleanroom state-fast
 cleanroom clean --include-cleanroom-state --days 30
 cleanroom clean --apply --include-cleanroom-state --days 30
 cleanroom permissions

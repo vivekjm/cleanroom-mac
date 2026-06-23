@@ -1,4 +1,4 @@
-.TH CLEANROOM 1 "June 2026" "cleanroom 1.51.0" "User Commands"
+.TH CLEANROOM 1 "June 2026" "cleanroom 1.52.0" "User Commands"
 .SH NAME
 cleanroom \- safe-by-default macOS storage cleaner
 .SH SYNOPSIS
@@ -25,6 +25,9 @@ cleanroom \- safe-by-default macOS storage cleaner
 .br
 .B cleanroom
 .RI "state [--json]"
+.br
+.B cleanroom
+.RI "state-fast [--json]"
 .br
 .B cleanroom
 .RI "permissions [--json]"
@@ -362,6 +365,9 @@ the latest two saved snapshots from ~/.local/state/cleanroom/snapshots.
 .B state
 Inventory Cleanroom-created apply logs, storage snapshots, and recoverable
 ~/.Trash/cleanroom-* folders. Cleanup is opt-in for old Cleanroom-created state.
+.TP
+.B state-fast
+Quickly summarize restore history without path or size scans.
 .TP
 .B permissions
 Audit whether common macOS privacy-sensitive storage locations exist and are
@@ -798,6 +804,7 @@ cleanroom map --json
 cleanroom snapshot --output ~/Desktop/cleanroom-before.json
 cleanroom diff ~/Desktop/cleanroom-before.json ~/Desktop/cleanroom-after.json
 cleanroom state --json
+cleanroom state-fast --json
 cleanroom permissions --json
 cleanroom scan
 cleanroom system-data
