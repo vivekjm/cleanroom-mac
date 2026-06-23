@@ -346,7 +346,7 @@ final class AppState: ObservableObject {
         stats[3].value = scanTimeFormatter.string(from: Date())
 
         if let used = grab("used_kb") ?? grab("disk_used") ?? grab("total_used") {
-            stats[0].value = formatKBString(used)
+            stats[0].value = Self.formatKBString(used)
         }
         if let rec = grab("estimate") ?? grab("reclaimable") ?? grab("recoverable") {
             stats[1].value = rec
@@ -365,19 +365,19 @@ final class AppState: ObservableObject {
 
         stats[3].value = scanTimeFormatter.string(from: Date())
 
-        if let usedKB = numberValue(object["used_kb"]) {
-            stats[0].value = formatKBString(String(usedKB))
-        } else if let used = stringValue(object["used"]) ?? stringValue(object["disk_used"]) {
+        if let usedKB = Self.numberValue(object["used_kb"]) {
+            stats[0].value = Self.formatKBString(String(usedKB))
+        } else if let used = Self.stringValue(object["used"]) ?? Self.stringValue(object["disk_used"]) {
             stats[0].value = used
         }
 
         if let summary = object["summary"] as? [String: Any] {
-            if let reclaimable = stringValue(summary["reclaimable"]) {
+            if let reclaimable = Self.stringValue(summary["reclaimable"]) {
                 stats[1].value = reclaimable
             }
-            if let protected = numberValue(summary["protected_present"]) {
+            if let protected = Self.numberValue(summary["protected_present"]) {
                 stats[2].value = "\(protected) guarded"
-            } else if let protected = stringValue(summary["protected_present"]) {
+            } else if let protected = Self.stringValue(summary["protected_present"]) {
                 stats[2].value = protected
             }
         }
@@ -391,8 +391,8 @@ final class AppState: ObservableObject {
     private func applyDashboardCards(_ cards: [[String: Any]]) {
         var valuesByTitle: [String: String] = [:]
         for card in cards {
-            guard let title = stringValue(card["title"]),
-                  let value = stringValue(card["value"]) else { continue }
+            guard let title = Self.stringValue(card["title"]),
+                  let value = Self.stringValue(card["value"]) else { continue }
             valuesByTitle[title] = value
         }
         categories = categories.map { category in
@@ -404,7 +404,7 @@ final class AppState: ObservableObject {
         }
     }
 
-    private func numberValue(_ value: Any?) -> Int? {
+    nonisolated private static func numberValue(_ value: Any?) -> Int? {
         switch value {
         case let number as NSNumber:
             return number.intValue
@@ -415,7 +415,7 @@ final class AppState: ObservableObject {
         }
     }
 
-    private func formatKBString(_ raw: String) -> String {
+    nonisolated private static func formatKBString(_ raw: String) -> String {
         guard let kb = Double(raw.trimmingCharacters(in: .whitespacesAndNewlines)) else { return raw }
         let units = ["KB", "MB", "GB", "TB"]
         var value = kb
@@ -464,10 +464,10 @@ final class AppState: ObservableObject {
                     }
                 }
             }
+            let presented = Self.presentableReview(title: action.title, action: action, details: result.output)
             await MainActor.run {
                 guard self.currentRunID == runID else { return }
                 self.currentProcess = nil
-                let presented = self.presentableReview(title: action.title, action: action, details: result.output)
                 self.reviewTitle = action.title
                 self.reviewItems = presented.items
                 self.reviewSummary = presented.summary
@@ -675,12 +675,12 @@ final class AppState: ObservableObject {
         return "\(title) finished. Open the report if you need more context."
     }
 
-    private func presentableReview(title: String, action: AppAction, details: String) -> PresentableReview {
+    nonisolated private static func presentableReview(title: String, action: AppAction, details: String) -> PresentableReview {
         let trimmed = details.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let data = trimmed.data(using: .utf8),
               let parsed = try? JSONSerialization.jsonObject(with: data),
-              let items = jsonItems(from: parsed) else {
-            let items = textReviewItems(title: title, details: details)
+              let items = Self.jsonItems(from: parsed) else {
+            let items = Self.textReviewItems(title: title, details: details)
             let safeSuffix = action.args.contains("--apply") ? "" : " No files were changed."
             if items.isEmpty {
                 return PresentableReview(summary: "\(title) finished.\(safeSuffix)\n", items: [])
@@ -697,15 +697,15 @@ final class AppState: ObservableObject {
 
         var lines = ["\(title) found \(items.count) review \(items.count == 1 ? "item" : "items")."]
         for item in items.prefix(40) {
-            lines.append(summaryLine(for: item))
+            lines.append(Self.summaryLine(for: item))
         }
         return PresentableReview(
             summary: lines.joined(separator: "\n") + "\n",
-            items: items.prefix(80).map { reviewItem(from: $0) }
+            items: items.prefix(80).map { Self.reviewItem(from: $0) }
         )
     }
 
-    private func textReviewItems(title: String, details: String) -> [ReviewItem] {
+    nonisolated private static func textReviewItems(title: String, details: String) -> [ReviewItem] {
         let cleaned = Self.sanitizeForApp(details)
         let lines = cleaned
             .split(separator: "\n", omittingEmptySubsequences: false)
@@ -713,24 +713,24 @@ final class AppState: ObservableObject {
             .filter { !$0.isEmpty }
 
         let items = lines.prefix(40).compactMap { line -> ReviewItem? in
-            guard let sentence = friendlySentence(line) else { return nil }
-            let badge = fallbackBadge(for: sentence)
-            if let size = leadingSize(in: sentence) {
+            guard let sentence = Self.friendlySentence(line) else { return nil }
+            let badge = Self.fallbackBadge(for: sentence)
+            if let size = Self.leadingSize(in: sentence) {
                 let titleText = sentence
                     .replacingOccurrences(of: "^[0-9]+(\\.[0-9]+)?\\s?(B|KB|MB|GB|TB)\\b\\s*", with: "", options: [.regularExpression, .caseInsensitive])
                     .trimmingCharacters(in: .whitespacesAndNewlines)
                 return ReviewItem(
-                    title: titleText.isEmpty ? title : friendlyLabel(titleText),
-                    detail: fallbackDetail(for: sentence),
+                    title: titleText.isEmpty ? title : Self.friendlyLabel(titleText),
+                    detail: Self.fallbackDetail(for: sentence),
                     size: size,
                     badge: badge,
                     path: nil
                 )
             }
             return ReviewItem(
-                title: fallbackTitle(for: sentence, defaultTitle: title),
-                detail: fallbackDetail(for: sentence),
-                size: fallbackSize(for: sentence),
+                title: Self.fallbackTitle(for: sentence, defaultTitle: title),
+                detail: Self.fallbackDetail(for: sentence),
+                size: Self.fallbackSize(for: sentence),
                 badge: badge,
                 path: nil
             )
@@ -752,7 +752,7 @@ final class AppState: ObservableObject {
         ]
     }
 
-    private func fallbackTitle(for sentence: String, defaultTitle: String) -> String {
+    nonisolated private static func fallbackTitle(for sentence: String, defaultTitle: String) -> String {
         let lower = sentence.lowercased()
         if lower.contains("could not") || lower.contains("try again") || lower.contains("unavailable") {
             return "Needs Attention"
@@ -772,7 +772,7 @@ final class AppState: ObservableObject {
         return defaultTitle
     }
 
-    private func fallbackDetail(for sentence: String) -> String {
+    nonisolated private static func fallbackDetail(for sentence: String) -> String {
         let lower = sentence.lowercased()
         if lower.contains("could not") || lower.contains("try again") || lower.contains("unavailable") {
             return "The review could not finish. Try again, or run App Checkup."
@@ -789,7 +789,7 @@ final class AppState: ObservableObject {
         return sentence
     }
 
-    private func fallbackSize(for sentence: String) -> String {
+    nonisolated private static func fallbackSize(for sentence: String) -> String {
         let lower = sentence.lowercased()
         if lower.contains("could not") || lower.contains("try again") || lower.contains("unavailable") {
             return "Check"
@@ -803,7 +803,7 @@ final class AppState: ObservableObject {
         return "Info"
     }
 
-    private func fallbackBadge(for sentence: String) -> String {
+    nonisolated private static func fallbackBadge(for sentence: String) -> String {
         let lower = sentence.lowercased()
         if lower.contains("could not") || lower.contains("try again") || lower.contains("unavailable") {
             return "Needs Attention"
@@ -817,31 +817,31 @@ final class AppState: ObservableObject {
         return "Ready"
     }
 
-    private func jsonItems(from parsed: Any) -> [[String: Any]]? {
+    nonisolated private static func jsonItems(from parsed: Any) -> [[String: Any]]? {
         if let array = parsed as? [[String: Any]] {
-            return appFacingItems(array)
+            return Self.appFacingItems(array)
         }
         if let object = parsed as? [String: Any] {
             if let available = object["available"] as? Bool, !available {
                 return []
             }
-            if let preflightItems = preflightReviewItems(from: object) {
-                return appFacingItems(preflightItems)
+            if let preflightItems = Self.preflightReviewItems(from: object) {
+                return Self.appFacingItems(preflightItems)
             }
             if let array = object["items"] as? [[String: Any]] {
-                return appFacingItems(array)
+                return Self.appFacingItems(array)
             }
             if let array = object["categories"] as? [[String: Any]] {
-                return appFacingItems(array)
+                return Self.appFacingItems(array)
             }
             if let array = object["buckets"] as? [[String: Any]] {
-                return appFacingItems(array)
+                return Self.appFacingItems(array)
             }
             if let array = object["cards"] as? [[String: Any]] {
-                return appFacingItems(array)
+                return Self.appFacingItems(array)
             }
-            if let doctorItems = doctorReviewItems(from: object) {
-                return appFacingItems(doctorItems)
+            if let doctorItems = Self.doctorReviewItems(from: object) {
+                return Self.appFacingItems(doctorItems)
             }
             var grouped: [[String: Any]] = []
             for key in ["apps", "uninstallers", "receipts", "leftovers"] {
@@ -850,22 +850,22 @@ final class AppState: ObservableObject {
                 }
             }
             if !grouped.isEmpty {
-                return appFacingItems(grouped)
+                return Self.appFacingItems(grouped)
             }
         }
         return nil
     }
 
-    private func preflightReviewItems(from object: [String: Any]) -> [[String: Any]]? {
-        guard stringValue(object["action"]) == "clean",
+    nonisolated private static func preflightReviewItems(from object: [String: Any]) -> [[String: Any]]? {
+        guard Self.stringValue(object["action"]) == "clean",
               let categories = object["categories"] as? [[String: Any]] else {
             return nil
         }
 
         var items: [[String: Any]] = categories.map { item in
-            let title = stringValue(item["title"]) ?? stringValue(item["id"]) ?? "Cleanup Area"
-            let safety = Self.friendlySafety(stringValue(item["safety"]))
-            let recovery = Self.friendlyRecovery(stringValue(item["recoverability"]))
+            let title = Self.stringValue(item["title"]) ?? Self.stringValue(item["id"]) ?? "Cleanup Area"
+            let safety = Self.friendlySafety(Self.stringValue(item["safety"]))
+            let recovery = Self.friendlyRecovery(Self.stringValue(item["recoverability"]))
             return [
                 "title": title,
                 "size": "Selected",
@@ -902,7 +902,7 @@ final class AppState: ObservableObject {
         return items
     }
 
-    private func doctorReviewItems(from object: [String: Any]) -> [[String: Any]]? {
+    nonisolated private static func doctorReviewItems(from object: [String: Any]) -> [[String: Any]]? {
         guard object["platform"] is [String: Any] ||
               object["tools"] is [[String: Any]] ||
               object["safety"] is [String: Any] else {
@@ -912,9 +912,9 @@ final class AppState: ObservableObject {
         var items: [[String: Any]] = []
 
         if let disk = object["disk"] as? [String: Any] {
-            let capacity = stringValue(disk["capacity"]) ?? "Review"
-            let available = numberValue(disk["available_kb"]).map { formatKBString(String($0)) } ?? "available space"
-            let used = numberValue(disk["used_kb"]).map { formatKBString(String($0)) } ?? "current usage"
+            let capacity = Self.stringValue(disk["capacity"]) ?? "Review"
+            let available = Self.numberValue(disk["available_kb"]).map { Self.formatKBString(String($0)) } ?? "available space"
+            let used = Self.numberValue(disk["used_kb"]).map { Self.formatKBString(String($0)) } ?? "current usage"
             items.append([
                 "title": "Disk Space",
                 "size": capacity,
@@ -924,7 +924,7 @@ final class AppState: ObservableObject {
         }
 
         if let safety = object["safety"] as? [String: Any] {
-            let protected = numberValue(safety["protected_present"]) ?? 0
+            let protected = Self.numberValue(safety["protected_present"]) ?? 0
             let rulesReady = (safety["rules_catalog"] as? Bool) == true
             let protectedReady = (safety["protected_catalog"] as? Bool) == true
             let status = rulesReady && protectedReady ? "Protected" : "Needs Attention"
@@ -940,7 +940,7 @@ final class AppState: ObservableObject {
 
         if let tools = object["tools"] as? [[String: Any]] {
             let required = tools.filter { ($0["required"] as? Bool) == true }
-            let missingRequired = required.filter { stringValue($0["status"]) != "ok" }
+            let missingRequired = required.filter { Self.stringValue($0["status"]) != "ok" }
             items.append([
                 "title": "Required Tools",
                 "size": missingRequired.isEmpty ? "Ready" : "\(missingRequired.count) missing",
@@ -951,9 +951,9 @@ final class AppState: ObservableObject {
             ])
 
             for tool in tools.prefix(12) {
-                let name = stringValue(tool["name"]) ?? "Tool"
+                let name = Self.stringValue(tool["name"]) ?? "Tool"
                 let requiredFlag = (tool["required"] as? Bool) == true
-                let status = stringValue(tool["status"]) ?? "review"
+                let status = Self.stringValue(tool["status"]) ?? "review"
                 items.append([
                     "title": name,
                     "size": status == "ok" ? "Ready" : "Check",
@@ -964,8 +964,8 @@ final class AppState: ObservableObject {
         }
 
         if let platform = object["platform"] as? [String: Any] {
-            let macOS = stringValue(platform["macos"]) ?? "macOS"
-            let architecture = stringValue(platform["architecture"]) ?? "Mac"
+            let macOS = Self.stringValue(platform["macos"]) ?? "macOS"
+            let architecture = Self.stringValue(platform["architecture"]) ?? "Mac"
             items.append([
                 "title": "Mac Compatibility",
                 "size": "Ready",
@@ -977,28 +977,28 @@ final class AppState: ObservableObject {
         return items.isEmpty ? nil : items
     }
 
-    private func appFacingItems(_ items: [[String: Any]]) -> [[String: Any]] {
+    nonisolated private static func appFacingItems(_ items: [[String: Any]]) -> [[String: Any]] {
         items.map { item in
             var cleaned = item
-            if let location = friendlyLocationHint(from: cleaned) {
+            if let location = Self.friendlyLocationHint(from: cleaned) {
                 cleaned["location"] = location
             }
             for key in cleaned.keys where shouldHideAppField(key) {
                 cleaned.removeValue(forKey: key)
             }
             for key in Array(cleaned.keys) {
-                guard let text = stringValue(cleaned[key]) else { continue }
-                if shouldHideAppValue(text) {
+                guard let text = Self.stringValue(cleaned[key]) else { continue }
+                if Self.shouldHideAppValue(text) {
                     cleaned.removeValue(forKey: key)
-                } else if shouldNormalizeAppTextField(key) {
-                    cleaned[key] = normalizeAppText(text)
+                } else if Self.shouldNormalizeAppTextField(key) {
+                    cleaned[key] = Self.normalizeAppText(text)
                 }
             }
             return cleaned
         }
     }
 
-    private func shouldHideAppField(_ key: String) -> Bool {
+    nonisolated private static func shouldHideAppField(_ key: String) -> Bool {
         let lower = key.lowercased()
         let pathFields: Set<String> = [
             "path",
@@ -1019,7 +1019,7 @@ final class AppState: ObservableObject {
             lower == "executable"
     }
 
-    private func shouldNormalizeAppTextField(_ key: String) -> Bool {
+    nonisolated private static func shouldNormalizeAppTextField(_ key: String) -> Bool {
         let lower = key.lowercased()
         return lower == "summary" ||
             lower == "guidance" ||
@@ -1036,7 +1036,7 @@ final class AppState: ObservableObject {
             lower == "value"
     }
 
-    private func shouldHideAppValue(_ text: String) -> Bool {
+    nonisolated private static func shouldHideAppValue(_ text: String) -> Bool {
         let lower = text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         return lower.hasPrefix("cleanroom ") ||
             lower.hasPrefix("open -r") ||
@@ -1046,11 +1046,11 @@ final class AppState: ObservableObject {
             lower.contains(" --json") ||
             lower.contains(" --include") ||
             lower.contains(" --preflight") ||
-            isSensitivePathText(text)
+            Self.isSensitivePathText(text)
     }
 
-    private func normalizeAppText(_ text: String) -> String {
-        friendlyLabelIfBackendToken(
+    nonisolated private static func normalizeAppText(_ text: String) -> String {
+        Self.friendlyLabelIfBackendToken(
             text.replacingOccurrences(of: "dry-run", with: "review", options: .caseInsensitive)
                 .replacingOccurrences(of: "opt-in", with: "optional", options: .caseInsensitive)
                 .replacingOccurrences(of: "--apply", with: "Clean Now", options: .caseInsensitive)
@@ -1058,70 +1058,70 @@ final class AppState: ObservableObject {
         )
     }
 
-    private func summaryLine(for item: [String: Any]) -> String {
-        let size = stringValue(item["size"]) ?? stringValue(item["value"]) ?? stringValue(item["potential_reclaim"]) ?? "Review"
-        let title = friendlyTitle(from: item)
-        if let location = friendlyLocationHint(from: item) {
+    nonisolated private static func summaryLine(for item: [String: Any]) -> String {
+        let size = Self.stringValue(item["size"]) ?? Self.stringValue(item["value"]) ?? Self.stringValue(item["potential_reclaim"]) ?? "Review"
+        let title = Self.friendlyTitle(from: item)
+        if let location = Self.friendlyLocationHint(from: item) {
             return "\(size)  \(title)  \(location)"
         }
         return "\(size)  \(title)"
     }
 
-    private func reviewItem(from item: [String: Any]) -> ReviewItem {
-        let size = stringValue(item["size"]) ?? stringValue(item["value"]) ?? stringValue(item["potential_reclaim"]) ?? stringValue(item["total"]) ?? "Review"
-        let title = friendlyTitle(from: item)
-        let badge = friendlyBadge(from: item)
-        let path = displayPath(from: item)
-        let detail = friendlyDetail(from: item) ??
-            friendlyLocationHint(from: item) ??
+    nonisolated private static func reviewItem(from item: [String: Any]) -> ReviewItem {
+        let size = Self.stringValue(item["size"]) ?? Self.stringValue(item["value"]) ?? Self.stringValue(item["potential_reclaim"]) ?? Self.stringValue(item["total"]) ?? "Review"
+        let title = Self.friendlyTitle(from: item)
+        let badge = Self.friendlyBadge(from: item)
+        let path = Self.displayPath(from: item)
+        let detail = Self.friendlyDetail(from: item) ??
+            Self.friendlyLocationHint(from: item) ??
             "Review before cleaning."
         return ReviewItem(title: title, detail: detail, size: size, badge: badge, path: path)
     }
 
-    private func friendlyTitle(from item: [String: Any]) -> String {
-        let raw = stringValue(item["title"]) ??
-            stringValue(item["name"]) ??
-            stringValue(item["kind"]) ??
-            stringValue(item["runtime"]) ??
-            stringValue(item["id"]) ??
-            stringValue(item["type"]) ??
+    nonisolated private static func friendlyTitle(from item: [String: Any]) -> String {
+        let raw = Self.stringValue(item["title"]) ??
+            Self.stringValue(item["name"]) ??
+            Self.stringValue(item["kind"]) ??
+            Self.stringValue(item["runtime"]) ??
+            Self.stringValue(item["id"]) ??
+            Self.stringValue(item["type"]) ??
             "Review item"
-        return friendlyLabel(raw)
+        return Self.friendlyLabel(raw)
     }
 
-    private func friendlyDetail(from item: [String: Any]) -> String? {
+    nonisolated private static func friendlyDetail(from item: [String: Any]) -> String? {
         let candidates = [
-            stringValue(item["summary"]),
-            stringValue(item["guidance"]),
-            stringValue(item["description"]),
-            stringValue(item["detail"]),
-            stringValue(item["reason"]),
-            stringValue(item["recoverability"]),
-            stringValue(item["modified"]),
-            stringValue(item["last_modified"])
+            Self.stringValue(item["summary"]),
+            Self.stringValue(item["guidance"]),
+            Self.stringValue(item["description"]),
+            Self.stringValue(item["detail"]),
+            Self.stringValue(item["reason"]),
+            Self.stringValue(item["recoverability"]),
+            Self.stringValue(item["modified"]),
+            Self.stringValue(item["last_modified"])
         ]
         for candidate in candidates {
             guard let candidate,
-                  let cleaned = friendlySentence(candidate) else { continue }
+                  let cleaned = Self.friendlySentence(candidate) else { continue }
             return cleaned
         }
         return nil
     }
 
-    private func friendlyBadge(from item: [String: Any]) -> String {
-        let raw = stringValue(item["safety"]) ??
-            stringValue(item["category"]) ??
-            stringValue(item["kind"]) ??
-            stringValue(item["type"]) ??
-            stringValue(item["status"]) ??
+    nonisolated private static func friendlyBadge(from item: [String: Any]) -> String {
+        let raw = Self.stringValue(item["safety"]) ??
+            Self.stringValue(item["category"]) ??
+            Self.stringValue(item["kind"]) ??
+            Self.stringValue(item["type"]) ??
+            Self.stringValue(item["status"]) ??
             "Review"
-        return friendlyLabel(raw)
+        return Self.friendlyLabel(raw)
     }
 
-    private func displayPath(from item: [String: Any]) -> String? {
-        if let path = stringValue(item["path"]) { return path }
+    nonisolated private static func displayPath(from item: [String: Any]) -> String? {
+        if let path = Self.stringValue(item["path"]) { return path }
         if let paths = item["paths"] as? [String], let first = paths.first { return first }
-        if let paths = stringValue(item["paths"]) {
+        if let paths = Self.stringValue(item["paths"]) {
             return paths
                 .components(separatedBy: CharacterSet(charactersIn: ";\n"))
                 .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -1130,7 +1130,7 @@ final class AppState: ObservableObject {
         return nil
     }
 
-    private func friendlySentence(_ raw: String) -> String? {
+    nonisolated private static func friendlySentence(_ raw: String) -> String? {
         let note = Self.friendlyCleanupNote(raw)
         if note != raw {
             return note
@@ -1151,13 +1151,13 @@ final class AppState: ObservableObject {
             lower.hasPrefix("--") ||
             lower.contains("preview command") ||
             lower.contains("apply command") ||
-            isSensitivePathText(text) {
+            Self.isSensitivePathText(text) {
             return nil
         }
-        return friendlyLabelIfBackendToken(text)
+        return Self.friendlyLabelIfBackendToken(text)
     }
 
-    private func friendlyLabelIfBackendToken(_ text: String) -> String {
+    nonisolated private static func friendlyLabelIfBackendToken(_ text: String) -> String {
         let exact = text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         let exactLabels: [String: String] = [
             "downloaded-models": "Downloaded models",
@@ -1182,19 +1182,19 @@ final class AppState: ObservableObject {
             return label
         }
         if text.range(of: "^[a-z0-9_.-]+$", options: .regularExpression) != nil {
-            return friendlyLabel(text)
+            return Self.friendlyLabel(text)
         }
         return text
             .replacingOccurrences(of: "dry-run", with: "review", options: .caseInsensitive)
             .replacingOccurrences(of: "opt-in", with: "optional", options: .caseInsensitive)
     }
 
-    private func friendlyLabel(_ raw: String) -> String {
+    nonisolated private static func friendlyLabel(_ raw: String) -> String {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return "Review item" }
         if trimmed.contains("/") {
             let last = URL(fileURLWithPath: trimmed).lastPathComponent
-            if !last.isEmpty { return friendlyLabel(last) }
+            if !last.isEmpty { return Self.friendlyLabel(last) }
         }
         let expanded = trimmed
             .replacingOccurrences(of: "cleanroom ", with: "", options: .caseInsensitive)
@@ -1231,13 +1231,13 @@ final class AppState: ObservableObject {
         return label.isEmpty ? "Review item" : label
     }
 
-    private func friendlyLocationHint(from item: [String: Any]) -> String? {
-        if let location = stringValue(item["location"]) { return location }
-        guard let path = displayPath(from: item) else { return nil }
-        return friendlyLocation(shortPath(path))
+    nonisolated private static func friendlyLocationHint(from item: [String: Any]) -> String? {
+        if let location = Self.stringValue(item["location"]) { return location }
+        guard let path = Self.displayPath(from: item) else { return nil }
+        return Self.friendlyLocation(Self.shortPath(path))
     }
 
-    private func friendlyLocation(_ path: String) -> String {
+    nonisolated private static func friendlyLocation(_ path: String) -> String {
         let lower = path.lowercased()
         if lower.contains("/downloads") || lower.hasPrefix("~/downloads") { return "In Downloads" }
         if lower.contains("/desktop") || lower.hasPrefix("~/desktop") { return "On Desktop" }
@@ -1253,7 +1253,7 @@ final class AppState: ObservableObject {
         return "Local storage item"
     }
 
-    private func shortPath(_ path: String) -> String {
+    nonisolated private static func shortPath(_ path: String) -> String {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         if path == home { return "~" }
         if path.hasPrefix(home + "/") {
@@ -1262,11 +1262,7 @@ final class AppState: ObservableObject {
         return path
     }
 
-    private func isSensitivePathText(_ text: String) -> Bool {
-        Self.isSensitivePathText(text)
-    }
-
-    private static func isSensitivePathText(_ text: String) -> Bool {
+    nonisolated private static func isSensitivePathText(_ text: String) -> Bool {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         let lower = trimmed.lowercased()
         return lower.hasPrefix("/users/") ||
@@ -1281,7 +1277,7 @@ final class AppState: ObservableObject {
             lower.contains("/node_modules/")
     }
 
-    private func stringValue(_ value: Any?) -> String? {
+    nonisolated private static func stringValue(_ value: Any?) -> String? {
         switch value {
         case let text as String where !text.isEmpty:
             return text
@@ -1292,7 +1288,7 @@ final class AppState: ObservableObject {
         }
     }
 
-    private func leadingSize(in line: String) -> String? {
+    nonisolated private static func leadingSize(in line: String) -> String? {
         guard let range = line.range(of: "^[0-9]+(\\.[0-9]+)?\\s?(B|KB|MB|GB|TB)\\b", options: [.regularExpression, .caseInsensitive]) else {
             return nil
         }
@@ -1543,7 +1539,7 @@ final class AppState: ObservableObject {
         return raw
     }
 
-    private static func sanitizeForApp(_ text: String) -> String {
+    nonisolated private static func sanitizeForApp(_ text: String) -> String {
         let plainText = text.replacingOccurrences(
             of: "\u{001B}\\[[0-9;]*[A-Za-z]",
             with: "",
