@@ -178,7 +178,8 @@ cleanroom review
 cleanroom review --json
 ```
 
-Get ranked cleanup recommendations:
+Get cleanup recommendations. Use `plan-fast` for an instant app-friendly plan, or `plan`
+for deeper size estimates and copyable commands:
 
 ```sh
 cleanroom plan-fast

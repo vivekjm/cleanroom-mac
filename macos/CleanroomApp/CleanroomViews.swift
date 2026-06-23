@@ -1079,7 +1079,7 @@ final class AppState: ObservableObject {
                 return CleanupPlanItem(title: title, estimate: estimate, safety: safety, recovery: recovery)
             }
             return (items, [
-                "Quick estimates are shown first; detailed reviews stay available for each area.",
+                "This plan opens instantly; focused reviews show sizes for each area.",
                 "Passwords, browser profiles, Photos, Mail, Messages, and cloud folders stay protected.",
                 "Clean Now still requires confirmation and moves eligible files to Trash where possible."
             ])
