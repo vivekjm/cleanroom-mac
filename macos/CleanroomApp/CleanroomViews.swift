@@ -229,6 +229,9 @@ final class AppState: ObservableObject {
     // Expensive storage measurement; run only when the user asks or after cleanup.
     func refreshStats(force: Bool = false) {
         guard !running else { return }
+        if force {
+            clearReviewCache()
+        }
         if !force,
            let lastStatsRefresh,
            Date().timeIntervalSince(lastStatsRefresh) < 30 {
@@ -380,7 +383,7 @@ final class AppState: ObservableObject {
             reviewSummary = cached.summary
             reviewItems = cached.items
             status = "\(action.title) ready"
-            activityMessage = "Showing a recent \(action.title) review. Analyze again later for fresh numbers."
+            activityMessage = "Showing a recent \(action.title) review. Analyze Storage clears recent reviews."
             summaryOpen = false
             return
         }
@@ -431,6 +434,7 @@ final class AppState: ObservableObject {
                 }
                 self.running = false
                 if action == .safeCleanup {
+                    self.clearReviewCache()
                     self.refreshStats(force: true)
                 }
             }
@@ -494,6 +498,10 @@ final class AppState: ObservableObject {
             items: items,
             createdAt: Date()
         )
+    }
+
+    private func clearReviewCache() {
+        reviewCache.removeAll()
     }
 
     func runLeftovers(_ query: String) {
