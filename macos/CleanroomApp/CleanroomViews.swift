@@ -482,7 +482,7 @@ final class AppState: ObservableObject {
                     self.summaryOpen = true
                 } else if result.status == 0 {
                     self.status = "\(action.title) complete"
-                    self.activityMessage = self.summarizeAction(action: action, details: presented.summary)
+                    self.activityMessage = self.summarizeAction(action: action, details: presented.summary, items: presented.items)
                     self.summaryOpen = false
                     self.storeCachedReview(title: action.title, summary: presented.summary, items: self.reviewItems, for: action)
                 } else {
@@ -648,7 +648,7 @@ final class AppState: ObservableObject {
         return args
     }
 
-    private func summarizeAction(action: AppAction, details: String) -> String {
+    private func summarizeAction(action: AppAction, details: String, items: [ReviewItem]) -> String {
         let changedFiles = action.args.contains("--apply")
         let title = action.title
         let noChangeText = changedFiles ? "" : " No files were changed."
@@ -664,15 +664,13 @@ final class AppState: ObservableObject {
             return "\(title) finished. Items were moved to Trash where possible."
         }
 
-        let rows = reviewRows(in: details)
-        if rows.count == 1, let size = leadingSize(in: rows[0]) {
+        if items.count == 1 {
+            let size = items[0].size
             return "\(title) found 1 review item, starting at \(size). No files were changed."
         }
-        if rows.count > 1, let size = leadingSize(in: rows[0]) {
-            return "\(title) found \(rows.count) review items, largest starts at \(size). No files were changed."
-        }
-        if rows.count > 0 {
-            return "\(title) found \(rows.count) review items. No files were changed."
+        if items.count > 1 {
+            let size = items[0].size
+            return "\(title) found \(items.count) review items, largest starts at \(size). No files were changed."
         }
         return "\(title) finished. Details are available if you need them."
     }
@@ -1292,19 +1290,6 @@ final class AppState: ObservableObject {
         default:
             return nil
         }
-    }
-
-    private func reviewRows(in details: String) -> [String] {
-        details
-            .split(separator: "\n", omittingEmptySubsequences: false)
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { line in
-                guard !line.isEmpty else { return false }
-                guard line.range(of: "^[0-9]+(\\.[0-9]+)?\\s?(B|KB|MB|GB|TB)\\b", options: [.regularExpression, .caseInsensitive]) != nil else {
-                    return false
-                }
-                return !line.localizedCaseInsensitiveContains("total:")
-            }
     }
 
     private func leadingSize(in line: String) -> String? {
