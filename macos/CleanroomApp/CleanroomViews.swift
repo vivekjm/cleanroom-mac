@@ -92,6 +92,9 @@ struct AppAction: Hashable {
     static let safetyPlan = AppAction(title: "Safety Plan", args: ["clean", "--preflight"])
     static let safeCleanup = AppAction(title: "Safe Cleanup", args: ["clean", "--apply", "--trash", "--yes"])
 
+    static func appReview(query: String) -> AppAction {
+        AppAction(title: "App Review: \(query)", args: ["appreview", query, "--limit", "40"])
+    }
 }
 
 enum NavDest: Hashable {
@@ -316,10 +319,6 @@ final class AppState: ObservableObject {
         return value >= 10 ? String(format: "%.0f%@", value, units[index]) : String(format: "%.1f%@", value, units[index])
     }
 
-    func run(_ args: String, title: String) {
-        run(AppAction(title: title, args: splitArgs(args)))
-    }
-
     func run(_ action: AppAction) {
         guard !running else { return }
         let runID = UUID()
@@ -382,7 +381,7 @@ final class AppState: ObservableObject {
     }
 
     func runLeftovers(_ query: String) {
-        run("appreview \(query) --limit 40", title: "App Review: \(query)")
+        run(.appReview(query: query))
     }
 
     func copyDetails() {
@@ -863,30 +862,6 @@ final class AppState: ObservableObject {
             return nil
         }
         return String(line[range])
-    }
-
-    private func splitArgs(_ raw: String) -> [String] {
-        var args: [String] = []
-        var current = ""
-        var inSingleQuote = false
-        var inDoubleQuote = false
-
-        for ch in raw {
-            if ch == "'" && !inDoubleQuote {
-                inSingleQuote.toggle()
-            } else if ch == "\"" && !inSingleQuote {
-                inDoubleQuote.toggle()
-            } else if ch.isWhitespace && !inSingleQuote && !inDoubleQuote {
-                if !current.isEmpty {
-                    args.append(current)
-                    current = ""
-                }
-            } else {
-                current.append(ch)
-            }
-        }
-        if !current.isEmpty { args.append(current) }
-        return args
     }
 
     func filteredCategories() -> [CleanCategory] {
