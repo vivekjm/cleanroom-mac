@@ -235,8 +235,8 @@ final class AppState: ObservableObject {
         if !force,
            let lastStatsRefresh,
            Date().timeIntervalSince(lastStatsRefresh) < 30 {
-            status = "Storage summary is up to date"
-            activityMessage = "Your storage summary was refreshed recently."
+            status = "Storage report is up to date"
+            activityMessage = "Your storage report was refreshed recently."
             return
         }
         status = "Measuring storage..."
@@ -247,8 +247,8 @@ final class AppState: ObservableObject {
             let raw = await Self.exec(command.executable, command.arguments, timeoutSeconds: AppRunLimit.quickSummary)
             await MainActor.run {
                 self.parseStats(raw.output)
-                self.status = "Storage summary updated"
-                self.activityMessage = "Storage summary updated. No files were changed."
+                self.status = "Storage report updated"
+                self.activityMessage = "Storage report updated. No files were changed."
             }
         }
     }
