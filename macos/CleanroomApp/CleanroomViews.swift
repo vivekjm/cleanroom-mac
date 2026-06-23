@@ -429,7 +429,26 @@ final class AppState: ObservableObject {
     }
 
     private func timeoutSeconds(for action: AppAction) -> Double {
-        action == .safeCleanup ? AppRunLimit.cleanup : AppRunLimit.review
+        if action == .safeCleanup {
+            return AppRunLimit.cleanup
+        }
+        if isQuickAction(action) {
+            return AppRunLimit.quickSummary
+        }
+        return AppRunLimit.review
+    }
+
+    private func isQuickAction(_ action: AppAction) -> Bool {
+        guard let first = action.args.first else { return false }
+        return first.hasSuffix("-fast") ||
+            first == "caches-instant" ||
+            first == "dashboard" ||
+            first == "map-fast" ||
+            first == "snapshot-fast" ||
+            first == "state-fast" ||
+            first == "report-fast" ||
+            first == "doctor-fast" ||
+            (first == "clean" && action.args.contains("--preflight"))
     }
 
     func runLeftovers(_ query: String) {
