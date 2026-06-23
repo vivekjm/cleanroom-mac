@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.67.0"
+VERSION="1.68.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -9180,7 +9180,8 @@ dashboard() {
 }
 
 dashboard_card_rows() {
-  local cache cache_value cache_detail
+  local cache app_data media cloud apps system
+  local cache_value cache_detail app_data_value app_data_detail media_value media_detail cloud_value cloud_detail apps_value apps_detail system_value system_detail
   cache="$(paths_present_count "~/.cache" "~/Library/Logs" "~/.npm/_cacache" "~/.yarn/cache" "~/Library/pnpm/store")"
   if [[ "$cache" -gt 0 ]]; then
     cache_value="Review"
@@ -9190,12 +9191,63 @@ dashboard_card_rows() {
     cache_detail="No common cache locations found."
   fi
 
+  app_data="$(paths_present_count "~/Library/Application Support" "~/Library/Containers" "~/Library/Group Containers" "~/Library/HTTPStorages" "~/Library/Saved Application State" "~/Library/WebKit")"
+  if [[ "$app_data" -gt 0 ]]; then
+    app_data_value="Review"
+    app_data_detail="App support and container locations found; open App Data for a focused review."
+  else
+    app_data_value="Clear"
+    app_data_detail="No common app data locations found."
+  fi
+
+  media="$(paths_present_count "~/Pictures/Photos Library.photoslibrary" "~/Music/Music Library.musiclibrary" "~/Music/iTunes" "~/Movies/TV Library.tvlibrary" "~/Movies/iMovie Library.imovielibrary" "~/Music/GarageBand" "~/Music/Logic")"
+  if [[ "$media" -gt 0 ]]; then
+    media_value="Protected"
+    media_detail="Media libraries found. Review them in their owning apps or Finder after backup."
+  else
+    media_value="Clear"
+    media_detail="No common media libraries found."
+  fi
+
+  cloud="$(paths_present_count "~/Library/Mobile Documents" "~/Library/CloudStorage" "~/Dropbox" "~/Google Drive" "~/OneDrive" "~/Box" "~/Sync")"
+  if [[ "$cloud" -gt 0 ]]; then
+    cloud_value="Review"
+    cloud_detail="Cloud-sync locations found. Review local files without deleting synced data."
+  else
+    cloud_value="Clear"
+    cloud_detail="No common cloud-sync locations found."
+  fi
+
+  apps="$(paths_present_count "/Applications" "~/Applications")"
+  if [[ "$apps" -gt 0 ]]; then
+    apps_value="Review"
+    apps_detail="Application folders found; open Apps for a focused review."
+  else
+    apps_value="Clear"
+    apps_detail="No application folders found."
+  fi
+
+  system="$(paths_present_count "~/Library" "~/Library/Developer" "~/Library/Application Support/MobileSync/Backup" "~/Library/Containers" "~/Library/Group Containers" "~/Library/Logs")"
+  if [[ "$system" -gt 0 ]]; then
+    system_value="Review"
+    system_detail="System Data buckets found; open System Data for the safe breakdown."
+  else
+    system_value="Clear"
+    system_detail="No common System Data buckets found."
+  fi
+
   printf '0\t%s\t%s\t%s\t%s\n' "caches" "Caches" "$cache_value" "$cache_detail"
-  printf '0\t%s\t%s\t%s\t%s\n' "node-modules" "Node Modules" "Review" "Open JavaScript Packages for stale dependency folders."
+  printf '0\t%s\t%s\t%s\t%s\n' "documents" "Documents" "Review" "Open Documents for large files and folders to review first."
+  printf '0\t%s\t%s\t%s\t%s\n' "app-data" "App Data" "$app_data_value" "$app_data_detail"
+  printf '0\t%s\t%s\t%s\t%s\n' "media-libraries" "Media Libraries" "$media_value" "$media_detail"
+  printf '0\t%s\t%s\t%s\t%s\n' "project-dependencies" "Project Dependencies" "Review" "Open Project Dependencies for stale dependency folders."
   printf '0\t%s\t%s\t%s\t%s\n' "downloads" "Downloads" "Review" "Open Downloads for old downloadable artifacts."
   printf '0\t%s\t%s\t%s\t%s\n' "large-files" "Large Files" "Review" "Open Large Files for a focused large-file review."
+  printf '0\t%s\t%s\t%s\t%s\n' "cloud-files" "Cloud Files" "$cloud_value" "$cloud_detail"
   printf '0\t%s\t%s\t%s\t%s\n' "archives" "Archives" "Review" "Open Archives for old archives and disk images."
-  printf '0\t%s\t%s\t%s\t%s\n' "developer" "Developer" "Review" "Open Developer Files for build artifacts and SDK caches."
+  printf '0\t%s\t%s\t%s\t%s\n' "apps" "Apps" "$apps_value" "$apps_detail"
+  printf '0\t%s\t%s\t%s\t%s\n' "developer-files" "Developer Files" "Review" "Open Developer Files for build artifacts and SDK caches."
+  printf '0\t%s\t%s\t%s\t%s\n' "system-data" "System Data" "$system_value" "$system_detail"
   printf '0\t%s\t%s\t%s\t%s\n' "screenshots" "Screenshots" "Review" "Open Screenshots for old screenshots and recordings."
   printf '0\t%s\t%s\t%s\t%s\n' "trash" "Trash" "Review" "Open Trash for current Trash contents."
 }

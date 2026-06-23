@@ -481,7 +481,7 @@ grep '"deep_scan_required":false' "$dashboard_json" >/dev/null
 grep '"cards":' "$dashboard_json" >/dev/null
 grep '"title":"Caches"' "$dashboard_json" >/dev/null
 grep 'open Caches for a focused review' "$dashboard_json" >/dev/null
-grep '"title":"Node Modules"' "$dashboard_json" >/dev/null
+grep '"title":"Project Dependencies"' "$dashboard_json" >/dev/null
 grep '"reclaimable_kb":' "$dashboard_json" >/dev/null
 rm -f "$dashboard_json"
 "$BIN" overview | grep 'cleanroom overview' >/dev/null
