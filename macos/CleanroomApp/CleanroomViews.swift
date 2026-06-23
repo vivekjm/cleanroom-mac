@@ -114,7 +114,7 @@ struct AppAction: Hashable {
     static let privacyReport = AppAction(title: "Privacy Report", args: ["report-fast", "--redact"])
     static let pastCleanups = AppAction(title: "Past Cleanups", args: ["history"])
     static let protectedItems = AppAction(title: "Protected Items", args: ["protect-fast"])
-    static let safetyPolicy = AppAction(title: "Safety Policy", args: ["rules"])
+    static let safetyPolicy = AppAction(title: "Safety Policy", args: ["rules-fast"])
     static let safetyPlan = AppAction(title: "Safety Plan", args: ["clean", "--preflight"])
     static let safeCleanup = AppAction(title: "Safe Cleanup", args: ["clean", "--apply", "--trash", "--yes"])
 
@@ -472,7 +472,7 @@ final class AppState: ObservableObject {
             "projectcaches", "projectcaches-fast", "updaters", "updaters-fast", "browsercaches", "browsercaches-fast",
             "aitools", "ai-tools", "ai",
             "xcode", "xcode-fast", "backups", "backups-fast", "system-data", "system-data-fast", "containers", "containers-fast", "toolchains", "toolchains-fast",
-            "loginitems", "startup", "snapshot", "snapshot-fast", "state", "protect", "protect-fast", "rules",
+            "loginitems", "startup", "snapshot", "snapshot-fast", "state", "protect", "protect-fast", "rules", "rules-fast",
             "map", "map-fast", "plan-fast", "doctor", "leftovers", "appreview", "history", "report-fast"
         ]
         if jsonActions.contains(action), !args.contains("--json") {

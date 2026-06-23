@@ -1,4 +1,4 @@
-.TH CLEANROOM 1 "June 2026" "cleanroom 1.45.0" "User Commands"
+.TH CLEANROOM 1 "June 2026" "cleanroom 1.46.0" "User Commands"
 .SH NAME
 cleanroom \- safe-by-default macOS storage cleaner
 .SH SYNOPSIS
@@ -301,6 +301,9 @@ cleanroom \- safe-by-default macOS storage cleaner
 .br
 .B cleanroom
 .RI "rules [--json]"
+.br
+.B cleanroom
+.RI "rules-fast [--json]"
 .br
 .B cleanroom
 .RI "interactive [options]"
@@ -638,6 +641,10 @@ checks, suitable for app dashboards.
 .B guard
 Explain whether specific paths are removable by cleanroom's central safety guard.
 .TP
+.B rules-fast
+Show a compact high-level safety policy summary without walking the full rule
+catalog.
+.TP
 .B categories
 Explain cleanup categories and safety levels.
 .TP
@@ -853,6 +860,7 @@ cleanroom protect --json
 cleanroom protect-fast --json
 cleanroom guard ~/Library/Application\\ Support/Google/Chrome
 cleanroom rules --json
+cleanroom rules-fast --json
 cleanroom interactive
 .fi
 .SH SAFETY

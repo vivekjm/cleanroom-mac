@@ -632,6 +632,14 @@ grep 'personal-inventory' "$rules_json" >/dev/null
 grep 'communications-inventory' "$rules_json" >/dev/null
 grep 'receipts-inventory' "$rules_json" >/dev/null
 rm -f "$rules_json"
+"$BIN" rules-fast | grep 'fast safety policy' >/dev/null
+rules_fast_json="$(mktemp)"
+"$BIN" rules-fast --json > "$rules_fast_json"
+python3 -m json.tool "$rules_fast_json" >/dev/null
+grep '"id":"personal-data-guard"' "$rules_fast_json" >/dev/null
+grep '"title":"Review Before Cleaning"' "$rules_fast_json" >/dev/null
+grep '"category":"Recovery"' "$rules_fast_json" >/dev/null
+rm -f "$rules_fast_json"
 "$BIN" review | grep 'personal storage checklist' >/dev/null
 review_json="$(mktemp)"
 "$BIN" review --json > "$review_json"

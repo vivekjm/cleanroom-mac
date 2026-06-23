@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.45.0"
+VERSION="1.46.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -163,6 +163,7 @@ Usage:
   cleanroom protect-fast [--json]
   cleanroom guard PATH... [--json]
   cleanroom rules [--json]
+  cleanroom rules-fast [--json]
   cleanroom categories
   cleanroom init-config [--config PATH]
   cleanroom help
@@ -260,6 +261,7 @@ Actions:
   protect              Audit protected personal data that cleanroom will not remove.
   guard                Explain whether specific paths are removable by cleanroom.
   rules                List cleanup rules, safety level, opt-in flag, and affected paths.
+  rules-fast           Show a compact high-level safety policy summary.
   categories           Explain cleanup categories and safety levels.
   init-config          Write a starter config file.
 
@@ -500,6 +502,7 @@ Examples:
   cleanroom protect --json
   cleanroom guard ~/Library/Application\ Support/Google/Chrome
   cleanroom rules
+  cleanroom rules-fast
   cleanroom rules --json
   cleanroom categories
   cleanroom init-config
@@ -8903,6 +8906,28 @@ rules() {
   done
 }
 
+rules_fast_json() {
+  cat <<'EOF'
+[{"id":"personal-data-guard","title":"Personal Data Guard","safety":"Protected","size":"Always on","summary":"Passwords, browser profiles, Keychains, Photos, Mail, Messages, and cloud-sync roots are never cleaned wholesale.","category":"Safety"},{"id":"review-first","title":"Review Before Cleaning","safety":"Protected","size":"Default","summary":"Storage reviews show candidates first. Cleaning only starts from an explicit cleanup action.","category":"Safety"},{"id":"rebuildable-caches","title":"Rebuildable Caches","safety":"Rebuildable","size":"Safe default","summary":"Default cleanup focuses on caches and logs that apps or macOS can recreate.","category":"Cleanup"},{"id":"trash-recovery","title":"Trash Recovery","safety":"Recoverable","size":"Recommended","summary":"Direct file removals can be moved to a Cleanroom Trash folder so they can be reviewed before emptying Trash.","category":"Recovery"},{"id":"opt-in-large-items","title":"Large Optional Areas","safety":"Review","size":"Opt in","summary":"Downloaded AI models, containers, SDKs, snapshots, old backups, and current Trash require explicit opt-in.","category":"Cleanup"},{"id":"developer-storage","title":"Developer Storage","safety":"Rebuildable","size":"Opt in","summary":"Package stores, toolchain caches, node_modules, and Python environments are handled separately from source code.","category":"Developer"},{"id":"cloud-safe","title":"Cloud-Safe Reviews","safety":"Protected","size":"Review only","summary":"Cloud folders and large synced files are inventoried without deleting or evicting local copies.","category":"Cloud"},{"id":"audit-trail","title":"Cleanup History","safety":"Recoverable","size":"Tracked","summary":"Applied cleanups write local history so Trash-mode runs can be inspected and restored while recovery files remain available.","category":"Recovery"}]
+EOF
+}
+
+rules_fast() {
+  if [[ "$JSON" -eq 1 ]]; then
+    rules_fast_json
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}cleanroom fast safety policy${RESET}"
+  printf 'High-level safety policy for app dashboards. No files were changed.\n\n'
+  printf '%-18s %-14s %s\n' "area" "safety" "summary"
+  printf '%-18s %-14s %s\n' "Personal data" "Protected" "Passwords, profiles, media, messages, mail, backups, and cloud roots stay guarded."
+  printf '%-18s %-14s %s\n' "Review flow" "Protected" "Reviews show candidates before any cleanup starts."
+  printf '%-18s %-14s %s\n' "Caches" "Rebuildable" "Default cleanup focuses on caches and logs apps can recreate."
+  printf '%-18s %-14s %s\n' "Trash recovery" "Recoverable" "Direct removals can move to Cleanroom Trash for inspection."
+  printf '%-18s %-14s %s\n' "Large items" "Opt in" "AI models, containers, SDKs, backups, snapshots, and current Trash require opt-in."
+}
+
 protect() {
   local file id type path reason expanded status kb
   file="$(protected_file)"
@@ -9561,7 +9586,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  dashboard|overview|map|map-fast|mapfast|snapshot|snapshot-fast|snapshotfast|diff|state|permissions|review|scan|system-data|system-data-fast|systemdata-fast|systemdatafast|plan|plan-fast|planfast|large|large-fast|largefast|brokenlinks|brokenlinks-fast|brokenlinksfast|broken-links-fast|broken-linksfast|quarantine|quarantine-fast|quarantinefast|metadata|metadata-fast|metadatafast|quicklook|quicklook-fast|quicklookfast|fontcaches|fontcaches-fast|fontcachesfast|font-caches|font-caches-fast|font-cachesfast|webcaches|webcaches-fast|webcachesfast|web-caches|web-caches-fast|web-cachesfast|savedstate|savedstate-fast|savedstatefast|saved-state|saved-state-fast|saved-statefast|projectcaches|project-caches|projectcaches-fast|projectcachesfast|project-caches-fast|project-cachesfast|developer-fast|developerfast|updaters|updaters-fast|updatersfast|updater-caches|updater-caches-fast|updater-cachesfast|browsercaches|browser-caches|browsercaches-fast|browsercachesfast|browser-caches-fast|browser-cachesfast|duplicates|duplicates-fast|duplicatesfast|documents|desktop|screenshots|screenshots-fast|screenshotsfast|archives|archives-fast|archivesfast|downloads|downloads-fast|downloadsfast|installers|nodes|nodes-fast|nodesfast|venvs|venvs-fast|venvsfast|virtualenvs|virtualenvs-fast|virtualenvsfast|apps|apps-fast|appsfast|uninstallers|appreview|aitools|ai-tools|ai|appdata|libraries|cloud|cloudfiles|cloudfiles-fast|cloudfilesfast|cloud-files|cloud-files-fast|cloud-filesfast|personal|communications|comms|browsers|leftovers|backups|backups-fast|backupsfast|xcode|xcode-fast|xcodefast|android|startup|loginitems|trash|caches|caches-fast|cachesfast|diagnostics|packages|npm-cache|npmcache|yarn-cache|yarncache|pnpm-store|pnpmstore|cocoapods-cache|pod-cache|podcache|pip-cache|pipcache|receipts|homebrew|homebrew-cleanup|brewcleanup|toolchains|toolchains-fast|toolchainsfast|containers|containers-fast|containersfast|snapshots|report|report-fast|reportfast|clean|history|restore|interactive|doctor|protect|protect-fast|protectfast|guard|rules|categories|init-config|help)
+  dashboard|overview|map|map-fast|mapfast|snapshot|snapshot-fast|snapshotfast|diff|state|permissions|review|scan|system-data|system-data-fast|systemdata-fast|systemdatafast|plan|plan-fast|planfast|large|large-fast|largefast|brokenlinks|brokenlinks-fast|brokenlinksfast|broken-links-fast|broken-linksfast|quarantine|quarantine-fast|quarantinefast|metadata|metadata-fast|metadatafast|quicklook|quicklook-fast|quicklookfast|fontcaches|fontcaches-fast|fontcachesfast|font-caches|font-caches-fast|font-cachesfast|webcaches|webcaches-fast|webcachesfast|web-caches|web-caches-fast|web-cachesfast|savedstate|savedstate-fast|savedstatefast|saved-state|saved-state-fast|saved-statefast|projectcaches|project-caches|projectcaches-fast|projectcachesfast|project-caches-fast|project-cachesfast|developer-fast|developerfast|updaters|updaters-fast|updatersfast|updater-caches|updater-caches-fast|updater-cachesfast|browsercaches|browser-caches|browsercaches-fast|browsercachesfast|browser-caches-fast|browser-cachesfast|duplicates|duplicates-fast|duplicatesfast|documents|desktop|screenshots|screenshots-fast|screenshotsfast|archives|archives-fast|archivesfast|downloads|downloads-fast|downloadsfast|installers|nodes|nodes-fast|nodesfast|venvs|venvs-fast|venvsfast|virtualenvs|virtualenvs-fast|virtualenvsfast|apps|apps-fast|appsfast|uninstallers|appreview|aitools|ai-tools|ai|appdata|libraries|cloud|cloudfiles|cloudfiles-fast|cloudfilesfast|cloud-files|cloud-files-fast|cloud-filesfast|personal|communications|comms|browsers|leftovers|backups|backups-fast|backupsfast|xcode|xcode-fast|xcodefast|android|startup|loginitems|trash|caches|caches-fast|cachesfast|diagnostics|packages|npm-cache|npmcache|yarn-cache|yarncache|pnpm-store|pnpmstore|cocoapods-cache|pod-cache|podcache|pip-cache|pipcache|receipts|homebrew|homebrew-cleanup|brewcleanup|toolchains|toolchains-fast|toolchainsfast|containers|containers-fast|containersfast|snapshots|report|report-fast|reportfast|clean|history|restore|interactive|doctor|protect|protect-fast|protectfast|guard|rules|rules-fast|rulesfast|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -9773,6 +9798,7 @@ case "$ACTION" in
   protect-fast|protectfast) protect_fast ;;
   guard) guard ;;
   rules) rules ;;
+  rules-fast|rulesfast) rules_fast ;;
   categories) categories ;;
   init-config) init_config ;;
   help) usage ;;

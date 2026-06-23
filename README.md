@@ -581,6 +581,7 @@ Inspect the cleanup rule catalog:
 
 ```sh
 cleanroom rules
+cleanroom rules-fast
 cleanroom rules --json
 ```
 
@@ -812,7 +813,7 @@ cleanroom restore --log ~/Desktop/cleanroom-run.log --apply
 
 More examples are in [docs/RECIPES.md](docs/RECIPES.md).
 
-Cleanup rules are cataloged in [data/cleanup-rules.tsv](data/cleanup-rules.tsv). `cleanroom rules --json` exposes the same catalog for wrappers and audits.
+Cleanup rules are cataloged in [data/cleanup-rules.tsv](data/cleanup-rules.tsv). `cleanroom rules --json` exposes the same catalog for wrappers and audits. `cleanroom rules-fast --json` emits a compact high-level policy summary for desktop apps.
 
 Protected personal-state paths are cataloged in [data/protected-paths.tsv](data/protected-paths.tsv). `cleanroom protect --json` exposes detected browser profile, credential, Photos, Mail, Messages, Contacts, Calendars, Notes, cloud-sync, iCloud, and related paths that cleanroom will not remove wholesale. `cleanroom protect-fast --json` skips deep size checks for app dashboards and quick safety reviews.
 
