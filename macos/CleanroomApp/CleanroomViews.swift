@@ -258,11 +258,16 @@ final class AppState: ObservableObject {
         lastStatsRefresh = Date()
         let command = resolvedCommand(["dashboard", "--json"])
         Task.detached(priority: .background) {
-            let raw = await Self.exec(command.executable, command.arguments, timeoutSeconds: AppRunLimit.quickSummary)
+            let result = await Self.exec(command.executable, command.arguments, timeoutSeconds: AppRunLimit.quickSummary)
             await MainActor.run {
-                self.parseStats(raw.output)
-                self.status = "Storage report updated"
-                self.activityMessage = "Storage report updated. No files were changed."
+                if result.status == 0 {
+                    self.parseStats(result.output)
+                    self.status = "Storage report updated"
+                    self.activityMessage = "Storage report updated. No files were changed."
+                } else {
+                    self.status = "Storage report needs attention"
+                    self.activityMessage = "Storage report could not be updated. Try again or run App Checkup."
+                }
                 self.statsLoading = false
             }
         }
