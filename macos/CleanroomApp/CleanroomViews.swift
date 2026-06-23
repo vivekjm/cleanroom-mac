@@ -1005,7 +1005,10 @@ final class AppState: ObservableObject {
         }
         let categories = object["categories"] as? [[String: Any]] ?? []
         let items = categories.map { item -> CleanupPlanItem in
-            let title = stringField("title", in: item) ?? stringField("id", in: item) ?? "Cleanup area"
+            let title = cleanupPlanTitle(
+                title: stringField("title", in: item),
+                id: stringField("id", in: item)
+            )
             let safety = friendlySafety(stringField("safety", in: item))
             let recovery = friendlyRecovery(stringField("recoverability", in: item))
             return CleanupPlanItem(title: title, safety: safety, recovery: recovery)
@@ -1013,6 +1016,60 @@ final class AppState: ObservableObject {
         let rawWarnings = object["warnings"] as? [String] ?? []
         let notes = rawWarnings.map(friendlyCleanupNote)
         return (items, notes)
+    }
+
+    nonisolated private static func cleanupPlanTitle(title: String?, id: String?) -> String {
+        let raw = (title?.isEmpty == false ? title : id) ?? "Cleanup area"
+        let key = (id ?? raw).lowercased()
+        let labels: [String: String] = [
+            "user-cache-children": "App caches",
+            "npm-cache": "NPM cache",
+            "yarn-cache": "Yarn cache",
+            "gradle-cache": "Gradle cache",
+            "pnpm-store": "PNPM store",
+            "xcode-derived-data": "Xcode build cache",
+            "simulator-caches": "Simulator caches",
+            "homebrew-cache": "Homebrew cache",
+            "old-logs": "Old logs",
+            "safe": "Safe cleanup",
+            "app-caches": "App caches",
+            "browser-caches": "Browser caches",
+            "old-installers": "Old installers",
+            "download-artifacts": "Old downloads",
+            "screenshots": "Old screenshots",
+            "metadata": "Finder clutter",
+            "quicklook": "Preview cache",
+            "font-caches": "Font cache",
+            "web-caches": "Web cache",
+            "saved-state": "Window state",
+            "project-caches": "Project caches",
+            "updater-caches": "Update cache",
+            "package-stores": "Package stores",
+            "toolchains": "Developer tool caches",
+            "node-stale": "Old JavaScript packages",
+            "venv-stale": "Old Python environments",
+            "diagnostics": "Old diagnostics",
+            "ai-workspaces": "Generated AI data",
+            "ai-models": "Downloaded AI models",
+            "containers": "Container storage",
+            "user-trash": "Current Trash"
+        ]
+        if let label = labels[key] {
+            return label
+        }
+        return raw
+            .replacingOccurrences(of: "_", with: " ")
+            .replacingOccurrences(of: "-", with: " ")
+            .split(whereSeparator: { $0.isWhitespace })
+            .map { word in
+                let lower = word.lowercased()
+                if lower == "npm" { return "NPM" }
+                if lower == "pnpm" { return "PNPM" }
+                if lower == "xcode" { return "Xcode" }
+                if lower == "ai" { return "AI" }
+                return lower.prefix(1).uppercased() + lower.dropFirst()
+            }
+            .joined(separator: " ")
     }
 
     nonisolated private static func stringField(_ key: String, in object: [String: Any]) -> String? {
@@ -1969,7 +2026,7 @@ struct ApplyConfirmSheet: View {
                     Text("Clean safely?")
                         .font(DS.T.h2)
                         .foregroundColor(DS.C.textPrimary)
-                    Text("Eligible files move to Trash and can be restored from a cleanup record.")
+                    Text("Cleanroom only touches selected safe areas. Personal data stays protected.")
                         .font(DS.T.bodySm)
                         .foregroundColor(DS.C.textSecondary)
                 }
@@ -1979,7 +2036,7 @@ struct ApplyConfirmSheet: View {
 
             VStack(alignment: .leading, spacing: DS.Sp.sm) {
                 HStack {
-                    Text("READY TO CLEAN")
+                    Text("SELECTED AREAS")
                         .font(DS.T.tag).kerning(0.6)
                         .foregroundColor(DS.C.textMuted)
                     Spacer()
@@ -2022,7 +2079,7 @@ struct ApplyConfirmSheet: View {
                     .buttonStyle(.plain)
                     .foregroundColor(DS.C.textSecondary)
                 Spacer()
-                PillBtn("Review First", style: .ghost) {
+                PillBtn("Review Details", style: .ghost) {
                     state.run(.safetyPlan)
                     dismiss()
                 }
@@ -2047,7 +2104,7 @@ struct ApplyConfirmSheet: View {
             return [
                 "Items are moved to Trash where possible.",
                 "Passwords, browser profiles, Photos, Mail, Messages, and cloud folders stay protected.",
-                "A restore record is written for the cleanup session.",
+                "Cleanroom keeps a recovery trail for files it moves.",
             ]
         }
         return state.cleanupPlanNotes
