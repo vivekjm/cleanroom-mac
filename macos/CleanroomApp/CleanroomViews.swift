@@ -511,8 +511,8 @@ final class AppState: ObservableObject {
     func copyDetails() {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(appFacingSummaryText(), forType: .string)
-        status = "Summary copied"
-        activityMessage = "Review summary copied."
+        status = "Report copied"
+        activityMessage = "Review report copied."
     }
 
     func clearSummary() {
@@ -520,7 +520,7 @@ final class AppState: ObservableObject {
         reviewTitle = "Review Summary"
         reviewItems = []
         status = "Ready"
-        activityMessage = "Summary cleared. Choose a review when you are ready."
+        activityMessage = "Report cleared. Choose a review when you are ready."
         summaryOpen = false
     }
 
@@ -2009,16 +2009,16 @@ struct ReviewSummaryPanel: View {
                     IconBtn(icon: "doc.on.clipboard", dark: true) {
                         state.copyDetails()
                     }
-                    .help("Copy summary")
+                    .help("Copy report")
                     IconBtn(icon: "xmark", dark: true) {
                         state.clearSummary()
                     }
-                    .help("Clear summary")
+                    .help("Clear report")
                 }
                 IconBtn(icon: state.summaryOpen ? "chevron.down" : "chevron.up", dark: true) {
                     withAnimation(DS.Ani.std) { state.summaryOpen.toggle() }
                 }
-                .help(state.summaryOpen ? "Hide summary" : "Show summary")
+                .help(state.summaryOpen ? "Hide report" : "Show report")
             }
             .padding(.horizontal, DS.Sp.lg)
             .padding(.vertical, DS.Sp.sm)
