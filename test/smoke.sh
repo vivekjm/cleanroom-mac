@@ -1398,6 +1398,15 @@ grep 'saved-state' "$caches_json" >/dev/null
 grep 'project-caches' "$caches_json" >/dev/null
 grep 'cleanroom clean --apply --trash --include-app-caches' "$caches_json" >/dev/null
 rm -f "$caches_json"
+"$BIN" caches-instant | grep 'instant cache overview' >/dev/null
+caches_instant_json="$(mktemp)"
+"$BIN" caches-instant --json > "$caches_instant_json"
+python3 -m json.tool "$caches_instant_json" >/dev/null
+grep '"mode":"instant"' "$caches_instant_json" >/dev/null
+grep '"id":"recommended-caches"' "$caches_instant_json" >/dev/null
+grep '"id":"browser-caches"' "$caches_instant_json" >/dev/null
+grep 'passwords stay protected' "$caches_instant_json" >/dev/null
+rm -f "$caches_instant_json"
 "$BIN" caches-fast | grep 'quick caches' >/dev/null
 caches_fast_json="$(mktemp)"
 "$BIN" caches-fast --json > "$caches_fast_json"

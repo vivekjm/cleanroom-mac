@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.46.0"
+VERSION="1.47.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -135,6 +135,7 @@ Usage:
   cleanroom loginitems [--json]
   cleanroom trash [--json]
   cleanroom caches [--json]
+  cleanroom caches-instant [--json]
   cleanroom caches-fast [--json]
   cleanroom diagnostics [--json]
   cleanroom packages [--json]
@@ -237,6 +238,7 @@ Actions:
   loginitems           List user Login Items for review.
   trash                Inventory current user Trash contents.
   caches               Inventory safe and opt-in cache buckets.
+  caches-instant       Show an instant desktop-app cache overview.
   caches-fast          Show a quick desktop-app cache summary.
   diagnostics          Inventory user logs and diagnostic reports.
   packages             Inventory package-manager caches and stores.
@@ -476,6 +478,7 @@ Examples:
   cleanroom trash
   cleanroom trash --json
   cleanroom caches
+  cleanroom caches-instant
   cleanroom caches-fast
   cleanroom caches --json
   cleanroom diagnostics
@@ -7256,6 +7259,27 @@ caches() {
   done <<<"$rows"
 }
 
+caches_instant_json() {
+  cat <<'EOF'
+[{"id":"recommended-caches","title":"Recommended Cache Cleanup","category":"Rebuildable","size":"Review","safety":"Rebuildable","summary":"Standard app caches, old logs, npm, Yarn, pnpm, Xcode, simulator, and Homebrew cache areas can usually be rebuilt.","mode":"instant"},{"id":"app-caches","title":"App Cache Folders","category":"Protected","size":"Review","safety":"Protected","summary":"Cleanroom targets nested cache folders only. Browser profiles, cookies, bookmarks, settings, and passwords stay protected.","mode":"instant"},{"id":"preview-cache","title":"Preview Cache","category":"Rebuildable","size":"Review","safety":"Rebuildable","summary":"Quick Look thumbnail and preview caches can be recreated by macOS after cleanup.","mode":"instant"},{"id":"font-cache","title":"Font Cache","category":"Rebuildable","size":"Review","safety":"Rebuildable","summary":"Font cache databases are rebuildable. Actual font files are not part of cache cleanup.","mode":"instant"},{"id":"web-cache","title":"Web Cache","category":"Rebuildable","size":"Review","safety":"Rebuildable","summary":"Safari and WebKit cache folders are separate from browser history, cookies, bookmarks, passwords, and profiles.","mode":"instant"},{"id":"window-state","title":"Window State","category":"Rebuildable","size":"Review","safety":"Rebuildable","summary":"Saved app window/session state can be cleared without touching documents or app profile data.","mode":"instant"},{"id":"project-caches","title":"Project Cache Artifacts","category":"Rebuildable","size":"Review","safety":"Rebuildable","summary":"Known build and test cache artifacts are handled separately from source code, .git folders, dependencies, and virtualenvs.","mode":"instant"},{"id":"browser-caches","title":"Browser Caches","category":"Protected","size":"Review","safety":"Protected","summary":"Only cache folders are considered. Password stores, profiles, bookmarks, sessions, extensions, cookies, and settings stay protected.","mode":"instant"}]
+EOF
+}
+
+caches_instant() {
+  if [[ "$JSON" -eq 1 ]]; then
+    caches_instant_json
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}cleanroom instant cache overview${RESET}"
+  printf 'High-level desktop cache overview. No deep sizing was run and no files were changed.\n\n'
+  printf '%-22s %-12s %s\n' "area" "safety" "summary"
+  printf '%-22s %-12s %s\n' "Recommended caches" "Rebuildable" "Standard app, log, package, Xcode, simulator, and Homebrew caches."
+  printf '%-22s %-12s %s\n' "App caches" "Protected" "Nested cache folders only; profiles and passwords stay guarded."
+  printf '%-22s %-12s %s\n' "Preview cache" "Rebuildable" "Quick Look thumbnails can be recreated by macOS."
+  printf '%-22s %-12s %s\n' "Browser caches" "Protected" "Cache folders are separate from passwords, cookies, bookmarks, and profiles."
+}
+
 caches_fast_rows() {
   local core package quicklook fontcache webcache savedstate updater
   core="$(sum_existing_kb "~/Library/Logs" "~/.npm/_cacache" "~/.npm/_logs" "~/.npm/_npx" "~/.yarn/cache" "~/.yarn/berry" "~/Library/pnpm/store")"
@@ -9586,7 +9610,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  dashboard|overview|map|map-fast|mapfast|snapshot|snapshot-fast|snapshotfast|diff|state|permissions|review|scan|system-data|system-data-fast|systemdata-fast|systemdatafast|plan|plan-fast|planfast|large|large-fast|largefast|brokenlinks|brokenlinks-fast|brokenlinksfast|broken-links-fast|broken-linksfast|quarantine|quarantine-fast|quarantinefast|metadata|metadata-fast|metadatafast|quicklook|quicklook-fast|quicklookfast|fontcaches|fontcaches-fast|fontcachesfast|font-caches|font-caches-fast|font-cachesfast|webcaches|webcaches-fast|webcachesfast|web-caches|web-caches-fast|web-cachesfast|savedstate|savedstate-fast|savedstatefast|saved-state|saved-state-fast|saved-statefast|projectcaches|project-caches|projectcaches-fast|projectcachesfast|project-caches-fast|project-cachesfast|developer-fast|developerfast|updaters|updaters-fast|updatersfast|updater-caches|updater-caches-fast|updater-cachesfast|browsercaches|browser-caches|browsercaches-fast|browsercachesfast|browser-caches-fast|browser-cachesfast|duplicates|duplicates-fast|duplicatesfast|documents|desktop|screenshots|screenshots-fast|screenshotsfast|archives|archives-fast|archivesfast|downloads|downloads-fast|downloadsfast|installers|nodes|nodes-fast|nodesfast|venvs|venvs-fast|venvsfast|virtualenvs|virtualenvs-fast|virtualenvsfast|apps|apps-fast|appsfast|uninstallers|appreview|aitools|ai-tools|ai|appdata|libraries|cloud|cloudfiles|cloudfiles-fast|cloudfilesfast|cloud-files|cloud-files-fast|cloud-filesfast|personal|communications|comms|browsers|leftovers|backups|backups-fast|backupsfast|xcode|xcode-fast|xcodefast|android|startup|loginitems|trash|caches|caches-fast|cachesfast|diagnostics|packages|npm-cache|npmcache|yarn-cache|yarncache|pnpm-store|pnpmstore|cocoapods-cache|pod-cache|podcache|pip-cache|pipcache|receipts|homebrew|homebrew-cleanup|brewcleanup|toolchains|toolchains-fast|toolchainsfast|containers|containers-fast|containersfast|snapshots|report|report-fast|reportfast|clean|history|restore|interactive|doctor|protect|protect-fast|protectfast|guard|rules|rules-fast|rulesfast|categories|init-config|help)
+  dashboard|overview|map|map-fast|mapfast|snapshot|snapshot-fast|snapshotfast|diff|state|permissions|review|scan|system-data|system-data-fast|systemdata-fast|systemdatafast|plan|plan-fast|planfast|large|large-fast|largefast|brokenlinks|brokenlinks-fast|brokenlinksfast|broken-links-fast|broken-linksfast|quarantine|quarantine-fast|quarantinefast|metadata|metadata-fast|metadatafast|quicklook|quicklook-fast|quicklookfast|fontcaches|fontcaches-fast|fontcachesfast|font-caches|font-caches-fast|font-cachesfast|webcaches|webcaches-fast|webcachesfast|web-caches|web-caches-fast|web-cachesfast|savedstate|savedstate-fast|savedstatefast|saved-state|saved-state-fast|saved-statefast|projectcaches|project-caches|projectcaches-fast|projectcachesfast|project-caches-fast|project-cachesfast|developer-fast|developerfast|updaters|updaters-fast|updatersfast|updater-caches|updater-caches-fast|updater-cachesfast|browsercaches|browser-caches|browsercaches-fast|browsercachesfast|browser-caches-fast|browser-cachesfast|duplicates|duplicates-fast|duplicatesfast|documents|desktop|screenshots|screenshots-fast|screenshotsfast|archives|archives-fast|archivesfast|downloads|downloads-fast|downloadsfast|installers|nodes|nodes-fast|nodesfast|venvs|venvs-fast|venvsfast|virtualenvs|virtualenvs-fast|virtualenvsfast|apps|apps-fast|appsfast|uninstallers|appreview|aitools|ai-tools|ai|appdata|libraries|cloud|cloudfiles|cloudfiles-fast|cloudfilesfast|cloud-files|cloud-files-fast|cloud-filesfast|personal|communications|comms|browsers|leftovers|backups|backups-fast|backupsfast|xcode|xcode-fast|xcodefast|android|startup|loginitems|trash|caches|caches-instant|cachesinstant|caches-fast|cachesfast|diagnostics|packages|npm-cache|npmcache|yarn-cache|yarncache|pnpm-store|pnpmstore|cocoapods-cache|pod-cache|podcache|pip-cache|pipcache|receipts|homebrew|homebrew-cleanup|brewcleanup|toolchains|toolchains-fast|toolchainsfast|containers|containers-fast|containersfast|snapshots|report|report-fast|reportfast|clean|history|restore|interactive|doctor|protect|protect-fast|protectfast|guard|rules|rules-fast|rulesfast|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -9771,6 +9795,7 @@ case "$ACTION" in
   loginitems) loginitems ;;
   trash) trash ;;
   caches) caches ;;
+  caches-instant|cachesinstant) caches_instant ;;
   caches-fast|cachesfast) caches_fast ;;
   diagnostics) diagnostics ;;
   packages) packages ;;

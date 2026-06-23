@@ -488,6 +488,7 @@ Inventory safe and opt-in cache buckets:
 
 ```sh
 cleanroom caches
+cleanroom caches-instant
 cleanroom caches --json
 ```
 
@@ -887,7 +888,7 @@ Config files use simple `key=value` lines and are never executed as shell.
 
 `android --json` emits Android SDK, NDK, system image, emulator, AVD, platform, build-tool, command-line tool, and Android Studio cache sizes with safety labels. NDKs, system images, and temporary SDK downloads are opt-in through `--include-dev-heavy`; full SDK roots and AVDs stay review-only.
 
-`caches --json` emits safe and opt-in cache bucket sizes with the matching preview and apply commands.
+`caches --json` emits safe and opt-in cache bucket sizes with the matching preview and apply commands. `caches-instant --json` emits a compact high-level cache overview for desktop apps without deep sizing.
 
 `diagnostics` inventories user logs, diagnostic reports, and CrashReporter data. Default cleanup already removes old log files; diagnostic report cleanup is opt-in with `cleanroom clean --include-diagnostics --days N`.
 
