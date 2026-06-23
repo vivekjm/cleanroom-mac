@@ -156,6 +156,7 @@ final class AppState: ObservableObject {
     @Published var filter:           String  = "all"
     @Published var reviewSummary:    String  = "Choose a review to see a report here.\n"
     @Published var running:          Bool    = false
+    @Published var statsLoading:     Bool    = false
     @Published var status:           String  = "Ready"
     @Published var activityMessage:  String  = "Choose a review or cleanup to begin."
     @Published var summaryOpen:      Bool    = false
@@ -236,6 +237,11 @@ final class AppState: ObservableObject {
     // Expensive storage measurement; run only when the user asks or after cleanup.
     func refreshStats(force: Bool = false) {
         guard !running else { return }
+        guard !statsLoading else {
+            status = "Storage report is updating"
+            activityMessage = "Storage report is already updating."
+            return
+        }
         if force {
             clearRecentResults()
         }
@@ -248,6 +254,7 @@ final class AppState: ObservableObject {
         }
         status = "Measuring storage..."
         activityMessage = "Checking disk usage without starting a cleanup."
+        statsLoading = true
         lastStatsRefresh = Date()
         let command = resolvedCommand(["dashboard", "--json"])
         Task.detached(priority: .background) {
@@ -256,6 +263,7 @@ final class AppState: ObservableObject {
                 self.parseStats(raw.output)
                 self.status = "Storage report updated"
                 self.activityMessage = "Storage report updated. No files were changed."
+                self.statsLoading = false
             }
         }
     }
@@ -1663,9 +1671,10 @@ struct NavRow: View {
 
     var isActive: Bool { state.dest == nav && onTap == nil }
     var isDisabled: Bool {
-        if !state.running { return false }
-        if onTap != nil { return true }
-        if case .run = nav { return true }
+        if state.running || state.statsLoading {
+            if onTap != nil { return true }
+            if case .run = nav { return true }
+        }
         return false
     }
 
@@ -1766,8 +1775,8 @@ struct HeaderStats: View {
                 Spacer()
                 // Navigation arrows — key visual from reference images 1 & 4
                 HStack(spacing: DS.Sp.sm) {
-                    NavArrow(icon: "arrow.left", disabled: state.running) { state.openReview(.pastCleanups) }
-                    NavArrow(icon: "arrow.right", disabled: state.running) { state.showApplyConfirm = true }
+                    NavArrow(icon: "arrow.left", disabled: state.running || state.statsLoading) { state.openReview(.pastCleanups) }
+                    NavArrow(icon: "arrow.right", disabled: state.running || state.statsLoading) { state.showApplyConfirm = true }
                 }
             }
             .padding(.horizontal, DS.Sp.xl)
@@ -1784,14 +1793,14 @@ struct HeaderStats: View {
             // Action strip below stats
             HStack(spacing: DS.Sp.sm) {
                 PillBtn("Analyze Storage", style: .ghost) { state.refreshStats(force: true) }
-                    .disabled(state.running)
-                    .opacity(state.running ? 0.42 : 1)
+                    .disabled(state.running || state.statsLoading)
+                    .opacity((state.running || state.statsLoading) ? 0.42 : 1)
                 Spacer()
                 PillBtn("Clean Safely", style: .primary) {
                     state.showApplyConfirm = true
                 }
-                .disabled(state.running)
-                .opacity(state.running ? 0.42 : 1)
+                .disabled(state.running || state.statsLoading)
+                .opacity((state.running || state.statsLoading) ? 0.42 : 1)
             }
             .padding(.horizontal, DS.Sp.xl)
             .padding(.bottom, DS.Sp.lg)
@@ -1898,8 +1907,8 @@ struct FilterBar: View {
                 .foregroundColor(DS.C.textSecondary)
             }
             .buttonStyle(.plain)
-            .disabled(state.running)
-            .opacity(state.running ? 0.42 : 1)
+            .disabled(state.running || state.statsLoading)
+            .opacity((state.running || state.statsLoading) ? 0.42 : 1)
         }
         .padding(.horizontal, DS.Sp.xl)
         .padding(.vertical, DS.Sp.md)
@@ -1987,8 +1996,8 @@ struct CategoryCardView: View {
                     .background(Capsule().fill(Color.white))
                 }
                 .buttonStyle(.plain)
-                .disabled(state.running)
-                .opacity(state.running ? 0.42 : 1)
+                .disabled(state.running || state.statsLoading)
+                .opacity((state.running || state.statsLoading) ? 0.42 : 1)
                 .scaleEffect(hovered ? 1.04 : 1.0)
                 .animation(DS.Ani.spring, value: hovered)
                 Spacer()
@@ -2043,9 +2052,10 @@ struct ReviewSummaryPanel: View {
         VStack(spacing: 0) {
             HStack(spacing: DS.Sp.sm) {
                 Circle()
-                    .fill(state.running ? DS.C.ctaOrange : DS.C.positive)
+                    .fill((state.running || state.statsLoading) ? DS.C.ctaOrange : DS.C.positive)
                     .frame(width: 7, height: 7)
                     .animation(DS.Ani.std, value: state.running)
+                    .animation(DS.Ani.std, value: state.statsLoading)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(state.activityMessage)
                         .font(DS.T.bodySm)
@@ -2370,21 +2380,21 @@ struct ApplyConfirmSheet: View {
                     .foregroundColor(DS.C.textSecondary)
                 Spacer()
                 PillBtn("Preview", style: .ghost) {
-                    if !state.running {
+                    if !state.running && !state.statsLoading {
                         state.openReview(.safetyPlan)
                         dismiss()
                     }
                 }
-                .disabled(state.running)
-                .opacity(state.running ? 0.42 : 1)
+                .disabled(state.running || state.statsLoading)
+                .opacity((state.running || state.statsLoading) ? 0.42 : 1)
                 PillBtn("Clean Now", style: .primary) {
-                    if !state.running {
+                    if !state.running && !state.statsLoading {
                         state.run(.safeCleanup)
                         dismiss()
                     }
                 }
-                .disabled(state.running)
-                .opacity(state.running ? 0.42 : 1)
+                .disabled(state.running || state.statsLoading)
+                .opacity((state.running || state.statsLoading) ? 0.42 : 1)
             }
         }
         .padding(DS.Sp.xxl)
