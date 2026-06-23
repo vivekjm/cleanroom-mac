@@ -112,12 +112,12 @@ struct AppAction: Hashable {
     static let startup = AppAction(title: "Startup", args: ["startup-fast"])
     static let storageRecord = AppAction(title: "Storage Record", args: ["snapshot-fast"])
     static let restoreHistory = AppAction(title: "Restore History", args: ["state-fast"])
-    static let safetyCheck = AppAction(title: "Safety Check", args: ["clean", "--preset", "dev", "--preflight"])
+    static let safetyCheck = AppAction(title: "Cleanup Check", args: ["clean", "--preset", "dev", "--preflight"])
     static let privacyReport = AppAction(title: "Privacy Report", args: ["report-fast", "--redact"])
     static let pastCleanups = AppAction(title: "Past Cleanups", args: ["history-fast"])
     static let protectedItems = AppAction(title: "Protected Items", args: ["protect-fast"])
     static let safetyPolicy = AppAction(title: "Safety Policy", args: ["rules-fast"])
-    static let safetyPlan = AppAction(title: "Safety Plan", args: ["clean", "--preflight"])
+    static let safetyPlan = AppAction(title: "Cleaning Preview", args: ["clean", "--preflight"])
     static let safeCleanup = AppAction(title: "Safe Cleanup", args: ["clean", "--apply", "--trash", "--yes"])
 
     static func appReview(query: String) -> AppAction {
@@ -619,12 +619,12 @@ final class AppState: ObservableObject {
 
         let apply = (object["apply"] as? Bool) == true
         items.insert([
-            "title": apply ? "Ready To Clean" : "Review Only",
+            "title": apply ? "Ready to Clean" : "Preview Only",
             "size": apply ? "Ready" : "Preview",
             "status": apply ? "Review" : "Protected",
             "summary": apply
                 ? "Cleaning will only start after confirmation."
-                : "No files are changed in this review."
+                : "No files are changed in this preview."
         ], at: 0)
 
         return items
@@ -1433,7 +1433,7 @@ struct SidebarView: View {
                             NavRow("chart.bar.fill",          "Storage Overview", .run(.storageOverview), state)
                             NavRow("magnifyingglass",         "Refresh Summary", .dashboard, state, onTap: { state.refreshStats(force: true) })
                             NavRow("text.badge.checkmark",    "Review",      .dashboard, state, onTap: { state.filter = "all"; state.refreshStats(force: true) })
-                            NavRow("list.clipboard.fill",     "Clean Plan",  .dashboard, state, onTap: { state.showApplyConfirm = true })
+                            NavRow("list.clipboard.fill",     "Clean Safely", .dashboard, state, onTap: { state.showApplyConfirm = true })
                         }
                         SidebarSection("FIND") {
                             NavRow("doc.fill",                "Large Files", .run(.largeFiles), state)
@@ -1477,7 +1477,7 @@ struct SidebarView: View {
                         SidebarSection("SAFETY") {
                             NavRow("camera.fill",             "Storage Record", .run(.storageRecord), state)
                             NavRow("clock.badge.checkmark.fill", "Restore History", .run(.restoreHistory), state)
-                            NavRow("checkmark.shield.fill",   "Safety Check",     .run(.safetyCheck), state)
+                            NavRow("checkmark.shield.fill",   "Cleanup Check",    .run(.safetyCheck), state)
                             NavRow("doc.text.fill",           "Privacy Report",   .run(.privacyReport), state)
                             NavRow("clock.fill",              "Past Cleanups",    .run(.pastCleanups), state)
                             NavRow("shield.fill",             "Protected Items", .run(.protectedItems), state)
@@ -2217,7 +2217,7 @@ struct ApplyConfirmSheet: View {
                     .buttonStyle(.plain)
                     .foregroundColor(DS.C.textSecondary)
                 Spacer()
-                PillBtn("Review Details", style: .ghost) {
+                PillBtn("Preview", style: .ghost) {
                     state.run(.safetyPlan)
                     dismiss()
                 }
