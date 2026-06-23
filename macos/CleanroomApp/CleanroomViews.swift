@@ -472,10 +472,12 @@ final class AppState: ObservableObject {
                     self.activityMessage = "\(action.title) needs attention. Open the report for what happened."
                     self.summaryOpen = true
                 }
-                self.running = false
                 if action == .safeCleanup {
                     self.clearRecentResults()
+                    self.running = false
                     self.refreshStats(force: true)
+                } else {
+                    self.running = false
                 }
             }
         }
