@@ -129,7 +129,7 @@ struct AppAction: Hashable {
     static let storageRecord = AppAction(title: "Storage Snapshot", args: ["snapshot-fast"])
     static let restoreHistory = AppAction(title: "Restore History", args: ["state-fast"])
     static let safetyCheck = AppAction(title: "Cleanup Preview", args: ["clean", "--preset", "dev", "--preflight"])
-    static let privacyReport = AppAction(title: "Shareable Report", args: ["report-fast", "--redact"])
+    static let privacyReport = AppAction(title: "Privacy Summary", args: ["report-fast", "--redact"])
     static let pastCleanups = AppAction(title: "Recent Cleanups", args: ["history-fast"])
     static let protectedItems = AppAction(title: "Protected Data", args: ["protect-fast"])
     static let safetyPolicy = AppAction(title: "Safety Rules", args: ["rules-fast"])
@@ -245,8 +245,8 @@ final class AppState: ObservableObject {
     func refreshStats(force: Bool = false) {
         guard !running else { return }
         guard !statsLoading else {
-            status = "Storage report is updating"
-            activityMessage = "Storage report is already updating."
+            status = "Storage analysis is updating"
+            activityMessage = "Storage analysis is already updating."
             return
         }
         if force {
@@ -255,8 +255,8 @@ final class AppState: ObservableObject {
         if !force,
            let lastStatsRefresh,
            Date().timeIntervalSince(lastStatsRefresh) < 30 {
-            status = "Storage report is up to date"
-            activityMessage = "Your storage report was refreshed recently."
+            status = "Storage analysis is up to date"
+            activityMessage = "Your storage analysis was refreshed recently."
             return
         }
         status = "Measuring storage..."
@@ -271,11 +271,11 @@ final class AppState: ObservableObject {
                 guard self.statsGeneration == generation else { return }
                 if result.status == 0 {
                     self.parseStats(result.output)
-                    self.status = "Storage report updated"
-                    self.activityMessage = "Storage report updated. No files were changed."
+                    self.status = "Storage analysis updated"
+                    self.activityMessage = "Storage analysis updated. No files were changed."
                 } else {
-                    self.status = "Storage report needs attention"
-                    self.activityMessage = "Storage report could not be updated. Try again or run App Checkup."
+                    self.status = "Storage analysis needs attention"
+                    self.activityMessage = "Storage analysis could not be updated. Try again or run App Checkup."
                 }
                 self.statsLoading = false
             }
@@ -668,7 +668,7 @@ final class AppState: ObservableObject {
         if rows.count > 0 {
             return "\(title) found \(rows.count) review items. No files were changed."
         }
-        return "\(title) finished. A report is available if you need it."
+        return "\(title) finished. Details are available if you need them."
     }
 
     private func presentableDetails(title: String, action: AppAction, details: String) -> String {
@@ -744,7 +744,7 @@ final class AppState: ObservableObject {
         return [
             ReviewItem(
                 title: title,
-                detail: "Review finished. No technical details need your attention.",
+                detail: "Review finished. No extra details need your attention.",
                 size: "Done",
                 badge: "Ready",
                 path: nil
@@ -1756,7 +1756,7 @@ struct SidebarView: View {
                             NavRow("camera.fill",             "Storage Snapshot", .run(.storageRecord), state)
                             NavRow("clock.badge.checkmark.fill", "Restore History", .run(.restoreHistory), state)
                             NavRow("checkmark.shield.fill",   "Cleanup Preview", .run(.safetyCheck), state)
-                            NavRow("doc.text.fill",           "Shareable Report", .run(.privacyReport), state)
+                            NavRow("doc.text.fill",           "Privacy Summary", .run(.privacyReport), state)
                             NavRow("clock.fill",              "Recent Cleanups", .run(.pastCleanups), state)
                             NavRow("shield.fill",             "Protected Data", .run(.protectedItems), state)
                             NavRow("flag.fill",               "Safety Rules", .run(.safetyPolicy), state)
