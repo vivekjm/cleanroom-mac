@@ -410,13 +410,13 @@ final class AppState: ObservableObject {
     }
 
     func openReview(_ action: AppAction) {
-        if running { return }
+        if running || statsLoading { return }
         dest = .run(action)
         run(action)
     }
 
     func run(_ action: AppAction) {
-        guard !running else { return }
+        guard !running, !statsLoading else { return }
         if let cached = cachedReview(for: action) {
             dest = .run(action)
             reviewTitle = cached.title
