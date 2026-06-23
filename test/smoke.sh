@@ -1149,6 +1149,14 @@ python3 -m json.tool "$libraries_json" >/dev/null
 grep 'iMovie Library' "$libraries_json" >/dev/null
 grep '"protected":true' "$libraries_json" >/dev/null
 rm -f "$libraries_json"
+"$BIN" libraries-fast | grep 'quick media library review' >/dev/null
+libraries_fast_json="$(mktemp)"
+"$BIN" libraries-fast --json > "$libraries_fast_json"
+python3 -m json.tool "$libraries_fast_json" >/dev/null
+grep '"mode":"fast"' "$libraries_fast_json" >/dev/null
+grep 'Photos Library' "$libraries_fast_json" >/dev/null
+grep '"safety":"Protected"' "$libraries_fast_json" >/dev/null
+rm -f "$libraries_fast_json"
 "$BIN" cloud | grep 'iCloud Drive' >/dev/null
 cloud_json="$(mktemp)"
 "$BIN" cloud --json > "$cloud_json"

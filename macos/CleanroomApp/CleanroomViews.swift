@@ -99,6 +99,7 @@ struct AppAction: Hashable {
     static let browserCache = AppAction(title: "Browser Cache", args: ["browsercaches-fast"])
     static let aiTools = AppAction(title: "AI Tools", args: ["aitools-fast"])
     static let appData = AppAction(title: "App Data", args: ["appdata-fast", "--limit", "40"])
+    static let mediaLibraries = AppAction(title: "Media Libraries", args: ["libraries-fast"])
     static let javascriptPackages = AppAction(title: "JavaScript Packages", args: ["nodes-fast", "--limit", "30", "--days", "30"])
     static let pythonEnvironments = AppAction(title: "Python Environments", args: ["venvs-fast", "--limit", "30", "--days", "30"])
     static let apps = AppAction(title: "Apps", args: ["apps-fast", "--limit", "30"])
@@ -473,7 +474,7 @@ final class AppState: ObservableObject {
             "documents", "documents-fast", "desktop", "desktop-fast", "downloads", "downloads-fast", "archives", "archives-fast", "screenshots", "screenshots-fast", "trash", "trash-fast", "cloudfiles", "cloudfiles-fast", "caches-instant", "caches-fast",
             "quicklook", "quicklook-fast", "fontcaches", "fontcaches-fast", "webcaches", "webcaches-fast", "savedstate", "savedstate-fast",
             "projectcaches", "projectcaches-fast", "updaters", "updaters-fast", "browsercaches", "browsercaches-fast",
-            "aitools", "aitools-fast", "ai-tools", "ai", "appdata", "appdata-fast",
+            "aitools", "aitools-fast", "ai-tools", "ai", "appdata", "appdata-fast", "libraries", "libraries-fast",
             "xcode", "xcode-fast", "backups", "backups-fast", "system-data", "system-data-fast", "containers", "containers-fast", "toolchains", "toolchains-fast",
             "loginitems", "loginitems-fast", "startup", "startup-fast", "snapshot", "snapshot-fast", "state", "state-fast", "protect", "protect-fast", "rules", "rules-fast",
             "map", "map-fast", "plan-fast", "doctor", "doctor-fast", "leftovers", "appreview", "history", "history-fast", "report-fast"
@@ -1460,6 +1461,7 @@ struct SidebarView: View {
                             NavRow("globe", "Browser Cache", .run(.browserCache), state)
                             NavRow("sparkles", "AI Tools", .run(.aiTools), state)
                             NavRow("internaldrive.fill",      "App Data",    .run(.appData), state)
+                            NavRow("photo.fill",              "Media Libraries", .run(.mediaLibraries), state)
                             NavRow("shippingbox.fill",        "JavaScript Packages",.run(.javascriptPackages), state)
                             NavRow("square.stack.3d.up.fill", "Python Environments", .run(.pythonEnvironments), state)
                             NavRow("apps.iphone",             "Apps",        .run(.apps), state)

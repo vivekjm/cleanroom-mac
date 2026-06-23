@@ -117,6 +117,7 @@ cleanroom uninstallers --json
 cleanroom appreview adobe --json
 cleanroom appdata --json
 cleanroom libraries --json
+cleanroom libraries-fast --json
 cleanroom cloud --json
 cleanroom cloudfiles --json
 cleanroom personal --json
@@ -227,7 +228,7 @@ cleanroom permissions --json
 
 `appdata --json` emits large top-level app support/container folders with size and guard status. It is intentionally review-only and does not remove app state. Use `appdata-fast --json` for a responsive desktop view that skips deep folder sizing.
 
-`libraries --json` emits protected Photos, Music, TV, iMovie, GarageBand, Logic, and related creative library sizes. It is intentionally review-only and does not delete personal media or projects.
+`libraries --json` emits protected Photos, Music, TV, iMovie, GarageBand, Logic, and related creative library sizes. It is intentionally review-only and does not delete personal media or projects. Use `libraries-fast --json` for a responsive desktop view that skips deep folder sizing and marks these libraries as protected.
 
 `cloud --json` emits protected iCloud Drive, File Provider CloudStorage, Dropbox, Google Drive, OneDrive, Box, and Sync sizes. It is intentionally review-only and does not delete synced data.
 

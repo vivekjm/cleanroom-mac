@@ -402,6 +402,7 @@ Review protected media and creative libraries:
 ```sh
 cleanroom libraries
 cleanroom libraries --json
+cleanroom libraries-fast --json
 ```
 
 Review protected cloud-sync storage:
@@ -962,7 +963,7 @@ Config files use simple `key=value` lines and are never executed as shell.
 
 `android` helps diagnose large developer storage created by Android Studio, Expo, React Native, Flutter, and native Android work. It inventories the SDK and emulator footprint before suggesting the explicit `clean --include-dev-heavy` path for redownloadable NDK/system-image/temp-download data.
 
-`libraries` inventories protected media and creative libraries such as Photos, Photo Booth, Music, iTunes, TV, iMovie, GarageBand, Logic, and Audio Music Apps. It is review-only and helps explain large Documents or media storage without deleting personal projects.
+`libraries` inventories protected media and creative libraries such as Photos, Photo Booth, Music, iTunes, TV, iMovie, GarageBand, Logic, and Audio Music Apps. It is review-only and helps explain large Documents or media storage without deleting personal projects. Use `libraries-fast` for the responsive desktop view that skips deep folder sizing and marks these libraries as protected.
 
 `cloud` inventories protected cloud-sync folders such as iCloud Drive, File Provider CloudStorage, Dropbox, Google Drive, OneDrive, Box, and Sync. It is review-only because local deletes can affect remote cloud or peer data.
 
