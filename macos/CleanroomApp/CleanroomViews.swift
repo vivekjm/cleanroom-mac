@@ -86,6 +86,11 @@ private struct CachedCleanupPlan {
     var ttl: TimeInterval
 }
 
+private struct PresentableReview {
+    var summary: String
+    var items: [ReviewItem]
+}
+
 struct AppAction: Hashable {
     let title: String
     let args: [String]
@@ -461,10 +466,10 @@ final class AppState: ObservableObject {
             await MainActor.run {
                 guard self.currentRunID == runID else { return }
                 self.currentProcess = nil
-                let displayOutput = self.presentableDetails(title: action.title, action: action, details: result.output)
+                let presented = self.presentableReview(title: action.title, action: action, details: result.output)
                 self.reviewTitle = action.title
-                self.reviewItems = self.presentableReviewItems(title: action.title, action: action, details: result.output)
-                self.reviewSummary = displayOutput
+                self.reviewItems = presented.items
+                self.reviewSummary = presented.summary
                 if result.status == 15 {
                     self.status = "\(action.title) stopped"
                     self.activityMessage = "\(action.title) stopped. Show details to see where it paused."
@@ -476,9 +481,9 @@ final class AppState: ObservableObject {
                     self.summaryOpen = true
                 } else if result.status == 0 {
                     self.status = "\(action.title) complete"
-                    self.activityMessage = self.summarizeAction(action: action, details: displayOutput)
+                    self.activityMessage = self.summarizeAction(action: action, details: presented.summary)
                     self.summaryOpen = false
-                    self.storeCachedReview(title: action.title, summary: displayOutput, items: self.reviewItems, for: action)
+                    self.storeCachedReview(title: action.title, summary: presented.summary, items: self.reviewItems, for: action)
                 } else {
                     self.status = "\(action.title) needs attention"
                     self.activityMessage = "\(action.title) needs attention. Show details for what happened."
@@ -671,7 +676,7 @@ final class AppState: ObservableObject {
         return "\(title) finished. Details are available if you need them."
     }
 
-    private func presentableDetails(title: String, action: AppAction, details: String) -> String {
+    private func presentableReview(title: String, action: AppAction, details: String) -> PresentableReview {
         let trimmed = details.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let data = trimmed.data(using: .utf8),
               let parsed = try? JSONSerialization.jsonObject(with: data),
@@ -679,30 +684,26 @@ final class AppState: ObservableObject {
             let items = textReviewItems(title: title, details: details)
             let safeSuffix = action.args.contains("--apply") ? "" : " No files were changed."
             if items.isEmpty {
-                return "\(title) finished.\(safeSuffix)\n"
+                return PresentableReview(summary: "\(title) finished.\(safeSuffix)\n", items: [])
             }
-            return "\(title) finished with \(items.count) \(items.count == 1 ? "note" : "notes").\(safeSuffix)\n"
+            return PresentableReview(
+                summary: "\(title) finished with \(items.count) \(items.count == 1 ? "note" : "notes").\(safeSuffix)\n",
+                items: items
+            )
         }
 
         if items.isEmpty {
-            return "\(title) found nothing that needs attention.\n"
+            return PresentableReview(summary: "\(title) found nothing that needs attention.\n", items: [])
         }
 
         var lines = ["\(title) found \(items.count) review \(items.count == 1 ? "item" : "items")."]
         for item in items.prefix(40) {
             lines.append(summaryLine(for: item))
         }
-        return lines.joined(separator: "\n") + "\n"
-    }
-
-    private func presentableReviewItems(title: String, action: AppAction, details: String) -> [ReviewItem] {
-        let trimmed = details.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let data = trimmed.data(using: .utf8),
-              let parsed = try? JSONSerialization.jsonObject(with: data),
-              let items = jsonItems(from: parsed) else {
-            return textReviewItems(title: title, details: details)
-        }
-        return items.prefix(80).map { reviewItem(from: $0) }
+        return PresentableReview(
+            summary: lines.joined(separator: "\n") + "\n",
+            items: items.prefix(80).map { reviewItem(from: $0) }
+        )
     }
 
     private func textReviewItems(title: String, details: String) -> [ReviewItem] {
