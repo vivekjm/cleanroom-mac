@@ -1662,6 +1662,12 @@ struct NavRow: View {
     }
 
     var isActive: Bool { state.dest == nav && onTap == nil }
+    var isDisabled: Bool {
+        if !state.running { return false }
+        if onTap != nil { return true }
+        if case .run = nav { return true }
+        return false
+    }
 
     var body: some View {
         Button {
@@ -1693,8 +1699,11 @@ struct NavRow: View {
             .padding(.horizontal, DS.Sp.sm)
         }
         .buttonStyle(.plain)
+        .disabled(isDisabled)
+        .opacity(isDisabled ? 0.42 : 1)
         .onHover { hovered = $0 }
         .animation(DS.Ani.snap, value: hovered)
+        .animation(DS.Ani.snap, value: isDisabled)
     }
 }
 
@@ -1757,8 +1766,8 @@ struct HeaderStats: View {
                 Spacer()
                 // Navigation arrows — key visual from reference images 1 & 4
                 HStack(spacing: DS.Sp.sm) {
-                    NavArrow(icon: "arrow.left") { state.openReview(.pastCleanups) }
-                    NavArrow(icon: "arrow.right") { state.showApplyConfirm = true }
+                    NavArrow(icon: "arrow.left", disabled: state.running) { state.openReview(.pastCleanups) }
+                    NavArrow(icon: "arrow.right", disabled: state.running) { state.showApplyConfirm = true }
                 }
             }
             .padding(.horizontal, DS.Sp.xl)
@@ -1775,10 +1784,14 @@ struct HeaderStats: View {
             // Action strip below stats
             HStack(spacing: DS.Sp.sm) {
                 PillBtn("Analyze Storage", style: .ghost) { state.refreshStats(force: true) }
+                    .disabled(state.running)
+                    .opacity(state.running ? 0.42 : 1)
                 Spacer()
                 PillBtn("Clean Safely", style: .primary) {
                     state.showApplyConfirm = true
                 }
+                .disabled(state.running)
+                .opacity(state.running ? 0.42 : 1)
             }
             .padding(.horizontal, DS.Sp.xl)
             .padding(.bottom, DS.Sp.lg)
@@ -1792,6 +1805,7 @@ struct HeaderStats: View {
 // Dark circular arrow button — ref image 1/4 top-right navigation
 struct NavArrow: View {
     let icon:   String
+    var disabled: Bool = false
     let action: () -> Void
     @State private var hovered = false
 
@@ -1808,8 +1822,11 @@ struct NavArrow: View {
                 )
         }
         .buttonStyle(.plain)
+        .disabled(disabled)
+        .opacity(disabled ? 0.42 : 1)
         .onHover { hovered = $0 }
         .animation(DS.Ani.snap, value: hovered)
+        .animation(DS.Ani.snap, value: disabled)
     }
 }
 
@@ -1881,6 +1898,8 @@ struct FilterBar: View {
                 .foregroundColor(DS.C.textSecondary)
             }
             .buttonStyle(.plain)
+            .disabled(state.running)
+            .opacity(state.running ? 0.42 : 1)
         }
         .padding(.horizontal, DS.Sp.xl)
         .padding(.vertical, DS.Sp.md)
@@ -1968,6 +1987,8 @@ struct CategoryCardView: View {
                     .background(Capsule().fill(Color.white))
                 }
                 .buttonStyle(.plain)
+                .disabled(state.running)
+                .opacity(state.running ? 0.42 : 1)
                 .scaleEffect(hovered ? 1.04 : 1.0)
                 .animation(DS.Ani.spring, value: hovered)
                 Spacer()
@@ -2354,12 +2375,16 @@ struct ApplyConfirmSheet: View {
                         dismiss()
                     }
                 }
+                .disabled(state.running)
+                .opacity(state.running ? 0.42 : 1)
                 PillBtn("Clean Now", style: .primary) {
                     if !state.running {
                         state.run(.safeCleanup)
                         dismiss()
                     }
                 }
+                .disabled(state.running)
+                .opacity(state.running ? 0.42 : 1)
             }
         }
         .padding(DS.Sp.xxl)
