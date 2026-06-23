@@ -560,6 +560,7 @@ Audit protected personal data and app profile paths:
 
 ```sh
 cleanroom protect
+cleanroom protect-fast
 cleanroom protect --json
 ```
 
@@ -813,7 +814,7 @@ More examples are in [docs/RECIPES.md](docs/RECIPES.md).
 
 Cleanup rules are cataloged in [data/cleanup-rules.tsv](data/cleanup-rules.tsv). `cleanroom rules --json` exposes the same catalog for wrappers and audits.
 
-Protected personal-state paths are cataloged in [data/protected-paths.tsv](data/protected-paths.tsv). `cleanroom protect --json` exposes detected browser profile, credential, Photos, Mail, Messages, Contacts, Calendars, Notes, cloud-sync, iCloud, and related paths that cleanroom will not remove wholesale.
+Protected personal-state paths are cataloged in [data/protected-paths.tsv](data/protected-paths.tsv). `cleanroom protect --json` exposes detected browser profile, credential, Photos, Mail, Messages, Contacts, Calendars, Notes, cloud-sync, iCloud, and related paths that cleanroom will not remove wholesale. `cleanroom protect-fast --json` skips deep size checks for app dashboards and quick safety reviews.
 
 `cleanroom guard PATH...` uses the same central guard as applied cleanup. It refuses broad dangerous paths, protected catalog paths, and any ancestor folder that would contain protected catalog entries.
 

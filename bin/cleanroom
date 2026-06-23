@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.44.0"
+VERSION="1.45.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -160,6 +160,7 @@ Usage:
   cleanroom interactive [options]
   cleanroom doctor [--json]
   cleanroom protect [--json]
+  cleanroom protect-fast [--json]
   cleanroom guard PATH... [--json]
   cleanroom rules [--json]
   cleanroom categories
@@ -495,6 +496,7 @@ Examples:
   cleanroom doctor
   cleanroom doctor --json
   cleanroom protect
+  cleanroom protect-fast
   cleanroom protect --json
   cleanroom guard ~/Library/Application\ Support/Google/Chrome
   cleanroom rules
@@ -8952,6 +8954,76 @@ protect() {
   done
 }
 
+protected_title() {
+  local id="$1" title
+  case "$id" in
+    icloud-drive) printf '%s' "iCloud Drive"; return 0 ;;
+    itunes-media) printf '%s' "iTunes Media"; return 0 ;;
+    tv-library) printf '%s' "TV Library"; return 0 ;;
+    imovie-library) printf '%s' "iMovie Library"; return 0 ;;
+    imovie-theater) printf '%s' "iMovie Theater"; return 0 ;;
+    garageband-library) printf '%s' "GarageBand Library"; return 0 ;;
+    cloudstorage) printf '%s' "Cloud Storage"; return 0 ;;
+    onedrive-home) printf '%s' "OneDrive Home"; return 0 ;;
+  esac
+  printf '%s' "$id"
+}
+
+protect_fast() {
+  local file id type path reason expanded status title present present_count total_count
+  file="$(protected_file)"
+  [[ -f "$file" ]] || die "Protected path catalog not found."
+  present_count=0
+  total_count=0
+
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '['
+    local first=1
+    tail -n +2 "$file" | while IFS=$'\t' read -r id type path reason; do
+      [[ -z "${id:-}" ]] && continue
+      expanded="$(expand_path "$path")"
+      title="$(protected_title "$id")"
+      if [[ -e "$expanded" ]]; then
+        status="present"
+        present=true
+      else
+        status="not found"
+        present=false
+      fi
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '{"id":"%s","title":"%s","category":"%s","path":"%s","present":%s,"status":"%s","size":"Protected","safety":"Protected","summary":"%s","mode":"fast"}' \
+        "$(printf '%s' "$id" | json_escape)" \
+        "$(printf '%s' "$title" | json_escape)" \
+        "$(printf '%s' "$type" | json_escape)" \
+        "$(printf '%s' "$expanded" | json_escape)" \
+        "$present" \
+        "$(printf '%s' "$status" | json_escape)" \
+        "$(printf '%s' "$reason" | json_escape)"
+    done
+    printf ']\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}cleanroom protected data quick review${RESET}"
+  printf 'These personal-data locations are guarded by cleanroom. Size checks are skipped for speed.\n\n'
+  printf '%-10s %-18s %-26s %s\n' "status" "type" "item" "path"
+  while IFS=$'\t' read -r id type path reason; do
+    [[ -z "${id:-}" || "$id" == "id" ]] && continue
+    expanded="$(expand_path "$path")"
+    title="$(protected_title "$id")"
+    total_count=$((total_count + 1))
+    if [[ -e "$expanded" ]]; then
+      status="present"
+      present_count=$((present_count + 1))
+    else
+      status="not found"
+    fi
+    printf '%-10s %-18s %-26s %s\n' "$status" "$type" "$title" "$expanded"
+  done < "$file"
+  printf '\n%s of %s protected locations are present. No files were changed.\n' "$present_count" "$total_count"
+}
+
 permission_rows() {
   printf '%s\t%s\t%s\t%s\t%s\n' "home-library" "User Library" "~/Library" "cleanroom system-data" "Main hidden user Library. Many macOS storage categories live here."
   printf '%s\t%s\t%s\t%s\t%s\n' "application-support" "Application Support" "~/Library/Application Support" "cleanroom appdata --limit 50" "Large app data and support folders. Some apps protect account state."
@@ -9489,7 +9561,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  dashboard|overview|map|map-fast|mapfast|snapshot|snapshot-fast|snapshotfast|diff|state|permissions|review|scan|system-data|system-data-fast|systemdata-fast|systemdatafast|plan|plan-fast|planfast|large|large-fast|largefast|brokenlinks|brokenlinks-fast|brokenlinksfast|broken-links-fast|broken-linksfast|quarantine|quarantine-fast|quarantinefast|metadata|metadata-fast|metadatafast|quicklook|quicklook-fast|quicklookfast|fontcaches|fontcaches-fast|fontcachesfast|font-caches|font-caches-fast|font-cachesfast|webcaches|webcaches-fast|webcachesfast|web-caches|web-caches-fast|web-cachesfast|savedstate|savedstate-fast|savedstatefast|saved-state|saved-state-fast|saved-statefast|projectcaches|project-caches|projectcaches-fast|projectcachesfast|project-caches-fast|project-cachesfast|developer-fast|developerfast|updaters|updaters-fast|updatersfast|updater-caches|updater-caches-fast|updater-cachesfast|browsercaches|browser-caches|browsercaches-fast|browsercachesfast|browser-caches-fast|browser-cachesfast|duplicates|duplicates-fast|duplicatesfast|documents|desktop|screenshots|screenshots-fast|screenshotsfast|archives|archives-fast|archivesfast|downloads|downloads-fast|downloadsfast|installers|nodes|nodes-fast|nodesfast|venvs|venvs-fast|venvsfast|virtualenvs|virtualenvs-fast|virtualenvsfast|apps|apps-fast|appsfast|uninstallers|appreview|aitools|ai-tools|ai|appdata|libraries|cloud|cloudfiles|cloudfiles-fast|cloudfilesfast|cloud-files|cloud-files-fast|cloud-filesfast|personal|communications|comms|browsers|leftovers|backups|backups-fast|backupsfast|xcode|xcode-fast|xcodefast|android|startup|loginitems|trash|caches|caches-fast|cachesfast|diagnostics|packages|npm-cache|npmcache|yarn-cache|yarncache|pnpm-store|pnpmstore|cocoapods-cache|pod-cache|podcache|pip-cache|pipcache|receipts|homebrew|homebrew-cleanup|brewcleanup|toolchains|toolchains-fast|toolchainsfast|containers|containers-fast|containersfast|snapshots|report|report-fast|reportfast|clean|history|restore|interactive|doctor|protect|guard|rules|categories|init-config|help)
+  dashboard|overview|map|map-fast|mapfast|snapshot|snapshot-fast|snapshotfast|diff|state|permissions|review|scan|system-data|system-data-fast|systemdata-fast|systemdatafast|plan|plan-fast|planfast|large|large-fast|largefast|brokenlinks|brokenlinks-fast|brokenlinksfast|broken-links-fast|broken-linksfast|quarantine|quarantine-fast|quarantinefast|metadata|metadata-fast|metadatafast|quicklook|quicklook-fast|quicklookfast|fontcaches|fontcaches-fast|fontcachesfast|font-caches|font-caches-fast|font-cachesfast|webcaches|webcaches-fast|webcachesfast|web-caches|web-caches-fast|web-cachesfast|savedstate|savedstate-fast|savedstatefast|saved-state|saved-state-fast|saved-statefast|projectcaches|project-caches|projectcaches-fast|projectcachesfast|project-caches-fast|project-cachesfast|developer-fast|developerfast|updaters|updaters-fast|updatersfast|updater-caches|updater-caches-fast|updater-cachesfast|browsercaches|browser-caches|browsercaches-fast|browsercachesfast|browser-caches-fast|browser-cachesfast|duplicates|duplicates-fast|duplicatesfast|documents|desktop|screenshots|screenshots-fast|screenshotsfast|archives|archives-fast|archivesfast|downloads|downloads-fast|downloadsfast|installers|nodes|nodes-fast|nodesfast|venvs|venvs-fast|venvsfast|virtualenvs|virtualenvs-fast|virtualenvsfast|apps|apps-fast|appsfast|uninstallers|appreview|aitools|ai-tools|ai|appdata|libraries|cloud|cloudfiles|cloudfiles-fast|cloudfilesfast|cloud-files|cloud-files-fast|cloud-filesfast|personal|communications|comms|browsers|leftovers|backups|backups-fast|backupsfast|xcode|xcode-fast|xcodefast|android|startup|loginitems|trash|caches|caches-fast|cachesfast|diagnostics|packages|npm-cache|npmcache|yarn-cache|yarncache|pnpm-store|pnpmstore|cocoapods-cache|pod-cache|podcache|pip-cache|pipcache|receipts|homebrew|homebrew-cleanup|brewcleanup|toolchains|toolchains-fast|toolchainsfast|containers|containers-fast|containersfast|snapshots|report|report-fast|reportfast|clean|history|restore|interactive|doctor|protect|protect-fast|protectfast|guard|rules|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -9698,6 +9770,7 @@ case "$ACTION" in
   interactive) interactive ;;
   doctor) doctor ;;
   protect) protect ;;
+  protect-fast|protectfast) protect_fast ;;
   guard) guard ;;
   rules) rules ;;
   categories) categories ;;

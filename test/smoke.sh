@@ -1437,6 +1437,15 @@ grep 'imovie-library' "$protect_json" >/dev/null
 grep 'cloudstorage' "$protect_json" >/dev/null
 grep 'voice-memos' "$protect_json" >/dev/null
 rm -f "$protect_json"
+"$BIN" protect-fast | grep 'protected data quick review' >/dev/null
+protect_fast_json="$(mktemp)"
+"$BIN" protect-fast --json > "$protect_fast_json"
+python3 -m json.tool "$protect_fast_json" >/dev/null
+grep '"mode":"fast"' "$protect_fast_json" >/dev/null
+grep '"safety":"Protected"' "$protect_fast_json" >/dev/null
+grep 'chrome-login-data' "$protect_fast_json" >/dev/null
+grep 'cloudstorage' "$protect_fast_json" >/dev/null
+rm -f "$protect_fast_json"
 "$BIN" guard "$HOME/Library/Application Support/Google/Chrome" | grep 'refused-protected' >/dev/null
 "$BIN" guard "$HOME/Library/Application Support/Google/Chrome/Default" | grep 'refused-protected' >/dev/null
 "$BIN" guard "$HOME/Library/Application Support/Google/Chrome/Default/Login Data" | grep 'refused-protected' >/dev/null
