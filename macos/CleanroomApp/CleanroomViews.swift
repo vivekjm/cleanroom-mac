@@ -221,6 +221,11 @@ final class AppState: ObservableObject {
     private var cleanupPlanGeneration = UUID()
     private let reviewCacheTTL: TimeInterval = 120
     private let fallbackCacheTTL: TimeInterval = 30
+    private let scanTimeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "h:mm a"
+        return formatter
+    }()
 
     func resolveEngine() {
         if let r = Bundle.main.resourceURL {
@@ -338,9 +343,7 @@ final class AppState: ObservableObject {
             return nil
         }
         // Update Last Scan timestamp regardless
-        let formatter = DateFormatter()
-        formatter.dateFormat = "h:mm a"
-        stats[3].value = formatter.string(from: Date())
+        stats[3].value = scanTimeFormatter.string(from: Date())
 
         if let used = grab("used_kb") ?? grab("disk_used") ?? grab("total_used") {
             stats[0].value = formatKBString(used)
@@ -360,9 +363,7 @@ final class AppState: ObservableObject {
             return false
         }
 
-        let formatter = DateFormatter()
-        formatter.dateFormat = "h:mm a"
-        stats[3].value = formatter.string(from: Date())
+        stats[3].value = scanTimeFormatter.string(from: Date())
 
         if let usedKB = numberValue(object["used_kb"]) {
             stats[0].value = formatKBString(String(usedKB))
