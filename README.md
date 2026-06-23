@@ -480,6 +480,8 @@ Review startup and background launch items:
 ```sh
 cleanroom startup
 cleanroom startup --json
+cleanroom startup-fast
+cleanroom startup-fast --json
 cleanroom loginitems
 cleanroom loginitems --json
 ```
@@ -965,7 +967,7 @@ Config files use simple `key=value` lines and are never executed as shell.
 
 `xcode` inventories DerivedData, simulator caches, DeviceSupport, simulator devices, and Xcode Archives. It separates rebuildable caches from review-only archives and high-impact simulator data.
 
-`startup` lists LaunchAgents and LaunchDaemons for review. It never unloads, disables, or removes startup items.
+`startup` lists LaunchAgents and LaunchDaemons for review. It never unloads, disables, or removes startup items. `startup-fast` summarizes startup locations without parsing every plist, which keeps desktop reviews responsive.
 
 `loginitems` lists user Login Items reported by macOS System Events, including hidden status and app path when available. It never disables or removes anything; manage entries in System Settings > General > Login Items. macOS may ask for automation permission before returning results.
 

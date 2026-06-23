@@ -1244,6 +1244,14 @@ python3 -m json.tool "$startup_json" >/dev/null
 grep 'com.example.cleanroom-test' "$startup_json" >/dev/null
 grep '"type":"LaunchAgent"' "$startup_json" >/dev/null
 rm -f "$startup_json"
+"$BIN" startup-fast | grep 'quick startup review' >/dev/null
+startup_fast_json="$(mktemp)"
+"$BIN" startup-fast --json > "$startup_fast_json"
+python3 -m json.tool "$startup_fast_json" >/dev/null
+grep '"mode":"fast"' "$startup_fast_json" >/dev/null
+grep '"title":"Launch Agents"' "$startup_fast_json" >/dev/null
+grep '"safety":"Review only"' "$startup_fast_json" >/dev/null
+rm -f "$startup_fast_json"
 "$BIN" loginitems | grep 'Cleanroom Login Helper' >/dev/null
 loginitems_json="$(mktemp)"
 "$BIN" loginitems --json > "$loginitems_json"

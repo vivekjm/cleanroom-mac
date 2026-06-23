@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.48.0"
+VERSION="1.49.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -133,6 +133,7 @@ Usage:
   cleanroom xcode-fast [--json]
   cleanroom android [--json]
   cleanroom startup [--json]
+  cleanroom startup-fast [--json]
   cleanroom loginitems [--json]
   cleanroom trash [--json]
   cleanroom caches [--json]
@@ -237,6 +238,7 @@ Actions:
   xcode                Inventory Xcode build, archive, DeviceSupport, and simulator storage.
   android              Inventory Android SDK, emulator, AVD, and Android Studio storage.
   startup              List LaunchAgents and LaunchDaemons for review.
+  startup-fast         Quickly summarize startup item locations for desktop review.
   loginitems           List user Login Items for review.
   trash                Inventory current user Trash contents.
   caches               Inventory safe and opt-in cache buckets.
@@ -6818,6 +6820,69 @@ startup_count() {
   startup_rows | awk 'END {print NR + 0}'
 }
 
+startup_fast_rows() {
+  local entries=(
+    "user	Launch Agents	$HOME/Library/LaunchAgents	User startup helpers that open when you sign in."
+    "local	Shared Launch Agents	/Library/LaunchAgents	Shared startup helpers available to all users."
+    "system	Launch Daemons	/Library/LaunchDaemons	Background services that can start without a user session."
+  )
+  local entry scope title dir summary count
+  for entry in "${entries[@]}"; do
+    IFS=$'\t' read -r scope title dir summary <<<"$entry"
+    if [[ -d "$dir" ]]; then
+      count="$(find "$dir" -maxdepth 1 -type f -name '*.plist' 2>/dev/null | awk 'END {print NR + 0}')"
+    else
+      count=0
+    fi
+    printf '%s\t%s\t%s\t%s\t%s\n' "$scope" "$title" "$dir" "$count" "$summary"
+  done
+}
+
+startup_fast() {
+  local rows
+  rows="$(startup_fast_rows)"
+
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '['
+    local first=1 scope title path count summary present status size
+    while IFS=$'\t' read -r scope title path count summary; do
+      [[ -z "${scope:-}" ]] && continue
+      if [[ "${count:-0}" -gt 0 ]]; then
+        present=true
+        status="Review"
+        size="${count} item"
+        [[ "$count" -eq 1 ]] || size="${count} items"
+      else
+        present=false
+        status="Clear"
+        size="None"
+      fi
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '{"id":"%s","title":"%s","path":"%s","present":%s,"count":%s,"size":"%s","status":"%s","safety":"Review only","summary":"%s","mode":"fast"}' \
+        "$(printf '%s' "$scope" | json_escape)" \
+        "$(printf '%s' "$title" | json_escape)" \
+        "$(printf '%s' "$path" | json_escape)" \
+        "$present" \
+        "${count:-0}" \
+        "$(printf '%s' "$size" | json_escape)" \
+        "$(printf '%s' "$status" | json_escape)" \
+        "$(printf '%s' "$summary" | json_escape)"
+    done <<<"$rows"
+    printf ']\n'
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}quick startup review${RESET}"
+  printf 'Fast review of startup locations. Deep plist parsing is skipped for speed.\n\n'
+  printf '%-8s %-22s %s\n' "items" "area" "location"
+  local scope title path count summary
+  while IFS=$'\t' read -r scope title path count summary; do
+    [[ -z "${scope:-}" ]] && continue
+    printf '%-8s %-22s %s\n' "${count:-0}" "$title" "$path"
+  done <<<"$rows"
+}
+
 loginitem_manage_command() {
   printf 'open x-apple.systempreferences:com.apple.LoginItems-Settings.extension'
 }
@@ -9630,7 +9695,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  dashboard|overview|map|map-fast|mapfast|snapshot|snapshot-fast|snapshotfast|diff|state|permissions|review|scan|system-data|system-data-fast|systemdata-fast|systemdatafast|plan|plan-fast|planfast|large|large-fast|largefast|brokenlinks|brokenlinks-fast|brokenlinksfast|broken-links-fast|broken-linksfast|quarantine|quarantine-fast|quarantinefast|metadata|metadata-fast|metadatafast|quicklook|quicklook-fast|quicklookfast|fontcaches|fontcaches-fast|fontcachesfast|font-caches|font-caches-fast|font-cachesfast|webcaches|webcaches-fast|webcachesfast|web-caches|web-caches-fast|web-cachesfast|savedstate|savedstate-fast|savedstatefast|saved-state|saved-state-fast|saved-statefast|projectcaches|project-caches|projectcaches-fast|projectcachesfast|project-caches-fast|project-cachesfast|developer-fast|developerfast|updaters|updaters-fast|updatersfast|updater-caches|updater-caches-fast|updater-cachesfast|browsercaches|browser-caches|browsercaches-fast|browsercachesfast|browser-caches-fast|browser-cachesfast|duplicates|duplicates-fast|duplicatesfast|documents|desktop|screenshots|screenshots-fast|screenshotsfast|archives|archives-fast|archivesfast|downloads|downloads-fast|downloadsfast|installers|nodes|nodes-fast|nodesfast|venvs|venvs-fast|venvsfast|virtualenvs|virtualenvs-fast|virtualenvsfast|apps|apps-fast|appsfast|uninstallers|appreview|aitools|aitools-fast|aitoolsfast|ai-tools|ai|appdata|libraries|cloud|cloudfiles|cloudfiles-fast|cloudfilesfast|cloud-files|cloud-files-fast|cloud-filesfast|personal|communications|comms|browsers|leftovers|backups|backups-fast|backupsfast|xcode|xcode-fast|xcodefast|android|startup|loginitems|trash|caches|caches-instant|cachesinstant|caches-fast|cachesfast|diagnostics|packages|npm-cache|npmcache|yarn-cache|yarncache|pnpm-store|pnpmstore|cocoapods-cache|pod-cache|podcache|pip-cache|pipcache|receipts|homebrew|homebrew-cleanup|brewcleanup|toolchains|toolchains-fast|toolchainsfast|containers|containers-fast|containersfast|snapshots|report|report-fast|reportfast|clean|history|restore|interactive|doctor|protect|protect-fast|protectfast|guard|rules|rules-fast|rulesfast|categories|init-config|help)
+  dashboard|overview|map|map-fast|mapfast|snapshot|snapshot-fast|snapshotfast|diff|state|permissions|review|scan|system-data|system-data-fast|systemdata-fast|systemdatafast|plan|plan-fast|planfast|large|large-fast|largefast|brokenlinks|brokenlinks-fast|brokenlinksfast|broken-links-fast|broken-linksfast|quarantine|quarantine-fast|quarantinefast|metadata|metadata-fast|metadatafast|quicklook|quicklook-fast|quicklookfast|fontcaches|fontcaches-fast|fontcachesfast|font-caches|font-caches-fast|font-cachesfast|webcaches|webcaches-fast|webcachesfast|web-caches|web-caches-fast|web-cachesfast|savedstate|savedstate-fast|savedstatefast|saved-state|saved-state-fast|saved-statefast|projectcaches|project-caches|projectcaches-fast|projectcachesfast|project-caches-fast|project-cachesfast|developer-fast|developerfast|updaters|updaters-fast|updatersfast|updater-caches|updater-caches-fast|updater-cachesfast|browsercaches|browser-caches|browsercaches-fast|browsercachesfast|browser-caches-fast|browser-cachesfast|duplicates|duplicates-fast|duplicatesfast|documents|desktop|screenshots|screenshots-fast|screenshotsfast|archives|archives-fast|archivesfast|downloads|downloads-fast|downloadsfast|installers|nodes|nodes-fast|nodesfast|venvs|venvs-fast|venvsfast|virtualenvs|virtualenvs-fast|virtualenvsfast|apps|apps-fast|appsfast|uninstallers|appreview|aitools|aitools-fast|aitoolsfast|ai-tools|ai|appdata|libraries|cloud|cloudfiles|cloudfiles-fast|cloudfilesfast|cloud-files|cloud-files-fast|cloud-filesfast|personal|communications|comms|browsers|leftovers|backups|backups-fast|backupsfast|xcode|xcode-fast|xcodefast|android|startup|startup-fast|startupfast|loginitems|trash|caches|caches-instant|cachesinstant|caches-fast|cachesfast|diagnostics|packages|npm-cache|npmcache|yarn-cache|yarncache|pnpm-store|pnpmstore|cocoapods-cache|pod-cache|podcache|pip-cache|pipcache|receipts|homebrew|homebrew-cleanup|brewcleanup|toolchains|toolchains-fast|toolchainsfast|containers|containers-fast|containersfast|snapshots|report|report-fast|reportfast|clean|history|restore|interactive|doctor|protect|protect-fast|protectfast|guard|rules|rules-fast|rulesfast|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -9813,6 +9878,7 @@ case "$ACTION" in
   xcode-fast|xcodefast) xcode_fast ;;
   android) android ;;
   startup) startup ;;
+  startup-fast|startupfast) startup_fast ;;
   loginitems) loginitems ;;
   trash) trash ;;
   caches) caches ;;
