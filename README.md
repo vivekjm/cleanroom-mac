@@ -378,6 +378,13 @@ cleanroom appreview adobe
 cleanroom appreview zoom --json
 ```
 
+Review AI tool storage:
+
+```sh
+cleanroom aitools-fast
+cleanroom aitools-fast --json
+```
+
 Review large app data folders:
 
 ```sh
@@ -936,7 +943,7 @@ Config files use simple `key=value` lines and are never executed as shell.
 
 `appreview` combines matching app bundles, vendor uninstallers, package receipts, and leftover candidates into one read-only workflow. Use it before removing apps so official uninstallers and package records are visible before leftover cleanup.
 
-`aitools` inventories known AI-agent generated state and local AI model stores. Cleanup remains split into explicit opt-in flags: `--include-ai-workspaces` for generated workspace state and `--include-ai-models` for downloaded model stores/backends.
+`aitools` inventories known AI-agent generated state and local AI model stores. `aitools-fast` skips deep model sizing for responsive desktop reviews. Cleanup remains split into explicit opt-in flags: `--include-ai-workspaces` for generated workspace state and `--include-ai-models` for downloaded model stores/backends.
 
 `appdata` ranks top-level Application Support, Containers, Group Containers, HTTPStorages, WebKit, and saved-state folders. It is review-only and includes the central guard status so protected profiles and personal data stand out before you investigate with `leftovers APPNAME`.
 

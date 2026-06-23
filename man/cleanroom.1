@@ -1,4 +1,4 @@
-.TH CLEANROOM 1 "June 2026" "cleanroom 1.47.0" "User Commands"
+.TH CLEANROOM 1 "June 2026" "cleanroom 1.48.0" "User Commands"
 .SH NAME
 cleanroom \- safe-by-default macOS storage cleaner
 .SH SYNOPSIS
@@ -169,6 +169,9 @@ cleanroom \- safe-by-default macOS storage cleaner
 .br
 .B cleanroom
 .RI "aitools [--json]"
+.br
+.B cleanroom
+.RI "aitools-fast [--json]"
 .br
 .B cleanroom
 .RI "appdata [--limit n] [--json]"
@@ -495,6 +498,9 @@ candidates in one read-only workflow.
 .B aitools
 Review known AI-agent generated state, downloaded local models, and backend
 extensions. Cleanup remains split behind explicit AI workspace and model flags.
+.TP
+.B aitools-fast
+Quickly review known AI storage areas without deep model or workspace sizing.
 .TP
 .B appdata
 Rank large app support, container, group-container, HTTP storage, WebKit, and

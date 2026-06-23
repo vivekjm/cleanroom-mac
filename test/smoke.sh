@@ -1092,6 +1092,16 @@ grep '"app":"Gemini / Antigravity"' "$aitools_json" >/dev/null
 grep '"safety":"downloaded-models"' "$aitools_json" >/dev/null
 grep '"safety":"generated-workspace"' "$aitools_json" >/dev/null
 rm -f "$aitools_json"
+"$BIN" aitools-fast | grep 'quick AI tools storage' >/dev/null
+aitools_fast_json="$(mktemp)"
+"$BIN" aitools-fast --json > "$aitools_fast_json"
+python3 -m json.tool "$aitools_fast_json" >/dev/null
+grep '"mode":"fast"' "$aitools_fast_json" >/dev/null
+grep '"app":"LM Studio"' "$aitools_fast_json" >/dev/null
+grep '"app":"Gemini / Antigravity"' "$aitools_fast_json" >/dev/null
+grep '"safety":"downloaded-models"' "$aitools_fast_json" >/dev/null
+grep '"safety":"generated-workspace"' "$aitools_fast_json" >/dev/null
+rm -f "$aitools_fast_json"
 "$BIN" appdata --limit 20 | grep 'CleanroomTestAdobe' >/dev/null
 appdata_json="$(mktemp)"
 "$BIN" appdata --json --limit 20 > "$appdata_json"

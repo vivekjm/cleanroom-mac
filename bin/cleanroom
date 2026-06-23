@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.47.0"
+VERSION="1.48.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -117,6 +117,7 @@ Usage:
   cleanroom uninstallers [PATH] [--limit N] [--json]
   cleanroom appreview QUERY... [--limit N] [--json]
   cleanroom aitools [--json]
+  cleanroom aitools-fast [--json]
   cleanroom appdata [--limit N] [--json]
   cleanroom libraries [--json]
   cleanroom cloud [--json]
@@ -222,6 +223,7 @@ Actions:
   uninstallers         List vendor uninstallers and remover tools for review.
   appreview            Review app bundles, uninstallers, receipts, and leftovers.
   aitools              Review AI-agent state, local models, and rebuildable AI caches.
+  aitools-fast         Quickly review AI storage areas without deep model sizing.
   appdata              Rank large app support, container, and group container folders.
   libraries            Inventory protected media and creative libraries.
   cloud                Inventory protected cloud-sync storage locations.
@@ -446,6 +448,7 @@ Examples:
   cleanroom appreview adobe
   cleanroom appreview zoom --json
   cleanroom aitools
+  cleanroom aitools-fast
   cleanroom aitools --json
   cleanroom appdata
   cleanroom appdata --json
@@ -2544,6 +2547,23 @@ aitools() {
     printf '  %s\n' "$description"
   done <<<"$rows"
   printf '\nPasswords, browser profiles, cookies, bookmarks, Keychains, and broad app profiles stay protected.\n'
+}
+
+aitools_fast() {
+  if [[ "$JSON" -eq 1 ]]; then
+    cat <<'EOF'
+[{"id":"gemini-generated-state","title":"Gemini / Antigravity Generated State","app":"Gemini / Antigravity","kind":"workspace state","safety":"generated-workspace","size":"Review","status":"Review","summary":"Recordings, scratch folders, local brain or memory data, implicit state, conversations, and generated browser rendering caches can be reviewed in the deep AI Tools view.","mode":"fast"},{"id":"lmstudio-model-storage","title":"LM Studio Model Storage","app":"LM Studio","kind":"models and backends","safety":"downloaded-models","size":"Review","status":"Review","summary":"Downloaded model files, backend runtimes, extensions, and temporary downloads can usually be downloaded again if needed.","mode":"fast"},{"id":"ollama-model-storage","title":"Ollama Model Storage","app":"Ollama","kind":"models","safety":"downloaded-models","size":"Review","status":"Review","summary":"Downloaded Ollama model blobs and manifests are treated as optional model storage, not personal credentials.","mode":"fast"},{"id":"shared-model-caches","title":"Shared Local Model Caches","app":"Hugging Face, ModelScope, PyTorch, Whisper, llama.cpp, GPT4All, Jan, AnythingLLM","kind":"models","safety":"downloaded-models","size":"Review","status":"Review","summary":"Known local model caches and app model stores are grouped here for a quick desktop review; open the deep AI Tools view for exact sizes.","mode":"fast"},{"id":"ai-safety-boundary","title":"AI Safety Boundary","app":"Cleanroom","kind":"safety","safety":"Protected","size":"Protected","status":"Protected","summary":"Browser profiles, saved passwords, cookies, bookmarks, Keychains, and broad app profiles stay protected.","mode":"fast"}]
+EOF
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}quick AI tools storage${RESET}"
+  printf 'Instant desktop summary. Exact model and workspace sizing is skipped for responsiveness.\n\n'
+  printf '%-28s %-20s %s\n' "area" "safety" "summary"
+  printf '%-28s %-20s %s\n' "Gemini / Antigravity" "generated-workspace" "Generated recordings, scratch, brain, implicit state, conversations, and rendering caches."
+  printf '%-28s %-20s %s\n' "LM Studio" "downloaded-models" "Models, backend runtimes, extensions, and temporary downloads."
+  printf '%-28s %-20s %s\n' "Shared model caches" "downloaded-models" "Hugging Face, ModelScope, PyTorch, Whisper, llama.cpp, GPT4All, Jan, and AnythingLLM."
+  printf '%-28s %-20s %s\n' "Safety boundary" "Protected" "Passwords, browser profiles, cookies, bookmarks, Keychains, and app profiles stay protected."
 }
 
 clean_containers() {
@@ -9610,7 +9630,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  dashboard|overview|map|map-fast|mapfast|snapshot|snapshot-fast|snapshotfast|diff|state|permissions|review|scan|system-data|system-data-fast|systemdata-fast|systemdatafast|plan|plan-fast|planfast|large|large-fast|largefast|brokenlinks|brokenlinks-fast|brokenlinksfast|broken-links-fast|broken-linksfast|quarantine|quarantine-fast|quarantinefast|metadata|metadata-fast|metadatafast|quicklook|quicklook-fast|quicklookfast|fontcaches|fontcaches-fast|fontcachesfast|font-caches|font-caches-fast|font-cachesfast|webcaches|webcaches-fast|webcachesfast|web-caches|web-caches-fast|web-cachesfast|savedstate|savedstate-fast|savedstatefast|saved-state|saved-state-fast|saved-statefast|projectcaches|project-caches|projectcaches-fast|projectcachesfast|project-caches-fast|project-cachesfast|developer-fast|developerfast|updaters|updaters-fast|updatersfast|updater-caches|updater-caches-fast|updater-cachesfast|browsercaches|browser-caches|browsercaches-fast|browsercachesfast|browser-caches-fast|browser-cachesfast|duplicates|duplicates-fast|duplicatesfast|documents|desktop|screenshots|screenshots-fast|screenshotsfast|archives|archives-fast|archivesfast|downloads|downloads-fast|downloadsfast|installers|nodes|nodes-fast|nodesfast|venvs|venvs-fast|venvsfast|virtualenvs|virtualenvs-fast|virtualenvsfast|apps|apps-fast|appsfast|uninstallers|appreview|aitools|ai-tools|ai|appdata|libraries|cloud|cloudfiles|cloudfiles-fast|cloudfilesfast|cloud-files|cloud-files-fast|cloud-filesfast|personal|communications|comms|browsers|leftovers|backups|backups-fast|backupsfast|xcode|xcode-fast|xcodefast|android|startup|loginitems|trash|caches|caches-instant|cachesinstant|caches-fast|cachesfast|diagnostics|packages|npm-cache|npmcache|yarn-cache|yarncache|pnpm-store|pnpmstore|cocoapods-cache|pod-cache|podcache|pip-cache|pipcache|receipts|homebrew|homebrew-cleanup|brewcleanup|toolchains|toolchains-fast|toolchainsfast|containers|containers-fast|containersfast|snapshots|report|report-fast|reportfast|clean|history|restore|interactive|doctor|protect|protect-fast|protectfast|guard|rules|rules-fast|rulesfast|categories|init-config|help)
+  dashboard|overview|map|map-fast|mapfast|snapshot|snapshot-fast|snapshotfast|diff|state|permissions|review|scan|system-data|system-data-fast|systemdata-fast|systemdatafast|plan|plan-fast|planfast|large|large-fast|largefast|brokenlinks|brokenlinks-fast|brokenlinksfast|broken-links-fast|broken-linksfast|quarantine|quarantine-fast|quarantinefast|metadata|metadata-fast|metadatafast|quicklook|quicklook-fast|quicklookfast|fontcaches|fontcaches-fast|fontcachesfast|font-caches|font-caches-fast|font-cachesfast|webcaches|webcaches-fast|webcachesfast|web-caches|web-caches-fast|web-cachesfast|savedstate|savedstate-fast|savedstatefast|saved-state|saved-state-fast|saved-statefast|projectcaches|project-caches|projectcaches-fast|projectcachesfast|project-caches-fast|project-cachesfast|developer-fast|developerfast|updaters|updaters-fast|updatersfast|updater-caches|updater-caches-fast|updater-cachesfast|browsercaches|browser-caches|browsercaches-fast|browsercachesfast|browser-caches-fast|browser-cachesfast|duplicates|duplicates-fast|duplicatesfast|documents|desktop|screenshots|screenshots-fast|screenshotsfast|archives|archives-fast|archivesfast|downloads|downloads-fast|downloadsfast|installers|nodes|nodes-fast|nodesfast|venvs|venvs-fast|venvsfast|virtualenvs|virtualenvs-fast|virtualenvsfast|apps|apps-fast|appsfast|uninstallers|appreview|aitools|aitools-fast|aitoolsfast|ai-tools|ai|appdata|libraries|cloud|cloudfiles|cloudfiles-fast|cloudfilesfast|cloud-files|cloud-files-fast|cloud-filesfast|personal|communications|comms|browsers|leftovers|backups|backups-fast|backupsfast|xcode|xcode-fast|xcodefast|android|startup|loginitems|trash|caches|caches-instant|cachesinstant|caches-fast|cachesfast|diagnostics|packages|npm-cache|npmcache|yarn-cache|yarncache|pnpm-store|pnpmstore|cocoapods-cache|pod-cache|podcache|pip-cache|pipcache|receipts|homebrew|homebrew-cleanup|brewcleanup|toolchains|toolchains-fast|toolchainsfast|containers|containers-fast|containersfast|snapshots|report|report-fast|reportfast|clean|history|restore|interactive|doctor|protect|protect-fast|protectfast|guard|rules|rules-fast|rulesfast|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -9777,6 +9797,7 @@ case "$ACTION" in
   uninstallers) uninstallers ;;
   appreview) appreview ;;
   aitools|ai-tools|ai) aitools ;;
+  aitools-fast|aitoolsfast) aitools_fast ;;
   appdata) appdata ;;
   libraries) libraries ;;
   cloud) cloud ;;
