@@ -1103,6 +1103,18 @@ grep 'Cleanroom Test Uninstaller.app' "$appreview_json" >/dev/null
 grep 'com.cleanroom.test.pkg' "$appreview_json" >/dev/null
 grep 'CleanroomTestAdobe' "$appreview_json" >/dev/null
 rm -f "$appreview_json"
+"$BIN" appreview-fast cleanroom --limit 20 | grep 'quick app removal review' >/dev/null
+appreview_fast_json="$(mktemp)"
+"$BIN" appreview-fast cleanroom --json --limit 20 > "$appreview_fast_json"
+python3 -m json.tool "$appreview_fast_json" >/dev/null
+grep '"mode":"fast"' "$appreview_fast_json" >/dev/null
+grep '"apps"' "$appreview_fast_json" >/dev/null
+grep '"uninstallers"' "$appreview_fast_json" >/dev/null
+grep '"receipts"' "$appreview_fast_json" >/dev/null
+grep '"leftovers"' "$appreview_fast_json" >/dev/null
+grep '"size":"Open folder"' "$appreview_fast_json" >/dev/null
+grep 'CleanroomTestAdobe' "$appreview_fast_json" >/dev/null
+rm -f "$appreview_fast_json"
 "$BIN" aitools | grep 'cleanroom AI tools storage' >/dev/null
 "$BIN" aitools | grep 'LM Studio' >/dev/null
 "$BIN" aitools | grep 'Gemini / Antigravity' >/dev/null

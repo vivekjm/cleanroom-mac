@@ -115,6 +115,7 @@ cleanroom venvs --json ~/Documents
 cleanroom apps --json
 cleanroom uninstallers --json
 cleanroom appreview adobe --json
+cleanroom appreview-fast adobe --json
 cleanroom appdata --json
 cleanroom libraries --json
 cleanroom libraries-fast --json
@@ -224,7 +225,7 @@ cleanroom permissions --json
 
 `uninstallers --json [PATH]` emits likely vendor uninstallers, remover apps, packages, and scripts with path, size, modified date, and launch/reveal command. It is intentionally review-only and does not run or remove these tools.
 
-`appreview --json QUERY...` emits matching app bundles, vendor uninstallers, package receipts, and leftover candidates in one read-only object. Use it before removing apps so official uninstallers and package records are visible before leftover cleanup.
+`appreview --json QUERY...` emits matching app bundles, vendor uninstallers, package receipts, and leftover candidates in one read-only object. Use it before removing apps so official uninstallers and package records are visible before leftover cleanup. `appreview-fast --json QUERY...` skips deep folder sizing for responsive desktop reviews.
 
 `appdata --json` emits large top-level app support/container folders with size and guard status. It is intentionally review-only and does not remove app state. Use `appdata-fast --json` for a responsive desktop view that skips deep folder sizing.
 

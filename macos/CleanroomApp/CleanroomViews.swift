@@ -123,7 +123,7 @@ struct AppAction: Hashable {
     static let safeCleanup = AppAction(title: "Safe Cleanup", args: ["clean", "--apply", "--trash", "--yes"])
 
     static func appReview(query: String) -> AppAction {
-        AppAction(title: "App Review: \(query)", args: ["appreview", query, "--limit", "40"])
+        AppAction(title: "App Review: \(query)", args: ["appreview-fast", query, "--limit", "40"])
     }
 }
 
@@ -477,7 +477,7 @@ final class AppState: ObservableObject {
             "aitools", "aitools-fast", "ai-tools", "ai", "appdata", "appdata-fast", "libraries", "libraries-fast",
             "xcode", "xcode-fast", "backups", "backups-fast", "system-data", "system-data-fast", "containers", "containers-fast", "toolchains", "toolchains-fast",
             "loginitems", "loginitems-fast", "startup", "startup-fast", "snapshot", "snapshot-fast", "state", "state-fast", "protect", "protect-fast", "rules", "rules-fast",
-            "map", "map-fast", "plan-fast", "doctor", "doctor-fast", "leftovers", "appreview", "history", "history-fast", "report-fast"
+            "map", "map-fast", "plan-fast", "doctor", "doctor-fast", "leftovers", "appreview", "appreview-fast", "history", "history-fast", "report-fast"
         ]
         if jsonActions.contains(action), !args.contains("--json") {
             return args + ["--json"]

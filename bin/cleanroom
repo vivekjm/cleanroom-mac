@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.60.0"
+VERSION="1.61.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -119,6 +119,7 @@ Usage:
   cleanroom apps-fast [PATH] [--limit N] [--json]
   cleanroom uninstallers [PATH] [--limit N] [--json]
   cleanroom appreview QUERY... [--limit N] [--json]
+  cleanroom appreview-fast QUERY... [--limit N] [--json]
   cleanroom aitools [--json]
   cleanroom aitools-fast [--json]
   cleanroom appdata [--limit N] [--json]
@@ -465,6 +466,7 @@ Examples:
   cleanroom uninstallers --json
   cleanroom appreview adobe
   cleanroom appreview zoom --json
+  cleanroom appreview-fast adobe --json
   cleanroom aitools
   cleanroom aitools-fast
   cleanroom aitools --json
@@ -5497,6 +5499,18 @@ appreview_app_rows() {
     head -n "$LIMIT"
 }
 
+appreview_app_fast_rows() {
+  local root path name
+  for root in "/Applications" "$HOME/Applications"; do
+    [[ -d "$root" ]] || continue
+    while IFS= read -r -d '' path; do
+      name="$(basename "$path" .app)"
+      leftover_match_query "$name $path" >/dev/null || continue
+      printf '%s\t%s\n' "$name" "$path"
+    done < <(find "$root" -maxdepth 2 -type d -name '*.app' -prune -print0 2>/dev/null)
+  done | sort -f | head -n "$LIMIT"
+}
+
 uninstaller_roots() {
   if [[ "${#PATH_ARGS[@]}" -gt 0 ]]; then
     local path
@@ -5571,6 +5585,26 @@ appreview_uninstaller_rows() {
     printf '%s\t%s\n' "app-support" "$HOME/Library/Application Support"
     printf '%s\t%s\n' "local-app-support" "/Library/Application Support"
   ) | sort -t $'\t' -k1,1rn -k2,2rn | head -n "$LIMIT"
+}
+
+appreview_uninstaller_fast_rows() {
+  local root_id root depth path epoch kind name
+  while IFS=$'\t' read -r root_id root depth; do
+    [[ -d "$root" ]] || continue
+    while IFS= read -r -d '' path; do
+      name="$(basename "$path")"
+      leftover_match_query "$name $path" >/dev/null || continue
+      kind="$(uninstaller_kind "$path")"
+      epoch="$(path_mtime_epoch "$path")"
+      printf '%012d\t%s\t%s\t%s\t%s\n' "$epoch" "$kind" "$root_id" "$name" "$path"
+    done < <(find "$root" -maxdepth "$depth" \( -type d -name '*.app' \( -iname '*uninstall*' -o -iname '*uninstaller*' -o -iname '*remove*' \) -prune -print0 \) -o \( -type d -name '*.app' -prune \) -o \( -type f \( -iname '*uninstall*' -o -iname '*uninstaller*' -o -iname '*remove*' \) -print0 \) 2>/dev/null)
+  done < <(
+    printf '%s\t%s\t%s\n' "applications" "/Applications" "2"
+    printf '%s\t%s\t%s\n' "user-applications" "$HOME/Applications" "2"
+    printf '%s\t%s\t%s\n' "utilities" "/Applications/Utilities" "1"
+    printf '%s\t%s\t%s\n' "app-support" "$HOME/Library/Application Support" "1"
+    printf '%s\t%s\t%s\n' "local-app-support" "/Library/Application Support" "1"
+  ) | sort -t $'\t' -k1,1rn | head -n "$LIMIT"
 }
 
 uninstallers() {
@@ -5854,16 +5888,23 @@ lower_text() {
 }
 
 leftover_match_query() {
-  local haystack query query_lower
-  haystack="$(lower_text "$1")"
+  local haystack query had_nocasematch
+  haystack="$1"
+  if shopt -q nocasematch; then
+    had_nocasematch=0
+  else
+    had_nocasematch=1
+  fi
+  shopt -s nocasematch
   for query in "${PATH_ARGS[@]}"; do
-    query_lower="$(lower_text "$query")"
-    [[ -z "$query_lower" ]] && continue
-    if [[ "$haystack" == *"$query_lower"* ]]; then
+    [[ -z "$query" ]] && continue
+    if [[ "$haystack" == *"$query"* ]]; then
+      [[ "$had_nocasematch" -ne 0 ]] && shopt -u nocasematch
       printf '%s\n' "$query"
       return 0
     fi
   done
+  [[ "$had_nocasematch" -ne 0 ]] && shopt -u nocasematch
   return 1
 }
 
@@ -5898,6 +5939,22 @@ leftover_rows() {
       printf '%012d\t%06d\t%s\t%s\t%s\n' "$kb" "$path_depth" "$category" "$matched" "$path"
     done < <(find "$root" -mindepth 1 -maxdepth "$depth" \( -type d -o -type f \) -print0 2>/dev/null)
   done < <(leftover_roots) | sort -t $'\t' -k1,1rn -k2,2n | head -n "$LIMIT" | cut -f1,3-
+}
+
+leftover_fast_rows() {
+  [[ "${#PATH_ARGS[@]}" -gt 0 ]] || die "leftovers requires at least one search term"
+  local category root_template depth root path matched slash_count path_depth
+  while IFS=$'\t' read -r category root_template depth; do
+    root="$(expand_path "$root_template")"
+    [[ -d "$root" ]] || continue
+    while IFS= read -r -d '' path; do
+      matched="$(leftover_match_query "$path" || true)"
+      [[ -n "$matched" ]] || continue
+      slash_count="${path//[!\/]/}"
+      path_depth="${#slash_count}"
+      printf '%06d\t%s\t%s\t%s\n' "$path_depth" "$category" "$matched" "$path"
+    done < <(find "$root" -mindepth 1 -maxdepth 1 \( -type d -o -type f \) -print0 2>/dev/null)
+  done < <(leftover_roots) | sort -t $'\t' -k1,1n -k4,4f | head -n "$LIMIT" | cut -f2-
 }
 
 json_queries_array() {
@@ -6041,6 +6098,129 @@ appreview_receipt_rows() {
       printf '%012d\t%012d\t%s\t%s\t%s\t%s\n' "$kb" "$epoch" "$id" "$kind" "$root_id" "$path"
     done < <(find "$root" -maxdepth 1 -type f \( -name '*.plist' -o -name '*.bom' \) -print0 2>/dev/null)
   done < <(receipt_roots) | sort -t $'\t' -k1,1rn -k2,2rn | head -n "$LIMIT"
+}
+
+appreview_receipt_fast_rows() {
+  local root_id root_template root query path kind name id epoch
+  while IFS=$'\t' read -r root_id root_template; do
+    root="$(expand_path "$root_template")"
+    [[ -d "$root" ]] || continue
+    for query in "${PATH_ARGS[@]}"; do
+      [[ -z "$query" ]] && continue
+      while IFS= read -r -d '' path; do
+        name="$(basename "$path")"
+        kind="${name##*.}"
+        [[ "$kind" == "plist" || "$kind" == "bom" ]] || continue
+        id="${name%.$kind}"
+        epoch="$(path_mtime_epoch "$path")"
+        printf '%012d\t%s\t%s\t%s\t%s\n' "$epoch" "$id" "$kind" "$root_id" "$path"
+      done < <(find "$root" -maxdepth 1 -type f \( -iname "*$query*.plist" -o -iname "*$query*.bom" \) -print0 2>/dev/null)
+    done
+  done < <(receipt_roots) | sort -u | sort -t $'\t' -k1,1rn | head -n "$LIMIT"
+}
+
+appreview_fast() {
+  [[ "${#PATH_ARGS[@]}" -gt 0 ]] || die "appreview-fast requires at least one app or vendor search term"
+
+  local app_rows_value uninstaller_rows_value leftover_rows_value receipt_rows_value
+  app_rows_value="$(appreview_app_fast_rows)"
+  uninstaller_rows_value="$(appreview_uninstaller_fast_rows)"
+  leftover_rows_value="$(leftover_fast_rows)"
+  receipt_rows_value="$(appreview_receipt_fast_rows)"
+
+  if [[ "$JSON" -eq 1 ]]; then
+    printf '{"queries":'
+    json_queries_array
+    printf ',"mode":"fast","apps":['
+    local first=1 name path
+    while IFS=$'\t' read -r name path; do
+      [[ -z "${path:-}" ]] && continue
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '{"name":"%s","path":"%s","size":"Open app","status":"Review","summary":"Matching app bundle. Open Finder or the vendor app to review it.","mode":"fast"}' \
+        "$(printf '%s' "$name" | json_escape)" \
+        "$(printf '%s' "$path" | json_escape)"
+    done <<<"$app_rows_value"
+    printf '],"uninstallers":['
+    first=1
+    local u_epoch u_kind u_root u_name u_path u_epoch_num
+    while IFS=$'\t' read -r u_epoch u_kind u_root u_name u_path; do
+      [[ -z "${u_path:-}" ]] && continue
+      u_epoch_num="$(printf '%s\n' "${u_epoch:-0}" | sed 's/^0*//; s/^$/0/')"
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '{"name":"%s","kind":"%s","root":"%s","path":"%s","size":"Open uninstaller","status":"Review first","modified_epoch":%s,"modified":"%s","summary":"Prefer the vendor uninstaller before removing leftovers.","mode":"fast"}' \
+        "$(printf '%s' "$u_name" | json_escape)" \
+        "$(printf '%s' "$u_kind" | json_escape)" \
+        "$(printf '%s' "$u_root" | json_escape)" \
+        "$(printf '%s' "$u_path" | json_escape)" \
+        "${u_epoch_num:-0}" \
+        "$(file_mtime_iso "${u_epoch_num:-0}" | json_escape)"
+    done <<<"$uninstaller_rows_value"
+    printf '],"receipts":['
+    first=1
+    local r_epoch r_id r_kind r_root r_path r_epoch_num
+    while IFS=$'\t' read -r r_epoch r_id r_kind r_root r_path; do
+      [[ -z "${r_path:-}" ]] && continue
+      r_epoch_num="$(printf '%s\n' "${r_epoch:-0}" | sed 's/^0*//; s/^$/0/')"
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '{"id":"%s","title":"%s","kind":"%s","root":"%s","path":"%s","size":"Receipt","status":"Review","modified_epoch":%s,"modified":"%s","summary":"Package receipt found. It can help identify installed components.","mode":"fast"}' \
+        "$(printf '%s' "$r_id" | json_escape)" \
+        "$(printf '%s' "$r_id" | json_escape)" \
+        "$(printf '%s' "$r_kind" | json_escape)" \
+        "$(printf '%s' "$r_root" | json_escape)" \
+        "$(printf '%s' "$r_path" | json_escape)" \
+        "${r_epoch_num:-0}" \
+        "$(file_mtime_iso "${r_epoch_num:-0}" | json_escape)"
+    done <<<"$receipt_rows_value"
+    printf '],"leftovers":['
+    first=1
+    local l_category l_matched l_path l_status l_reason l_line
+    while IFS=$'\t' read -r l_category l_matched l_path; do
+      [[ -z "${l_path:-}" ]] && continue
+      l_line="$(guard_status "$l_path")"
+      l_status="${l_line%%$'\t'*}"
+      l_reason="${l_line#*$'\t'}"
+      [[ "$first" -eq 0 ]] && printf ','
+      first=0
+      printf '{"title":"%s","path":"%s","category":"%s","matched_query":"%s","size":"Open folder","status":"%s","reason":"%s","summary":"Matching app data. Review before cleaning.","mode":"fast"}' \
+        "$(basename "$l_path" | json_escape)" \
+        "$(printf '%s' "$l_path" | json_escape)" \
+        "$(printf '%s' "$l_category" | json_escape)" \
+        "$(printf '%s' "$l_matched" | json_escape)" \
+        "$(printf '%s' "$l_status" | json_escape)" \
+        "$(printf '%s' "$l_reason" | json_escape)"
+    done <<<"$leftover_rows_value"
+    printf '],"guidance":"%s"}\n' "$(printf '%s' "Open vendor uninstallers first, then review leftover app data. This fast review does not change files." | json_escape)"
+    return 0
+  fi
+
+  printf '%s\n' "${BOLD}quick app removal review${RESET}"
+  printf 'Fast review. Sizes are skipped so large app data folders do not slow the desktop app down.\n'
+  printf 'Queries: %s  Limit: %s\n\n' "${PATH_ARGS[*]}" "$LIMIT"
+  printf '%-16s %s\n' "section" "item"
+  local name path
+  while IFS=$'\t' read -r name path; do
+    [[ -z "${path:-}" ]] && continue
+    printf '%-16s %s\n' "app" "$name"
+  done <<<"$app_rows_value"
+  local u_epoch u_kind u_root u_name u_path
+  while IFS=$'\t' read -r u_epoch u_kind u_root u_name u_path; do
+    [[ -z "${u_path:-}" ]] && continue
+    printf '%-16s %s\n' "uninstaller" "$u_name"
+  done <<<"$uninstaller_rows_value"
+  local r_epoch r_id r_kind r_root r_path
+  while IFS=$'\t' read -r r_epoch r_id r_kind r_root r_path; do
+    [[ -z "${r_path:-}" ]] && continue
+    printf '%-16s %s\n' "receipt" "$r_id"
+  done <<<"$receipt_rows_value"
+  local l_category l_matched l_path
+  while IFS=$'\t' read -r l_category l_matched l_path; do
+    [[ -z "${l_path:-}" ]] && continue
+    printf '%-16s %s\n' "leftover" "$(basename "$l_path")"
+  done <<<"$leftover_rows_value"
+  printf '\nOpen vendor uninstallers first, then review leftover app data. No files were changed.\n'
 }
 
 appreview() {
@@ -10106,7 +10286,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "${1:-}" in
-  dashboard|overview|map|map-fast|mapfast|snapshot|snapshot-fast|snapshotfast|diff|state|state-fast|statefast|permissions|review|scan|system-data|system-data-fast|systemdata-fast|systemdatafast|plan|plan-fast|planfast|large|large-fast|largefast|brokenlinks|brokenlinks-fast|brokenlinksfast|broken-links-fast|broken-linksfast|quarantine|quarantine-fast|quarantinefast|metadata|metadata-fast|metadatafast|quicklook|quicklook-fast|quicklookfast|fontcaches|fontcaches-fast|fontcachesfast|font-caches|font-caches-fast|font-cachesfast|webcaches|webcaches-fast|webcachesfast|web-caches|web-caches-fast|web-cachesfast|savedstate|savedstate-fast|savedstatefast|saved-state|saved-state-fast|saved-statefast|projectcaches|project-caches|projectcaches-fast|projectcachesfast|project-caches-fast|project-cachesfast|developer-fast|developerfast|updaters|updaters-fast|updatersfast|updater-caches|updater-caches-fast|updater-cachesfast|browsercaches|browser-caches|browsercaches-fast|browsercachesfast|browser-caches-fast|browser-cachesfast|duplicates|duplicates-fast|duplicatesfast|documents|documents-fast|documentsfast|desktop|desktop-fast|desktopfast|screenshots|screenshots-fast|screenshotsfast|archives|archives-fast|archivesfast|downloads|downloads-fast|downloadsfast|installers|nodes|nodes-fast|nodesfast|venvs|venvs-fast|venvsfast|virtualenvs|virtualenvs-fast|virtualenvsfast|apps|apps-fast|appsfast|uninstallers|appreview|aitools|aitools-fast|aitoolsfast|ai-tools|ai|appdata|appdata-fast|appdatafast|libraries|libraries-fast|librariesfast|cloud|cloudfiles|cloudfiles-fast|cloudfilesfast|cloud-files|cloud-files-fast|cloud-filesfast|personal|communications|comms|browsers|leftovers|backups|backups-fast|backupsfast|xcode|xcode-fast|xcodefast|android|startup|startup-fast|startupfast|loginitems|loginitems-fast|loginitemsfast|trash|trash-fast|trashfast|caches|caches-instant|cachesinstant|caches-fast|cachesfast|diagnostics|packages|npm-cache|npmcache|yarn-cache|yarncache|pnpm-store|pnpmstore|cocoapods-cache|pod-cache|podcache|pip-cache|pipcache|receipts|homebrew|homebrew-cleanup|brewcleanup|toolchains|toolchains-fast|toolchainsfast|containers|containers-fast|containersfast|snapshots|report|report-fast|reportfast|clean|history|history-fast|historyfast|restore|interactive|doctor|doctor-fast|doctorfast|protect|protect-fast|protectfast|guard|rules|rules-fast|rulesfast|categories|init-config|help)
+  dashboard|overview|map|map-fast|mapfast|snapshot|snapshot-fast|snapshotfast|diff|state|state-fast|statefast|permissions|review|scan|system-data|system-data-fast|systemdata-fast|systemdatafast|plan|plan-fast|planfast|large|large-fast|largefast|brokenlinks|brokenlinks-fast|brokenlinksfast|broken-links-fast|broken-linksfast|quarantine|quarantine-fast|quarantinefast|metadata|metadata-fast|metadatafast|quicklook|quicklook-fast|quicklookfast|fontcaches|fontcaches-fast|fontcachesfast|font-caches|font-caches-fast|font-cachesfast|webcaches|webcaches-fast|webcachesfast|web-caches|web-caches-fast|web-cachesfast|savedstate|savedstate-fast|savedstatefast|saved-state|saved-state-fast|saved-statefast|projectcaches|project-caches|projectcaches-fast|projectcachesfast|project-caches-fast|project-cachesfast|developer-fast|developerfast|updaters|updaters-fast|updatersfast|updater-caches|updater-caches-fast|updater-cachesfast|browsercaches|browser-caches|browsercaches-fast|browsercachesfast|browser-caches-fast|browser-cachesfast|duplicates|duplicates-fast|duplicatesfast|documents|documents-fast|documentsfast|desktop|desktop-fast|desktopfast|screenshots|screenshots-fast|screenshotsfast|archives|archives-fast|archivesfast|downloads|downloads-fast|downloadsfast|installers|nodes|nodes-fast|nodesfast|venvs|venvs-fast|venvsfast|virtualenvs|virtualenvs-fast|virtualenvsfast|apps|apps-fast|appsfast|uninstallers|appreview|appreview-fast|appreviewfast|aitools|aitools-fast|aitoolsfast|ai-tools|ai|appdata|appdata-fast|appdatafast|libraries|libraries-fast|librariesfast|cloud|cloudfiles|cloudfiles-fast|cloudfilesfast|cloud-files|cloud-files-fast|cloud-filesfast|personal|communications|comms|browsers|leftovers|backups|backups-fast|backupsfast|xcode|xcode-fast|xcodefast|android|startup|startup-fast|startupfast|loginitems|loginitems-fast|loginitemsfast|trash|trash-fast|trashfast|caches|caches-instant|cachesinstant|caches-fast|cachesfast|diagnostics|packages|npm-cache|npmcache|yarn-cache|yarncache|pnpm-store|pnpmstore|cocoapods-cache|pod-cache|podcache|pip-cache|pipcache|receipts|homebrew|homebrew-cleanup|brewcleanup|toolchains|toolchains-fast|toolchainsfast|containers|containers-fast|containersfast|snapshots|report|report-fast|reportfast|clean|history|history-fast|historyfast|restore|interactive|doctor|doctor-fast|doctorfast|protect|protect-fast|protectfast|guard|rules|rules-fast|rulesfast|categories|init-config|help)
     ACTION="$1"
     shift
     ;;
@@ -10204,7 +10384,7 @@ while [[ "$#" -gt 0 ]]; do
     -h|--help) usage; exit 0 ;;
     -v|--version) echo "$VERSION"; exit 0 ;;
     *)
-      if [[ "$ACTION" == "guard" || "$ACTION" == "diff" || "$ACTION" == "large" || "$ACTION" == "large-fast" || "$ACTION" == "largefast" || "$ACTION" == "brokenlinks" || "$ACTION" == "brokenlinks-fast" || "$ACTION" == "brokenlinksfast" || "$ACTION" == "broken-links-fast" || "$ACTION" == "broken-linksfast" || "$ACTION" == "quarantine" || "$ACTION" == "quarantine-fast" || "$ACTION" == "quarantinefast" || "$ACTION" == "metadata" || "$ACTION" == "metadata-fast" || "$ACTION" == "metadatafast" || "$ACTION" == "projectcaches" || "$ACTION" == "project-caches" || "$ACTION" == "projectcaches-fast" || "$ACTION" == "projectcachesfast" || "$ACTION" == "project-caches-fast" || "$ACTION" == "project-cachesfast" || "$ACTION" == "developer-fast" || "$ACTION" == "developerfast" || "$ACTION" == "duplicates" || "$ACTION" == "duplicates-fast" || "$ACTION" == "duplicatesfast" || "$ACTION" == "documents" || "$ACTION" == "documents-fast" || "$ACTION" == "documentsfast" || "$ACTION" == "desktop-fast" || "$ACTION" == "desktopfast" || "$ACTION" == "screenshots" || "$ACTION" == "screenshots-fast" || "$ACTION" == "screenshotsfast" || "$ACTION" == "archives" || "$ACTION" == "archives-fast" || "$ACTION" == "archivesfast" || "$ACTION" == "nodes" || "$ACTION" == "nodes-fast" || "$ACTION" == "nodesfast" || "$ACTION" == "venvs" || "$ACTION" == "venvs-fast" || "$ACTION" == "venvsfast" || "$ACTION" == "virtualenvs" || "$ACTION" == "virtualenvs-fast" || "$ACTION" == "virtualenvsfast" || "$ACTION" == "apps" || "$ACTION" == "apps-fast" || "$ACTION" == "appsfast" || "$ACTION" == "uninstallers" || "$ACTION" == "appreview" || "$ACTION" == "cloudfiles" || "$ACTION" == "cloudfiles-fast" || "$ACTION" == "cloudfilesfast" || "$ACTION" == "cloud-files" || "$ACTION" == "cloud-files-fast" || "$ACTION" == "cloud-filesfast" || "$ACTION" == "leftovers" ]]; then
+      if [[ "$ACTION" == "guard" || "$ACTION" == "diff" || "$ACTION" == "large" || "$ACTION" == "large-fast" || "$ACTION" == "largefast" || "$ACTION" == "brokenlinks" || "$ACTION" == "brokenlinks-fast" || "$ACTION" == "brokenlinksfast" || "$ACTION" == "broken-links-fast" || "$ACTION" == "broken-linksfast" || "$ACTION" == "quarantine" || "$ACTION" == "quarantine-fast" || "$ACTION" == "quarantinefast" || "$ACTION" == "metadata" || "$ACTION" == "metadata-fast" || "$ACTION" == "metadatafast" || "$ACTION" == "projectcaches" || "$ACTION" == "project-caches" || "$ACTION" == "projectcaches-fast" || "$ACTION" == "projectcachesfast" || "$ACTION" == "project-caches-fast" || "$ACTION" == "project-cachesfast" || "$ACTION" == "developer-fast" || "$ACTION" == "developerfast" || "$ACTION" == "duplicates" || "$ACTION" == "duplicates-fast" || "$ACTION" == "duplicatesfast" || "$ACTION" == "documents" || "$ACTION" == "documents-fast" || "$ACTION" == "documentsfast" || "$ACTION" == "desktop-fast" || "$ACTION" == "desktopfast" || "$ACTION" == "screenshots" || "$ACTION" == "screenshots-fast" || "$ACTION" == "screenshotsfast" || "$ACTION" == "archives" || "$ACTION" == "archives-fast" || "$ACTION" == "archivesfast" || "$ACTION" == "nodes" || "$ACTION" == "nodes-fast" || "$ACTION" == "nodesfast" || "$ACTION" == "venvs" || "$ACTION" == "venvs-fast" || "$ACTION" == "venvsfast" || "$ACTION" == "virtualenvs" || "$ACTION" == "virtualenvs-fast" || "$ACTION" == "virtualenvsfast" || "$ACTION" == "apps" || "$ACTION" == "apps-fast" || "$ACTION" == "appsfast" || "$ACTION" == "uninstallers" || "$ACTION" == "appreview" || "$ACTION" == "appreview-fast" || "$ACTION" == "appreviewfast" || "$ACTION" == "cloudfiles" || "$ACTION" == "cloudfiles-fast" || "$ACTION" == "cloudfilesfast" || "$ACTION" == "cloud-files" || "$ACTION" == "cloud-files-fast" || "$ACTION" == "cloud-filesfast" || "$ACTION" == "leftovers" ]]; then
         PATH_ARGS+=("$1")
       else
         die "Unknown option: $1"
@@ -10275,6 +10455,7 @@ case "$ACTION" in
   apps-fast|appsfast) apps_fast ;;
   uninstallers) uninstallers ;;
   appreview) appreview ;;
+  appreview-fast|appreviewfast) appreview_fast ;;
   aitools|ai-tools|ai) aitools ;;
   aitools-fast|aitoolsfast) aitools_fast ;;
   appdata) appdata ;;

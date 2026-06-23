@@ -379,6 +379,7 @@ Review an app before removal:
 ```sh
 cleanroom appreview adobe
 cleanroom appreview zoom --json
+cleanroom appreview-fast adobe --json
 ```
 
 Review AI tool storage:
@@ -955,7 +956,7 @@ Config files use simple `key=value` lines and are never executed as shell.
 
 `uninstallers` lists likely vendor uninstallers, remover apps, packages, and scripts from common application and Application Support locations, or a path you provide. It never runs or removes them; use these official tools before manual leftover cleanup.
 
-`appreview` combines matching app bundles, vendor uninstallers, package receipts, and leftover candidates into one read-only workflow. Use it before removing apps so official uninstallers and package records are visible before leftover cleanup.
+`appreview` combines matching app bundles, vendor uninstallers, package receipts, and leftover candidates into one read-only workflow. Use it before removing apps so official uninstallers and package records are visible before leftover cleanup. `appreview-fast` is the responsive desktop version: it skips deep folder sizing and points people to app bundles, uninstallers, receipts, and leftover folders quickly.
 
 `aitools` inventories known AI-agent generated state and local AI model stores. `aitools-fast` skips deep model sizing for responsive desktop reviews. Cleanup remains split into explicit opt-in flags: `--include-ai-workspaces` for generated workspace state and `--include-ai-models` for downloaded model stores/backends.
 
