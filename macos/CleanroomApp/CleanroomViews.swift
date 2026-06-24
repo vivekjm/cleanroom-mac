@@ -1722,7 +1722,7 @@ struct SidebarView: View {
                             NavRow("heart.text.square.fill",  "App Checkup", .run(.healthCheck), state)
                             NavRow("chart.bar.fill",          "Storage Overview", .run(.storageOverview), state)
                             NavRow("magnifyingglass",         "Analyze Storage", .dashboard, state, onTap: { state.refreshStats(force: true) })
-                            NavRow("text.badge.checkmark",    "Review",      .dashboard, state, onTap: { state.filter = "all"; state.refreshStats(force: true) })
+                            NavRow("text.badge.checkmark",    "Review",      .dashboard, state, onTap: { state.filter = "all"; state.refreshStats() })
                             NavRow("list.clipboard.fill",     "Clean Safely", .dashboard, state, onTap: { state.showApplyConfirm = true })
                         }
                         SidebarSection("FIND") {
