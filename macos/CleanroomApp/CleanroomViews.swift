@@ -116,7 +116,7 @@ struct AppAction: Hashable {
     static let screenshots = AppAction(title: "Screenshots", args: ["screenshots-fast", "--limit", "30", "--days", "7"])
     static let caches = AppAction(title: "Caches", args: ["caches-instant"])
     static let developerFiles = AppAction(title: "Developer Files", args: ["developer-fast", "--limit", "30", "--days", "30"])
-    static let previewCache = AppAction(title: "Preview Cache", args: ["quicklook-fast"])
+    static let previewCache = AppAction(title: "Quick Look Cache", args: ["quicklook-fast"])
     static let fontCache = AppAction(title: "Font Cache", args: ["fontcaches-fast"])
     static let webCache = AppAction(title: "Web Cache", args: ["webcaches-fast"])
     static let windowState = AppAction(title: "Window State", args: ["savedstate-fast"])
@@ -818,7 +818,7 @@ final class AppState: ObservableObject {
             return "Passwords, browser profiles, and personal app data stay protected."
         }
         if lower.contains("no files") || lower.contains("nothing") || lower.contains("empty") {
-            return "No files were changed."
+            return "Nothing was cleaned."
         }
         return sentence
     }
@@ -1455,7 +1455,7 @@ final class AppState: ObservableObject {
             "download-artifacts": "Old downloads",
             "screenshots": "Old screenshots",
             "metadata": "Finder clutter",
-            "quicklook": "Preview cache",
+            "quicklook": "Quick Look cache",
             "font-caches": "Font cache",
             "web-caches": "Web cache",
             "saved-state": "Window state",
@@ -1743,7 +1743,7 @@ struct SidebarView: View {
                             NavRow("archivebox.fill",         "Archives",    .run(.archives), state)
                             NavRow("camera.viewfinder",       "Screenshots", .run(.screenshots), state)
                             NavRow("xmark.bin.fill",          "Caches",      .run(.caches), state)
-                            NavRow("eye.fill",                "Preview Cache", .run(.previewCache), state)
+                            NavRow("eye.fill",                "Quick Look Cache", .run(.previewCache), state)
                             NavRow("textformat",              "Font Cache", .run(.fontCache), state)
                             NavRow("safari.fill",             "Web Cache",  .run(.webCache), state)
                             NavRow("rectangle.stack.fill",    "Window State", .run(.windowState), state)
