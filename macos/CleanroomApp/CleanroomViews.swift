@@ -710,12 +710,12 @@ final class AppState: ObservableObject {
               let parsed = try? JSONSerialization.jsonObject(with: data),
               let items = Self.jsonItems(from: parsed) else {
             let items = Self.textReviewItems(title: title, details: details)
-            let safeSuffix = action.args.contains("--apply") ? "" : " No files were changed."
+            let reviewOnlySuffix = action.args.contains("--apply") ? "" : " Nothing was cleaned."
             if items.isEmpty {
-                return PresentableReview(summary: "\(title) finished.\(safeSuffix)\n", items: [])
+                return PresentableReview(summary: "\(title) finished.\(reviewOnlySuffix)\n", items: [])
             }
             return PresentableReview(
-                summary: "\(title) finished with \(items.count) \(items.count == 1 ? "note" : "notes").\(safeSuffix)\n",
+                summary: "\(title) finished with \(items.count) \(items.count == 1 ? "note" : "notes").\(reviewOnlySuffix)\n",
                 items: items
             )
         }
@@ -2456,7 +2456,7 @@ struct LeftoversSheet: View {
                 Text("Find App Leftovers")
                     .font(DS.T.h2)
                     .foregroundColor(DS.C.textPrimary)
-                Text("Enter an app or vendor name to preview matching files before cleaning anything.")
+                Text("Enter an app or vendor name to review matching files before cleaning anything.")
                     .font(DS.T.body)
                     .foregroundColor(DS.C.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
