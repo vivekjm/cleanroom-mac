@@ -102,7 +102,7 @@ enum DS {
         static let textSecondary = Color(hex: "#475569")
         /// Muted — placeholder, disabled text
         static let textMuted     = Color(hex: "#94A3B8")
-        /// On-dark text — used on sidebarBg / activity details background
+        /// On-dark text — used on sidebarBg / report panel background
         static let textOnDark    = Color(hex: "#E8F5E8")
         static let textWhite     = Color.white
 

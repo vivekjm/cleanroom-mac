@@ -48,7 +48,7 @@ TYPOGRAPHY LOGIC
   Headlines          = semibold sans, 16–26px
   Body               = regular sans, 13px
   Labels             = all-caps, 10px, semibold, +0.6 letter-spacing
-  Activity details   = monospaced, 11–12px
+  Report rows        = compact sans, 12–16px
 
 INTERACTION LOGIC
   Hover              = scale(1.012–1.04) on cards; subtle bg tint on rows
@@ -71,7 +71,7 @@ All tokens live in `macos/CleanroomApp/DesignSystem.swift` under the `DS` namesp
 | `surfaceMint` | `#E8F5E8` | Header stats + filter bar surface |
 | `surfaceRaised` | `#F0FAF0` | Hover state on mint surface |
 | `sidebarBg` | `#0F1A0F` | Sidebar background |
-| `terminalBg` | `#0B160B` | Activity details panel background |
+| `summaryBg` | `#0B160B` | Collapsible report panel background |
 | `brandPurple` | `#7C3AED` | Brand anchor colour |
 | `brandLavender` | `#A78BFA` | Interactive / icon on dark |
 | `ctaOrange` | `#F59E0B` | Primary CTA, active filter chip |
@@ -87,7 +87,7 @@ All tokens live in `macos/CleanroomApp/DesignSystem.swift` under the `DS` namesp
 | `textPrimary` | `#0D1A0D` | Main text (green-tinted near-black) |
 | `textSecondary` | `#475569` | Secondary / label text |
 | `textMuted` | `#94A3B8` | Placeholder / disabled |
-| `textOnDark` | `#E8F5E8` | Text on sidebar / activity details |
+| `textOnDark` | `#E8F5E8` | Text on sidebar / report panel |
 | `positive` | `#22C55E` | Up-trend indicator |
 | `negative` | `#EF4444` | Down-trend indicator |
 | `divider` | `rgba(0,0,0,0.07)` | Divider on light surfaces |
@@ -106,8 +106,8 @@ All tokens live in `macos/CleanroomApp/DesignSystem.swift` under the `DS` namesp
 | `bodySm` | 12px | Regular | Default | Secondary body |
 | `label` | 12px | Medium | Default | Labels |
 | `tag` | 10px | Semibold | Default | All-caps micro labels; use with `.kerning(0.6)` |
-| `mono` | 12px | Regular | Monospaced | Activity details |
-| `monoSm` | 11px | Regular | Monospaced | Status bar text |
+| `mono` | 12px | Regular | Monospaced | Reserved for diagnostics, not primary app UI |
+| `monoSm` | 11px | Regular | Monospaced | Reserved for diagnostics, not primary app UI |
 
 ### Spacing Tokens (`DS.Sp`)
 
@@ -233,20 +233,21 @@ Structure (top → bottom):
   4. 1px rule        — divider colour (KEY visual — horizontal rule under each stat)
 ```
 
-### OutputPanel
-Dark-forest activity details panel, collapsible.
+### ReportPanel
+Dark-forest review report panel, collapsible.
 
 ```
 Chrome bar (always visible):
   • 7px status dot — orange (running) / green (idle)
-  • Monospaced status text
-  • Three icon buttons: Copy Apply, Clear, Collapse/Expand
+  • Human-readable status text
+  • Stop button while running
+  • Copy/Clear/Collapse controls only after a report exists
 
-Output area (collapsible, 240px):
-  • Background: terminalBg (#0B160B)
-  • Font: mono 12px, textOnDark × 0.88
-  • Text selection enabled
-  • Auto-scrolls to bottom on output change
+Report area (collapsible, 240px):
+  • Background: summaryBg (#0B160B)
+  • Structured rows with size, badge, title, and plain-language detail
+  • No raw commands, flags, file-system internals, or terminal transcript
+  • Opens automatically only when a review needs attention or was stopped
 ```
 
 ### SidebarSection
@@ -269,12 +270,12 @@ Groups nav items with an all-caps 10px header label.
 ### Running state
 - Status dot pulses between `ctaOrange` (running) and `positive` (done).
 - Sidebar shows a small circular `ProgressView` tinted `brandLavender`.
-- Output panel opens automatically when a command finishes.
+- Report panel opens automatically when a review needs attention, times out, or is stopped.
 
 ### Keyboard / Trackpad
 - All buttons respond to Enter/Space.
 - `ScrollView` areas support two-finger trackpad scroll.
-- The output panel is text-selectable for copy-paste.
+- Report copy is available only after a report exists and copies app-facing rows, not raw process text.
 
 ---
 
@@ -285,7 +286,7 @@ Groups nav items with an all-caps 10px header label.
 | Filter chip selection | `DS.Ani.snap` — instant-feeling, 0.13s |
 | Nav row selection | `DS.Ani.snap` |
 | Card hover scale | `DS.Ani.spring` (response 0.32, damping 0.72) |
-| Output panel open/close | `DS.Ani.std` — 0.22s easeInOut |
+| Report panel open/close | `DS.Ani.std` — 0.22s easeInOut |
 | Category-filter transition | `DS.Ani.snap` (LazyVGrid reflows) |
 
 **Principle**: Micro-interactions are instant (`snap`). Structural changes are smooth (`std`). Physical interactions are spring-based.
@@ -295,7 +296,7 @@ Groups nav items with an all-caps 10px header label.
 ## 8. Accessibility Standards
 
 - All interactive elements have `.plain` button style for proper focus ring support.
-- Text is `.textSelection(.enabled)` in the output panel for keyboard copy.
+- Report rows must remain readable with keyboard focus and copy actions.
 - Colour is **never the only differentiator** — icons, labels, and shapes accompany every colour signal.
 - Status dot uses shape (circle) + colour (orange vs green) together.
 - Trend badges use directional arrows + colour together.
@@ -330,9 +331,9 @@ Groups nav items with an all-caps 10px header label.
 │ ██████                       │  │ [Inspect→│  │ [Inspect→│  │ [Inspect→│  │
 │ ██████  SYSTEM               │  └──────────┘  └──────────┘  └──────────┘  │
 │ ██████  ○ Xcode              │                                              │
-│ ██████  ○ Backups            │  ● Ready     [Copy Details][Clear]  [∨]      │
-│ ██████  ○ System Data        │  Ready                                      │
-│ ██████                       │  → /Library/Caches: 2.3 GB                  │
+│ ██████  ○ Backups            │  ● Ready                         [∨]        │
+│ ██████  ○ System Data        │  Caches found 4 review items.              │
+│ ██████                       │  2.3 GB  App cache  Rebuildable             │
 │ ██████  Protected mode       │                                              │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -354,7 +355,7 @@ macos/CleanroomApp/
 ├── DesignSystem.swift     ← All DS tokens (Color, Typography, Spacing, Radius,
 │                             Shadow, Animation, Layout)
 ├── CleanroomViews.swift   ← AppState observable + all SwiftUI views
-└── main.swift             ← 44-line AppKit entry point (NSHostingView wrapper)
+└── main.swift             ← AppKit entry point (NSHostingView container)
 ```
 
 ### Build
@@ -378,7 +379,7 @@ swiftc -O \
 
 ### Populating Stats
 
-Storage measurement is intentionally user-triggered because deep scans can be expensive on large Macs. Top-level app refreshes use the fast dashboard summary; detailed reports remain deliberate user actions and expose a Stop control while running. After refreshing the storage summary, parse the output and update `state.stats`:
+Storage measurement is intentionally user-triggered because deep scans can be expensive on large Macs. Top-level app refreshes use the fast dashboard summary; detailed reports remain deliberate user actions and expose a Stop control while running. Parsing should happen off the main actor; the UI should receive prepared app-facing stats and rows:
 
 ```swift
 // Example: update after overview runs
