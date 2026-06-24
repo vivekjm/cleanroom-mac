@@ -140,12 +140,12 @@ struct AppAction: Hashable {
     static let startup = AppAction(title: "Startup Items", args: ["startup-fast"])
     static let storageRecord = AppAction(title: "Storage Snapshot", args: ["snapshot-fast"])
     static let restoreHistory = AppAction(title: "Restore History", args: ["state-fast"])
-    static let safetyCheck = AppAction(title: "Cleanup Preview", args: ["clean", "--preset", "dev", "--preflight"])
+    static let safetyCheck = AppAction(title: "Cleanup Plan", args: ["clean", "--preset", "dev", "--preflight"])
     static let privacyReport = AppAction(title: "Privacy Summary", args: ["report-fast", "--redact"])
     static let pastCleanups = AppAction(title: "Recent Cleanups", args: ["history-fast"])
     static let protectedItems = AppAction(title: "Protected Data", args: ["protect-fast"])
     static let safetyPolicy = AppAction(title: "Safety Rules", args: ["rules-fast"])
-    static let safetyPlan = AppAction(title: "Cleaning Preview", args: ["clean", "--preflight"])
+    static let safetyPlan = AppAction(title: "Cleaning Plan", args: ["clean", "--preflight"])
     static let safeCleanup = AppAction(title: "Safe Cleanup", args: ["clean", "--apply", "--trash", "--yes"])
 
     static func appReview(query: String) -> AppAction {
@@ -1767,7 +1767,7 @@ struct SidebarView: View {
                         SidebarSection("SAFETY") {
                             NavRow("camera.fill",             "Storage Snapshot", .run(.storageRecord), state)
                             NavRow("clock.badge.checkmark.fill", "Restore History", .run(.restoreHistory), state)
-                            NavRow("checkmark.shield.fill",   "Cleanup Preview", .run(.safetyCheck), state)
+                            NavRow("checkmark.shield.fill",   "Cleanup Plan", .run(.safetyCheck), state)
                             NavRow("doc.text.fill",           "Privacy Summary", .run(.privacyReport), state)
                             NavRow("clock.fill",              "Recent Cleanups", .run(.pastCleanups), state)
                             NavRow("shield.fill",             "Protected Data", .run(.protectedItems), state)
@@ -2604,7 +2604,7 @@ struct ApplyConfirmSheet: View {
                     .buttonStyle(.plain)
                     .foregroundColor(DS.C.textSecondary)
                 Spacer()
-                PillBtn("Preview", style: .ghost) {
+                PillBtn("Review Plan", style: .ghost) {
                     if !state.running && !state.statsLoading {
                         state.openReview(.safetyPlan)
                         dismiss()
