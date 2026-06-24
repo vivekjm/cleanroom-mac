@@ -605,6 +605,7 @@ final class AppState: ObservableObject {
         clearReviewCache()
         statsGeneration = UUID()
         statsLoading = false
+        lastStatsRefresh = nil
         cleanupPlanCache = nil
         cleanupPlanGeneration = UUID()
         cleanupPlanLoading = false
