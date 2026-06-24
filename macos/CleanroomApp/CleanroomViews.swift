@@ -86,6 +86,13 @@ private struct CachedCleanupPlan {
     var ttl: TimeInterval
 }
 
+private struct DashboardUpdate {
+    var diskUsed: String?
+    var reclaimable: String?
+    var protected: String?
+    var categoryResults: [String: String]
+}
+
 private struct PresentableReview {
     var summary: String
     var items: [ReviewItem]
@@ -277,10 +284,11 @@ final class AppState: ObservableObject {
         let command = resolvedCommand(["dashboard", "--json"])
         Task.detached(priority: .background) {
             let result = await Self.exec(command.executable, command.arguments, timeoutSeconds: AppRunLimit.quickSummary)
+            let update = Self.dashboardUpdate(from: result.output)
             await MainActor.run {
                 guard self.statsGeneration == generation else { return }
                 if result.status == 0 {
-                    self.parseStats(result.output)
+                    self.applyDashboardUpdate(update)
                     self.status = "Storage analysis updated"
                     self.activityMessage = "Storage analysis updated. No files were changed."
                 } else {
@@ -326,11 +334,32 @@ final class AppState: ObservableObject {
         }
     }
 
-    private func parseStats(_ raw: String) {
-        if parseStatsJSON(raw) {
-            return
+    private func applyDashboardUpdate(_ update: DashboardUpdate) {
+        stats[3].value = scanTimeFormatter.string(from: Date())
+        if let diskUsed = update.diskUsed {
+            stats[0].value = diskUsed
         }
-        // Best-effort: scan for recognisable patterns in JSON output.
+        if let reclaimable = update.reclaimable {
+            stats[1].value = reclaimable
+        }
+        if let protected = update.protected {
+            stats[2].value = protected
+        }
+        guard !update.categoryResults.isEmpty else { return }
+        categories = categories.map { category in
+            var updated = category
+            if let value = update.categoryResults[category.title] {
+                updated.result = value
+            }
+            return updated
+        }
+    }
+
+    nonisolated private static func dashboardUpdate(from raw: String) -> DashboardUpdate {
+        if let update = Self.dashboardUpdateFromJSON(raw) {
+            return update
+        }
+        var update = DashboardUpdate(diskUsed: nil, reclaimable: nil, protected: nil, categoryResults: [:])
         func grab(_ key: String) -> String? {
             let patterns = ["\"\(key)\"\\s*:\\s*\"([^\"]+)\"",
                             "\"\(key)\"\\s*:\\s*([0-9.]+[KMGT]?B?)"]
@@ -342,66 +371,58 @@ final class AppState: ObservableObject {
             }
             return nil
         }
-        // Update Last Scan timestamp regardless
-        stats[3].value = scanTimeFormatter.string(from: Date())
 
         if let used = grab("used_kb") ?? grab("disk_used") ?? grab("total_used") {
-            stats[0].value = Self.formatKBString(used)
+            update.diskUsed = Self.formatKBString(used)
         }
         if let rec = grab("estimate") ?? grab("reclaimable") ?? grab("recoverable") {
-            stats[1].value = rec
+            update.reclaimable = rec
         }
         if let protected = grab("protected_present") {
-            stats[2].value = protected
+            update.protected = protected
         }
+        return update
     }
 
-    private func parseStatsJSON(_ raw: String) -> Bool {
+    nonisolated private static func dashboardUpdateFromJSON(_ raw: String) -> DashboardUpdate? {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let data = trimmed.data(using: .utf8),
               let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            return false
+            return nil
         }
 
-        stats[3].value = scanTimeFormatter.string(from: Date())
-
+        var update = DashboardUpdate(diskUsed: nil, reclaimable: nil, protected: nil, categoryResults: [:])
         if let usedKB = Self.numberValue(object["used_kb"]) {
-            stats[0].value = Self.formatKBString(String(usedKB))
+            update.diskUsed = Self.formatKBString(String(usedKB))
         } else if let used = Self.stringValue(object["used"]) ?? Self.stringValue(object["disk_used"]) {
-            stats[0].value = used
+            update.diskUsed = used
         }
 
         if let summary = object["summary"] as? [String: Any] {
             if let reclaimable = Self.stringValue(summary["reclaimable"]) {
-                stats[1].value = reclaimable
+                update.reclaimable = reclaimable
             }
             if let protected = Self.numberValue(summary["protected_present"]) {
-                stats[2].value = "\(protected) guarded"
+                update.protected = "\(protected) guarded"
             } else if let protected = Self.stringValue(summary["protected_present"]) {
-                stats[2].value = protected
+                update.protected = protected
             }
         }
 
         if let cards = object["cards"] as? [[String: Any]] {
-            applyDashboardCards(cards)
+            update.categoryResults = Self.dashboardCategoryResults(from: cards)
         }
-        return true
+        return update
     }
 
-    private func applyDashboardCards(_ cards: [[String: Any]]) {
-        var valuesByTitle: [String: String] = [:]
+    nonisolated private static func dashboardCategoryResults(from cards: [[String: Any]]) -> [String: String] {
+        var results: [String: String] = [:]
         for card in cards {
             guard let title = Self.stringValue(card["title"]),
                   let value = Self.stringValue(card["value"]) else { continue }
-            valuesByTitle[title] = value
+            results[title] = value
         }
-        categories = categories.map { category in
-            var updated = category
-            if let value = valuesByTitle[category.title] {
-                updated.result = value
-            }
-            return updated
-        }
+        return results
     }
 
     nonisolated private static func numberValue(_ value: Any?) -> Int? {
