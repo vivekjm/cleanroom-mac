@@ -272,9 +272,6 @@ final class AppState: ObservableObject {
             activityMessage = "Storage analysis is already updating."
             return
         }
-        if force {
-            clearRecentResults()
-        }
         if !force,
            let lastStatsRefresh,
            Date().timeIntervalSince(lastStatsRefresh) < 30 {
