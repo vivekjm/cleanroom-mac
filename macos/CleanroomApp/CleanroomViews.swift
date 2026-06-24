@@ -295,11 +295,15 @@ final class AppState: ObservableObject {
                 guard self.statsGeneration == generation else { return }
                 if result.status == 0 {
                     self.applyDashboardUpdate(update)
-                    self.status = "Storage analysis updated"
-                    self.activityMessage = "Storage analysis updated. No files were changed."
+                    if !self.running {
+                        self.status = "Storage analysis updated"
+                        self.activityMessage = "Storage analysis updated. Nothing was cleaned."
+                    }
                 } else {
-                    self.status = "Storage analysis needs attention"
-                    self.activityMessage = "Storage analysis could not be updated. Try again or run App Checkup."
+                    if !self.running {
+                        self.status = "Storage analysis needs attention"
+                        self.activityMessage = "Storage analysis could not be updated. Try again or run App Checkup."
+                    }
                 }
                 self.statsLoading = false
             }
@@ -455,13 +459,14 @@ final class AppState: ObservableObject {
     }
 
     func openReview(_ action: AppAction) {
-        if running || statsLoading { return }
+        if running { return }
         dest = .run(action)
         run(action)
     }
 
     func run(_ action: AppAction) {
-        guard !running, !statsLoading else { return }
+        guard !running else { return }
+        if statsLoading && action == .safeCleanup { return }
         if let cached = cachedReview(for: action) {
             dest = .run(action)
             reviewTitle = cached.title
@@ -1830,7 +1835,7 @@ struct NavRow: View {
 
     var isActive: Bool { state.dest == nav && onTap == nil }
     var isDisabled: Bool {
-        if state.running || state.statsLoading {
+        if state.running || (state.statsLoading && onTap != nil) {
             if onTap != nil { return true }
             if case .run = nav { return true }
         }
@@ -1934,7 +1939,7 @@ struct HeaderStats: View {
                 Spacer()
                 // Navigation arrows — key visual from reference images 1 & 4
                 HStack(spacing: DS.Sp.sm) {
-                    NavArrow(icon: "arrow.left", disabled: state.running || state.statsLoading) { state.openReview(.pastCleanups) }
+                    NavArrow(icon: "arrow.left", disabled: state.running) { state.openReview(.pastCleanups) }
                     NavArrow(icon: "arrow.right", disabled: state.running || state.statsLoading) { state.showApplyConfirm = true }
                 }
             }
@@ -2155,8 +2160,8 @@ struct CategoryCardView: View {
                     .background(Capsule().fill(Color.white))
                 }
                 .buttonStyle(.plain)
-                .disabled(state.running || state.statsLoading)
-                .opacity((state.running || state.statsLoading) ? 0.42 : 1)
+                .disabled(state.running)
+                .opacity(state.running ? 0.42 : 1)
                 .scaleEffect(hovered ? 1.04 : 1.0)
                 .animation(DS.Ani.spring, value: hovered)
                 Spacer()
@@ -2605,13 +2610,13 @@ struct ApplyConfirmSheet: View {
                     .foregroundColor(DS.C.textSecondary)
                 Spacer()
                 PillBtn("Review Plan", style: .ghost) {
-                    if !state.running && !state.statsLoading {
+                    if !state.running {
                         state.openReview(.safetyPlan)
                         dismiss()
                     }
                 }
-                .disabled(state.running || state.statsLoading)
-                .opacity((state.running || state.statsLoading) ? 0.42 : 1)
+                .disabled(state.running)
+                .opacity(state.running ? 0.42 : 1)
                 PillBtn("Clean Now", style: .primary) {
                     if !state.running && !state.statsLoading {
                         state.run(.safeCleanup)
