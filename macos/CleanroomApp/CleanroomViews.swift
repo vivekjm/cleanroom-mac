@@ -226,7 +226,7 @@ final class AppState: ObservableObject {
     private var reviewCache: [String: CachedReview] = [:]
     private var cleanupPlanCache: CachedCleanupPlan? = nil
     private var cleanupPlanGeneration = UUID()
-    private let reviewCacheTTL: TimeInterval = 120
+    private let reviewCacheTTL: TimeInterval = 300
     private let fallbackCacheTTL: TimeInterval = 30
     private let scanTimeFormatter: DateFormatter = {
         let formatter = DateFormatter()
