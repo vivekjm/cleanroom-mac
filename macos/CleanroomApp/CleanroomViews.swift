@@ -680,14 +680,14 @@ final class AppState: ObservableObject {
     private func summarizeAction(action: AppAction, details: String, items: [ReviewItem]) -> String {
         let changedFiles = action.args.contains("--apply")
         let title = action.title
-        let noChangeText = changedFiles ? "" : " No files were changed."
+        let reviewOnlyText = changedFiles ? "" : " Nothing was cleaned."
         let lowerDetails = details.lowercased()
 
         if lowerDetails.contains("trash is empty") {
-            return "Trash is empty. No files were changed."
+            return "Trash is empty. Nothing was cleaned."
         }
         if lowerDetails.contains("nothing to clean") || lowerDetails.contains("no matches") || lowerDetails.contains("no files found") {
-            return "\(title) found nothing that needs attention.\(noChangeText)"
+            return "\(title) found nothing that needs attention.\(reviewOnlyText)"
         }
         if changedFiles {
             return "\(title) finished. Items were moved to Trash where possible."
@@ -695,11 +695,11 @@ final class AppState: ObservableObject {
 
         if items.count == 1 {
             let size = items[0].size
-            return "\(title) found 1 review item, starting at \(size). No files were changed."
+            return "\(title) found 1 item to review, starting at \(size). Nothing was cleaned."
         }
         if items.count > 1 {
             let size = items[0].size
-            return "\(title) found \(items.count) review items, largest starts at \(size). No files were changed."
+            return "\(title) found \(items.count) items to review; largest starts at \(size). Nothing was cleaned."
         }
         return "\(title) finished. Open the report if you need more context."
     }
@@ -920,12 +920,12 @@ final class AppState: ObservableObject {
 
         let apply = (object["apply"] as? Bool) == true
         items.insert([
-            "title": apply ? "Ready to Clean" : "Preview Only",
-            "size": apply ? "Ready" : "Preview",
+            "title": apply ? "Ready to Clean" : "Review Plan",
+            "size": apply ? "Ready" : "Plan",
             "status": apply ? "Review" : "Protected",
             "summary": apply
                 ? "Cleaning will only start after confirmation."
-                : "No files are changed in this preview."
+                : "This plan does not change files."
         ], at: 0)
 
         return items
