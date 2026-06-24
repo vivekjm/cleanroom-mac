@@ -234,6 +234,12 @@ final class AppState: ObservableObject {
         return formatter
     }()
 
+    var hasReportContent: Bool {
+        !reviewItems.isEmpty ||
+            reviewTitle != "Review Report" ||
+            !reviewSummary.localizedCaseInsensitiveContains("Choose a review to see the report here")
+    }
+
     func resolveEngine() {
         if let r = Bundle.main.resourceURL {
             let b = r.appendingPathComponent("bin/cleanroom").path
@@ -462,7 +468,7 @@ final class AppState: ObservableObject {
             reviewSummary = cached.summary
             reviewItems = cached.items
             status = "\(action.title) ready"
-            activityMessage = "Showing a recent \(action.title) review. Analyze Storage clears recent reviews."
+            activityMessage = "Showing a recent \(action.title) review."
             summaryOpen = false
             return
         }
@@ -601,6 +607,7 @@ final class AppState: ObservableObject {
     }
 
     func copyDetails() {
+        guard hasReportContent else { return }
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(appFacingSummaryText(), forType: .string)
         status = "Report copied"
@@ -608,6 +615,7 @@ final class AppState: ObservableObject {
     }
 
     func clearSummary() {
+        guard hasReportContent else { return }
         reviewSummary = "Choose a review to see the report here.\n"
         reviewTitle = "Review Report"
         reviewItems = []
@@ -2223,7 +2231,7 @@ struct ReviewSummaryPanel: View {
                         state.cancelRun()
                     }
                     .help("Stop current review")
-                } else {
+                } else if state.hasReportContent {
                     IconBtn(icon: "doc.on.clipboard", dark: true) {
                         state.copyDetails()
                     }
