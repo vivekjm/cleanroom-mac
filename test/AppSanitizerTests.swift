@@ -82,6 +82,9 @@ struct AppSanitizerTests {
         expect(folderAction.expandedReviewLimitForTesting().args == ["documents-fast", "/Users/example/Documents/media-project", "--limit", "120"], "show more should expand an existing review limit")
         let unboundedAction = AppAction(title: "Custom Review", args: ["documents-fast", "/Users/example/Documents/media-project"])
         expect(unboundedAction.expandedReviewLimitForTesting().args == ["documents-fast", "/Users/example/Documents/media-project", "--limit", "120"], "show more should add a useful limit when one is missing")
+        expect(AppState.shouldOpenReviewDetailsForTesting(itemCount: 2, status: 0), "successful reviews with rows should open the file list")
+        expect(!AppState.shouldOpenReviewDetailsForTesting(itemCount: 0, status: 0), "successful empty reviews should not force-open details")
+        expect(AppState.shouldOpenReviewDetailsForTesting(itemCount: 0, status: 1), "failed reviews should open details")
 
         let home = "/Users/example"
         let documentFile = ReviewItem(

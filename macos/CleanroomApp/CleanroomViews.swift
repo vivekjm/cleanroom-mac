@@ -517,7 +517,7 @@ final class AppState: ObservableObject {
             reviewItems = cached.items
             status = "\(action.title) ready"
             activityMessage = "Showing a recent \(action.title) review."
-            summaryOpen = false
+            summaryOpen = Self.shouldOpenReviewDetailsForTesting(itemCount: cached.items.count, status: 0)
             return
         }
         let runID = UUID()
@@ -559,7 +559,7 @@ final class AppState: ObservableObject {
                 } else if result.status == 0 {
                     self.status = "\(action.title) complete"
                     self.activityMessage = self.summarizeAction(action: action, details: presented.summary, items: presented.items)
-                    self.summaryOpen = false
+                    self.summaryOpen = Self.shouldOpenReviewDetailsForTesting(itemCount: presented.items.count, status: result.status)
                     self.storeCachedReview(title: action.title, summary: presented.summary, items: self.reviewItems, for: action)
                 } else {
                     self.status = "\(action.title) needs attention"
@@ -1155,6 +1155,10 @@ final class AppState: ObservableObject {
 
     nonisolated static func reviewItemsForTesting(_ items: [[String: Any]]) -> [ReviewItem] {
         Self.appFacingItems(items).map { Self.reviewItem(from: $0) }
+    }
+
+    nonisolated static func shouldOpenReviewDetailsForTesting(itemCount: Int, status: Int32) -> Bool {
+        itemCount > 0 || status != 0
     }
 
     nonisolated static func canMoveReviewItemToTrashForTesting(_ item: ReviewItem, homePath: String) -> Bool {
