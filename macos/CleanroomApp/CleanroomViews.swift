@@ -2370,6 +2370,13 @@ struct EmptyReportPanel: View {
 struct ReviewResultRow: View {
     let item: ReviewItem
 
+    private var visiblePath: String? {
+        guard let path = item.path else { return nil }
+        let shortened = shortPath(path)
+        guard !shortened.isEmpty, shortened != item.detail else { return nil }
+        return shortened
+    }
+
     var body: some View {
         HStack(alignment: .top, spacing: DS.Sp.md) {
             VStack(alignment: .leading, spacing: 3) {
@@ -2391,10 +2398,18 @@ struct ReviewResultRow: View {
                     .foregroundColor(DS.C.textOnDark.opacity(0.92))
                     .lineLimit(1)
                     .truncationMode(.middle)
+                if let visiblePath {
+                    Text(visiblePath)
+                        .font(DS.T.bodySm.monospaced())
+                        .foregroundColor(DS.C.textOnDark.opacity(0.72))
+                        .lineLimit(2)
+                        .textSelection(.enabled)
+                        .truncationMode(.middle)
+                }
                 Text(item.detail)
                     .font(DS.T.bodySm)
                     .foregroundColor(DS.C.textOnDark.opacity(0.66))
-                    .lineLimit(2)
+                    .lineLimit(visiblePath == nil ? 2 : 1)
                     .truncationMode(.middle)
                 if let hint = locationHint(for: item) {
                     Text(hint)
