@@ -1041,8 +1041,6 @@ final class AppState: ObservableObject {
     nonisolated private static func shouldHideAppField(_ key: String) -> Bool {
         let lower = key.lowercased()
         let pathFields: Set<String> = [
-            "path",
-            "paths",
             "record_path",
             "log_path",
             "plist",
