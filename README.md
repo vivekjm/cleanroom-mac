@@ -1,61 +1,28 @@
 # cleanroom
 
-`cleanroom` is a safe-by-default macOS storage cleaner for developers and power users.
+Cleanroom is a safe macOS storage cleaner.
 
-It scans the places that commonly bloat macOS storage, then cleans only rebuildable cache/artifact data unless you explicitly opt into heavier categories.
+It helps you find what is filling **Documents**, **Developer**, and **System Data**, then cleans rebuildable junk without touching personal data.
 
-## Why
+## What It Does
 
-macOS Storage often labels hidden user folders as **Documents** or **System Data**. In real machines this can include:
+- Lists large files and folders with sizes.
+- Reviews old downloads, archives, screenshots, app data, caches, developer files, AI tool data, containers, backups, and cloud-local files.
+- Cleans safe rebuildable clutter such as caches, logs, Quick Look thumbnails, metadata files, update caches, project caches, stale package folders, and old generated data.
+- Moves recoverable cleanup items to Trash when requested.
+- Keeps a local cleanup history so Trash-mode runs can be inspected and restored.
 
-- Xcode and simulator artifacts
-- Xcode Archives and DeviceSupport
-- Android SDK NDK/system images
-- npm, Yarn, pnpm, Gradle, CocoaPods stores
-- Homebrew caches, Cellar, Caskroom, logs, and service data
-- Go, Python, SwiftPM, Maven, Composer, Ruby, uv, and Poetry toolchain caches
-- iCloud Drive, CloudStorage, Dropbox, Google Drive, OneDrive, Box, and Syncthing footprint
-- Mail, Messages, Contacts, Calendars, Notes, Reminders, and Voice Memos footprint
-- Docker Desktop, Colima, Lima, and Podman container storage
-- old `node_modules`
-- stale Python virtualenv folders
-- Python/dev project caches such as `__pycache__`, pytest, mypy, ruff, tox, nox, and coverage artifacts
-- AI-agent recordings, scratch data, local memory, and generated workspaces
-- local AI model downloads and backends
-- Chrome/VS Code/Cursor cache folders
-- browser profile and cache footprint
-- Quick Look thumbnail and preview caches
-- large app support, container, and group-container folders
-- Photos, Music, TV, iMovie, GarageBand, and Logic library footprint
-- app leftovers after manual uninstalls
-- old logs, crash reports, and diagnostic reports
-- old downloaded installer files
-- `.DS_Store`, AppleDouble, and cross-platform filesystem metadata clutter
-- local iPhone and iPad backups
+## What It Protects
 
-`cleanroom` makes those visible and gives you a cautious way to clean them.
+Cleanroom does not delete these by default:
 
-## Safety Model
+- browser profiles, passwords, cookies, bookmarks, sessions, and Keychains
+- Photos, Music, TV, iMovie, GarageBand, and Logic libraries
+- Mail, Messages, Contacts, Calendars, Notes, Reminders, Voice Memos, and call history
+- iCloud Drive and cloud-sync roots such as Dropbox, Google Drive, OneDrive, Box, and Syncthing
+- arbitrary files in Documents, Desktop, and Downloads
 
-By default, `cleanroom` does **not** delete:
-
-- browser profiles
-- saved password databases
-- Keychains
-- bookmarks, cookies, or full app profile folders
-- Photos libraries
-- Music, TV, iMovie, GarageBand, and Logic libraries
-- Mail
-- Messages, Contacts, Calendars, Notes, Reminders, Voice Memos, or call history
-- iCloud Drive
-- cloud-sync folders such as Dropbox, Google Drive, OneDrive, Box, and Syncthing
-- arbitrary files in Documents/Desktop/Downloads
-
-The default `clean` action is also a dry-run. You must pass `--apply` to delete.
-
-For safer applied runs, pass `--trash` to move cleanroom-managed path removals into `~/.Trash/cleanroom-*` instead of deleting them immediately. Applied runs also write an audit log under `~/.local/state/cleanroom/runs/` by default.
-
-Trash-mode runs can be inspected with `cleanroom history` and restored with `cleanroom restore --log PATH`.
+Cleaning is review-first. The default cleanup preview does not delete anything. Use `--apply` to clean, and use `--trash` to move recoverable items to `~/.Trash/cleanroom-*`.
 
 ## Install
 
@@ -65,16 +32,24 @@ From this repo:
 ./install.sh
 ```
 
-This installs the `cleanroom` command, a `cleanroom(1)` man page, and zsh completions under `/usr/local` by default. Override `PREFIX` if you want a different location:
+Run the app locally:
+
+```sh
+make macos-app
+open dist/Cleanroom.app
+```
+
+Or use the command line directly:
+
+```sh
+./bin/cleanroom documents-fast --json
+./bin/cleanroom clean --preflight
+```
+
+Install somewhere else:
 
 ```sh
 PREFIX="$HOME/.local" ./install.sh
-```
-
-Or run directly:
-
-```sh
-./bin/cleanroom scan
 ```
 
 From a release archive:
@@ -85,47 +60,57 @@ cd cleanroom-*
 ./install.sh
 ```
 
-Homebrew formula metadata is generated for releases. After a GitHub release exists:
-
-```sh
-make homebrew-formula
-brew install ./dist/Formula/cleanroom.rb
-```
-
 Uninstall:
 
 ```sh
 ./uninstall.sh
 ```
 
-## Development
+## Common Tasks
 
-Run the smoke tests:
+List what is making Documents large:
+
+```sh
+cleanroom documents-fast
+cleanroom documents-fast --json
+```
+
+Review safe cleanup areas:
+
+```sh
+cleanroom clean --preflight
+```
+
+Clean safe rebuildable clutter, moving recoverable items to Trash:
+
+```sh
+cleanroom clean --apply --trash --yes
+```
+
+Find stale project packages:
+
+```sh
+cleanroom nodes-fast
+cleanroom venvs-fast
+```
+
+Review app leftovers after uninstalling an app:
+
+```sh
+cleanroom appreview "App Name"
+cleanroom leftovers "App Name"
+```
+
+## Development
 
 ```sh
 make test
-```
-
-Build a release archive:
-
-```sh
 make package
-```
-
-Build release archive plus Homebrew formula:
-
-```sh
 make homebrew-formula
-```
-
-Build the lightweight macOS app wrapper:
-
-```sh
 make macos-app
-open dist/Cleanroom.app
 ```
 
-The app wrapper is ad-hoc signed for local builds. It is not Developer ID notarized unless a maintainer signs and notarizes a release build.
+The local app build is ad-hoc signed. Release builds need maintainer signing and notarization.
 
 ## Usage
 

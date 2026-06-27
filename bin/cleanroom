@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.111.0"
+VERSION="1.112.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -3982,14 +3982,25 @@ documents() {
 
 documents_fast_rows() {
   local root="$1"
-  find "$root" -xdev -mindepth 1 -maxdepth 1 ! -name '.*' -print0 2>/dev/null |
-    while IFS= read -r -d '' path; do
-      if [[ -f "$path" ]]; then
-        printf '%012d\tfile\t%s\t%s\n' "$(file_size_kb "$path")" "$(document_guard_status "$path")" "$path"
-      else
-        printf '%012d\t%s\t%s\t%s\n' 0 "$(document_item_kind "$path")" "$(document_guard_status "$path")" "$path"
-      fi
-    done |
+  {
+    if command -v mdfind >/dev/null 2>&1; then
+      local min_bytes=$((MIN_MB * 1024 * 1024))
+      mdfind -onlyin "$root" "kMDItemFSSize > $min_bytes" 2>/dev/null |
+        while IFS= read -r path; do
+          [[ -f "$path" ]] || continue
+          printf '%012d\tlarge file\t%s\t%s\n' "$(file_size_kb "$path")" "$(document_guard_status "$path")" "$path"
+        done
+    fi
+    find "$root" -xdev -mindepth 1 -maxdepth 1 ! -name '.*' -print0 2>/dev/null |
+      while IFS= read -r -d '' path; do
+        if [[ -f "$path" ]]; then
+          printf '%012d\tfile\t%s\t%s\n' "$(file_size_kb "$path")" "$(document_guard_status "$path")" "$path"
+        else
+          printf '%012d\t%s\t%s\t%s\n' 0 "$(document_item_kind "$path")" "$(document_guard_status "$path")" "$path"
+        fi
+      done
+  } |
+    awk -F '\t' '!seen[$4]++' |
     sort -rn |
     head -n "$LIMIT" || true
 }
@@ -4019,9 +4030,9 @@ documents_fast() {
       [[ -z "${path:-}" ]] && continue
       kb_num="$(printf '%s\n' "$kb" | sed 's/^0*//; s/^$/0/')"
       name="$(basename "$path")"
-      if [[ "$kind" == "file" ]]; then
+      if [[ "$kind" == "file" || "$kind" == "large file" ]]; then
         size="$(human_kb "${kb:-0}")"
-        summary="Loose file $area_location. Review before deleting or moving."
+        summary="File $area_location. Review before deleting or moving."
       else
         size="Open folder"
         summary="Folder size is checked only when you open a deeper review."
@@ -4054,7 +4065,7 @@ documents_fast() {
   fi
 
   printf '%s\n' "${BOLD}cleanroom quick $area review${RESET}"
-  printf 'Fast read-only view. Folder sizes are not deep-scanned until you open a folder.\n'
+  printf 'Fast read-only view. Large nested files are listed when Spotlight is available; folder sizes are checked in deeper review.\n'
   printf 'Path: %s  Limit: %s\n\n' "$root" "$LIMIT"
   if [[ -z "$rows" ]]; then
     printf 'No top-level items found.\n'
@@ -4064,7 +4075,7 @@ documents_fast() {
   local kb kind guard path label
   while IFS=$'\t' read -r kb kind guard path; do
     [[ -z "${path:-}" ]] && continue
-    if [[ "$kind" == "file" ]]; then
+    if [[ "$kind" == "file" || "$kind" == "large file" ]]; then
       label="$(human_kb "$kb")"
     else
       label="Open folder"
