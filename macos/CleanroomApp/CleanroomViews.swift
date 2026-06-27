@@ -2432,6 +2432,20 @@ struct ReviewResultRow: View {
                 }
             }
             Spacer(minLength: 0)
+            if item.path != nil {
+                Button(action: revealItemInFinder) {
+                    Image(systemName: "folder")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(DS.C.textOnDark.opacity(0.78))
+                        .frame(width: 30, height: 30)
+                        .background(
+                            Circle()
+                                .fill(Color.white.opacity(0.07))
+                        )
+                }
+                .buttonStyle(.plain)
+                .help("Show in Finder")
+            }
         }
         .padding(DS.Sp.md)
         .background(
@@ -2442,6 +2456,29 @@ struct ReviewResultRow: View {
             RoundedRectangle(cornerRadius: DS.R.sm)
                 .stroke(DS.C.dividerOnDark, lineWidth: 1)
         )
+    }
+
+    private func revealItemInFinder() {
+        guard let path = item.path else { return }
+        let url = URL(fileURLWithPath: expandingHome(in: path))
+        let fileManager = FileManager.default
+        if fileManager.fileExists(atPath: url.path) {
+            NSWorkspace.shared.activateFileViewerSelecting([url])
+            return
+        }
+
+        let parent = url.deletingLastPathComponent()
+        if fileManager.fileExists(atPath: parent.path) {
+            NSWorkspace.shared.open(parent)
+        }
+    }
+
+    private func expandingHome(in path: String) -> String {
+        if path == "~" { return FileManager.default.homeDirectoryForCurrentUser.path }
+        if path.hasPrefix("~/") {
+            return FileManager.default.homeDirectoryForCurrentUser.path + String(path.dropFirst())
+        }
+        return path
     }
 
     private func locationHint(for item: ReviewItem) -> String? {
