@@ -95,6 +95,7 @@ struct AppSanitizerTests {
         expect(AppState.shouldOpenReviewDetailsForTesting(itemCount: 0, status: 1), "failed reviews should open details")
         expect(AppAction.storageRecord.title == "Storage Record", "desktop storage history label should be plain language")
         expect(AppAction.safetyPolicy.title == "Protection Guide", "desktop safety label should be plain language")
+        expect(AppState.postCleanupActivityMessageForTesting().contains("Run Analyze Storage"), "post-cleanup flow should not imply a hidden storage analysis")
 
         let home = "/Users/example"
         let documentFile = ReviewItem(

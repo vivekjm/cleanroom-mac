@@ -262,6 +262,8 @@ final class AppState: ObservableObject {
     private var cleanupPlanGeneration = UUID()
     private let reviewCacheTTL: TimeInterval = 300
     private let fallbackCacheTTL: TimeInterval = 30
+    private nonisolated static let postCleanupStatus = "Cleanup complete"
+    private nonisolated static let postCleanupActivity = "Cleanup finished. Run Analyze Storage when you want updated disk numbers."
     private let scanTimeFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateFormat = "h:mm a"
@@ -568,8 +570,8 @@ final class AppState: ObservableObject {
                 }
                 if action == .safeCleanup {
                     self.clearRecentResults()
+                    self.markStorageStatsNeedRefreshAfterCleanup()
                     self.running = false
-                    self.refreshStats(force: true)
                 } else {
                     self.running = false
                 }
@@ -638,6 +640,17 @@ final class AppState: ObservableObject {
 
     private func clearReviewCache() {
         reviewCache.removeAll()
+    }
+
+    private func markStorageStatsNeedRefreshAfterCleanup() {
+        stats[1].value = "Analyze"
+        stats[3].value = "Cleanup done"
+        status = Self.postCleanupStatus
+        activityMessage = Self.postCleanupActivity
+    }
+
+    nonisolated static func postCleanupActivityMessageForTesting() -> String {
+        postCleanupActivity
     }
 
     private func clearRecentResults() {
