@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.137.0"
+VERSION="1.138.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -4524,8 +4524,11 @@ downloads_rows() {
 downloads_fast_rows() {
   local root="$HOME/Downloads"
   [[ -d "$root" ]] || return 0
-  local now path kb epoch age_days count=0
+  local now path kb epoch age_days count=0 candidate_cap
   now="$(date '+%s')"
+  candidate_cap=$((LIMIT * 8))
+  [[ "$candidate_cap" -lt 40 ]] && candidate_cap=40
+  [[ "$candidate_cap" -gt 300 ]] && candidate_cap=300
   while IFS= read -r -d '' path; do
     kb="$(file_size_kb "$path")"
     epoch="$(path_mtime_epoch "$path")"
@@ -4536,8 +4539,10 @@ downloads_fast_rows() {
     fi
     printf '%012d\t%s\t%s\t%s\n' "$kb" "$epoch" "$age_days" "$path"
     count=$((count + 1))
-    [[ "$count" -ge "$LIMIT" ]] && return 0
-  done < <(find "$root" -maxdepth 1 -type f -mtime +"$DAYS" -print0 2>/dev/null)
+    [[ "$count" -ge "$candidate_cap" ]] && break
+  done < <(find "$root" -maxdepth 1 -type f -mtime +"$DAYS" -print0 2>/dev/null) |
+    sort -rn |
+    head -n "$LIMIT"
   return 0
 }
 

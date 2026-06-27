@@ -1072,6 +1072,18 @@ grep '"mode":"fast"' "$downloads_fast_json" >/dev/null
 grep 'old-installer.dmg' "$downloads_fast_json" >/dev/null
 grep '"cleanup_eligible":true' "$downloads_fast_json" >/dev/null
 rm -f "$downloads_fast_json"
+printf 'small\n' >"$HOME/Downloads/old-small-download.tmp"
+dd if=/dev/zero of="$HOME/Downloads/old-large-download.tmp" bs=1024 count=2048 >/dev/null 2>&1
+touch -t 202001010000 "$HOME/Downloads/old-small-download.tmp" "$HOME/Downloads/old-large-download.tmp"
+downloads_fast_top_json="$(mktemp)"
+"$BIN" downloads-fast --json --days 30 --limit 1 > "$downloads_fast_top_json"
+python3 -m json.tool "$downloads_fast_top_json" >/dev/null
+grep 'old-large-download.tmp' "$downloads_fast_top_json" >/dev/null
+if grep 'old-small-download.tmp' "$downloads_fast_top_json" >/dev/null; then
+  echo "downloads-fast should prefer larger old downloads within its quick candidate set" >&2
+  exit 1
+fi
+rm -f "$downloads_fast_top_json"
 "$BIN" installers --days 30 --limit 5 | grep 'old-installer.dmg' >/dev/null
 installers_json="$(mktemp)"
 "$BIN" installers --json --days 30 --limit 5 > "$installers_json"
