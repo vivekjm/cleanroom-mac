@@ -78,6 +78,10 @@ struct AppSanitizerTests {
         let folderAction = AppAction.folderReview(path: "/Users/example/Documents/media-project")
         expect(folderAction.title == "media-project", "folder review action should use the folder name")
         expect(folderAction.args == ["documents-fast", "/Users/example/Documents/media-project", "--limit", "40"], "folder review action should run a focused fast folder review")
+        expect(folderAction.reviewLimitForTesting() == 40, "folder review should expose its current limit")
+        expect(folderAction.expandedReviewLimitForTesting().args == ["documents-fast", "/Users/example/Documents/media-project", "--limit", "120"], "show more should expand an existing review limit")
+        let unboundedAction = AppAction(title: "Custom Review", args: ["documents-fast", "/Users/example/Documents/media-project"])
+        expect(unboundedAction.expandedReviewLimitForTesting().args == ["documents-fast", "/Users/example/Documents/media-project", "--limit", "120"], "show more should add a useful limit when one is missing")
 
         let home = "/Users/example"
         let documentFile = ReviewItem(

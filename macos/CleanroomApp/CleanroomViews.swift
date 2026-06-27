@@ -158,6 +158,30 @@ struct AppAction: Hashable {
         let name = URL(fileURLWithPath: path).lastPathComponent
         return AppAction(title: name.isEmpty ? "Folder Review" : name, args: ["documents-fast", path, "--limit", "40"])
     }
+
+    func reviewLimitForTesting() -> Int? {
+        guard let index = args.firstIndex(of: "--limit"),
+              args.indices.contains(index + 1) else {
+            return nil
+        }
+        return Int(args[index + 1])
+    }
+
+    func withReviewLimitForTesting(_ limit: Int) -> AppAction {
+        var updated = args
+        if let index = updated.firstIndex(of: "--limit"), updated.indices.contains(index + 1) {
+            updated[index + 1] = "\(limit)"
+        } else {
+            updated += ["--limit", "\(limit)"]
+        }
+        return AppAction(title: title, args: updated)
+    }
+
+    func expandedReviewLimitForTesting() -> AppAction {
+        let current = reviewLimitForTesting() ?? 40
+        let expanded = min(max(current * 3, 100), 500)
+        return withReviewLimitForTesting(expanded)
+    }
 }
 
 enum NavDest: Hashable {
@@ -186,6 +210,7 @@ final class AppState: ObservableObject {
     @Published var cardOffset:       Int     = 0
     @Published var reviewTitle:      String  = "Review"
     @Published var reviewItems:      [ReviewItem] = []
+    @Published var currentReviewAction: AppAction? = nil
     @Published var cleanupPlanItems: [CleanupPlanItem] = []
     @Published var cleanupPlanNotes: [String] = []
     @Published var cleanupPlanLoading: Bool = false
@@ -247,6 +272,17 @@ final class AppState: ObservableObject {
         !reviewItems.isEmpty ||
             reviewTitle != "Review" ||
             !reviewSummary.localizedCaseInsensitiveContains("Choose an area to review")
+    }
+
+    var canShowMoreResults: Bool {
+        guard !running,
+              let action = currentReviewAction,
+              let limit = action.reviewLimitForTesting(),
+              reviewItems.count >= limit,
+              limit < 500 else {
+            return false
+        }
+        return true
     }
 
     func resolveEngine() {
@@ -475,6 +511,7 @@ final class AppState: ObservableObject {
         if statsLoading && action == .safeCleanup { return }
         if let cached = cachedReview(for: action) {
             dest = .run(action)
+            currentReviewAction = action
             reviewTitle = cached.title
             reviewSummary = cached.summary
             reviewItems = cached.items
@@ -492,6 +529,7 @@ final class AppState: ObservableObject {
         reviewSummary = "Reviewing \(action.title).\n"
         reviewTitle = action.title
         reviewItems = []
+        currentReviewAction = action
         let commandArgs = appFacingArgs(action.args)
         let command = resolvedCommand(commandArgs)
         Task.detached(priority: .userInitiated) {
@@ -675,9 +713,16 @@ final class AppState: ObservableObject {
         reviewSummary = "Choose an area to review.\n"
         reviewTitle = "Review"
         reviewItems = []
+        currentReviewAction = nil
         status = "Ready"
         activityMessage = "Review cleared. Choose an area when you are ready."
         summaryOpen = false
+    }
+
+    func showMoreResults() {
+        guard canShowMoreResults,
+              let action = currentReviewAction else { return }
+        openReview(action.expandedReviewLimitForTesting())
     }
 
     private func appFacingSummaryText() -> String {
@@ -2393,6 +2438,26 @@ struct ReviewSummaryPanel: View {
                             }
                             ForEach(state.reviewItems) { item in
                                 ReviewResultRow(state: state, item: item)
+                            }
+                            if state.canShowMoreResults {
+                                Button(action: { state.showMoreResults() }) {
+                                    HStack(spacing: 8) {
+                                        Image(systemName: "chevron.down.circle.fill")
+                                            .font(.system(size: 14, weight: .semibold))
+                                        Text("Show more")
+                                            .font(DS.T.bodySm.weight(.semibold))
+                                    }
+                                    .foregroundColor(DS.C.textOnDark.opacity(0.86))
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, DS.Sp.sm)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: DS.R.sm)
+                                            .fill(Color.white.opacity(0.07))
+                                    )
+                                }
+                                .buttonStyle(.plain)
+                                .disabled(state.running)
+                                .help("Show more results")
                             }
                         }
                     }
