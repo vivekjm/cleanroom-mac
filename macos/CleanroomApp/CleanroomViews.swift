@@ -167,7 +167,7 @@ final class AppState: ObservableObject {
 
     @Published var dest:             NavDest = .dashboard
     @Published var filter:           String  = "all"
-    @Published var reviewSummary:    String  = "Choose a review to see the report here.\n"
+    @Published var reviewSummary:    String  = "Choose an area to review.\n"
     @Published var running:          Bool    = false
     @Published var statsLoading:     Bool    = false
     @Published var status:           String  = "Ready"
@@ -176,7 +176,7 @@ final class AppState: ObservableObject {
     @Published var showLeftovers:    Bool    = false
     @Published var showApplyConfirm: Bool    = false
     @Published var cardOffset:       Int     = 0
-    @Published var reviewTitle:      String  = "Review Report"
+    @Published var reviewTitle:      String  = "Review"
     @Published var reviewItems:      [ReviewItem] = []
     @Published var cleanupPlanItems: [CleanupPlanItem] = []
     @Published var cleanupPlanNotes: [String] = []
@@ -236,8 +236,8 @@ final class AppState: ObservableObject {
 
     var hasReportContent: Bool {
         !reviewItems.isEmpty ||
-            reviewTitle != "Review Report" ||
-            !reviewSummary.localizedCaseInsensitiveContains("Choose a review to see the report here")
+            reviewTitle != "Review" ||
+            !reviewSummary.localizedCaseInsensitiveContains("Choose an area to review")
     }
 
     func resolveEngine() {
@@ -502,7 +502,7 @@ final class AppState: ObservableObject {
                 self.reviewSummary = presented.summary
                 if result.status == 15 {
                     self.status = "\(action.title) stopped"
-                    self.activityMessage = "\(action.title) stopped. Open the report to see where it paused."
+                    self.activityMessage = "\(action.title) stopped. Open details to see where it paused."
                     self.reviewSummary += "Review stopped.\n"
                     self.summaryOpen = true
                 } else if result.status == 124 {
@@ -516,7 +516,7 @@ final class AppState: ObservableObject {
                     self.storeCachedReview(title: action.title, summary: presented.summary, items: self.reviewItems, for: action)
                 } else {
                     self.status = "\(action.title) needs attention"
-                    self.activityMessage = "\(action.title) needs attention. Open the report for what happened."
+                    self.activityMessage = "\(action.title) needs attention. Open details to see what happened."
                     self.summaryOpen = true
                 }
                 if action == .safeCleanup {
@@ -613,24 +613,24 @@ final class AppState: ObservableObject {
         guard hasReportContent else { return }
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(appFacingSummaryText(), forType: .string)
-        status = "Report copied"
-        activityMessage = "Review report copied."
+        status = "Review copied"
+        activityMessage = "Review details copied."
     }
 
     func clearSummary() {
         guard hasReportContent else { return }
-        reviewSummary = "Choose a review to see the report here.\n"
-        reviewTitle = "Review Report"
+        reviewSummary = "Choose an area to review.\n"
+        reviewTitle = "Review"
         reviewItems = []
         status = "Ready"
-        activityMessage = "Report cleared. Choose a review when you are ready."
+        activityMessage = "Review cleared. Choose an area when you are ready."
         summaryOpen = false
     }
 
     private func appFacingSummaryText() -> String {
         guard !reviewItems.isEmpty else {
             return [
-                reviewTitle == "Review Report" ? "Cleanroom" : reviewTitle,
+                reviewTitle == "Review" ? "Cleanroom" : reviewTitle,
                 activityMessage,
                 status
             ]
@@ -707,7 +707,7 @@ final class AppState: ObservableObject {
             let size = items[0].size
             return "\(title) found \(items.count) items to review; largest starts at \(size). Nothing was cleaned."
         }
-        return "\(title) finished. Open the report if you need more context."
+        return "\(title) finished. Open details if you need more context."
     }
 
     nonisolated private static func presentableReview(title: String, action: AppAction, details: String) -> PresentableReview {
@@ -779,7 +779,7 @@ final class AppState: ObservableObject {
         return [
             ReviewItem(
                 title: title,
-                detail: "Review finished. No extra report notes need your attention.",
+                detail: "Review finished. No extra notes need your attention.",
                 size: "Done",
                 badge: "Ready",
                 path: nil
@@ -2250,16 +2250,16 @@ struct ReviewSummaryPanel: View {
                     IconBtn(icon: "doc.on.clipboard", dark: true) {
                         state.copyDetails()
                     }
-                    .help("Copy report")
+                    .help("Copy details")
                     IconBtn(icon: "xmark", dark: true) {
                         state.clearSummary()
                     }
-                    .help("Clear report")
+                    .help("Clear details")
                 }
                 IconBtn(icon: state.summaryOpen ? "chevron.down" : "chevron.up", dark: true) {
                     withAnimation(DS.Ani.std) { state.summaryOpen.toggle() }
                 }
-                .help(state.summaryOpen ? "Hide report" : "Show report")
+                .help(state.summaryOpen ? "Hide details" : "Show details")
             }
             .padding(.horizontal, DS.Sp.lg)
             .padding(.vertical, DS.Sp.sm)
@@ -2341,8 +2341,8 @@ struct EmptyReportPanel: View {
         if state.running { return "Review In Progress" }
         if state.statsLoading { return "Storage Analysis In Progress" }
         if state.status.localizedCaseInsensitiveContains("attention") { return "Needs Attention" }
-        if state.status.localizedCaseInsensitiveContains("copied") { return "Report Copied" }
-        if state.reviewTitle != "Review Report" { return state.reviewTitle }
+        if state.status.localizedCaseInsensitiveContains("copied") { return "Review Copied" }
+        if state.reviewTitle != "Review" { return state.reviewTitle }
         return "Ready When You Are"
     }
 
