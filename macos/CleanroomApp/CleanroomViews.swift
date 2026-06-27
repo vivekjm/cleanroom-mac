@@ -62,6 +62,7 @@ struct ReviewItem: Identifiable {
     var size: String
     var badge: String
     var path: String?
+    var sizeKB: Int? = nil
 }
 
 struct CleanupPlanItem: Identifiable {
@@ -1048,6 +1049,13 @@ final class AppState: ObservableObject {
         Self.appFacingItems(items)
     }
 
+    nonisolated static func visibleReviewTotalLabelForTesting(_ items: [ReviewItem]) -> String {
+        let countLabel = "\(items.count) \(items.count == 1 ? "item" : "items")"
+        let totalKB = items.compactMap(\.sizeKB).reduce(0, +)
+        guard totalKB > 0 else { return countLabel }
+        return "\(countLabel) · \(Self.formatKBString(String(totalKB))) listed"
+    }
+
     nonisolated private static func shouldPreserveAppPathField(_ key: String) -> Bool {
         let lower = key.lowercased()
         return lower == "path" || lower == "paths"
@@ -1128,7 +1136,8 @@ final class AppState: ObservableObject {
         let detail = Self.friendlyDetail(from: item) ??
             Self.friendlyLocationHint(from: item) ??
             "Review before cleaning."
-        return ReviewItem(title: title, detail: detail, size: size, badge: badge, path: path)
+        let sizeKB = Self.numberValue(item["size_kb"]).flatMap { Int(exactly: $0) }
+        return ReviewItem(title: title, detail: detail, size: size, badge: badge, path: path, sizeKB: sizeKB)
     }
 
     nonisolated private static func friendlyTitle(from item: [String: Any]) -> String {
@@ -2285,7 +2294,7 @@ struct ReviewSummaryPanel: View {
                                     .font(DS.T.h3)
                                     .foregroundColor(DS.C.textOnDark)
                                 Spacer()
-                                Text("\(state.reviewItems.count) items")
+                                Text(AppState.visibleReviewTotalLabelForTesting(state.reviewItems))
                                     .font(DS.T.tag)
                                     .foregroundColor(DS.C.textOnDark.opacity(0.52))
                             }

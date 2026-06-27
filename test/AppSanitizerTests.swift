@@ -11,6 +11,8 @@ struct AppSanitizerTests {
             "review_command": "cleanroom documents /Users/example/Documents/project/builds --limit 10",
             "apply_command": "cleanroom clean --apply --trash --yes",
             "mode": "fast",
+            "size_kb": 1572864,
+            "size": "1.5GB",
             "summary": "File in Documents. Review before deleting or moving."
         ]]
 
@@ -42,6 +44,26 @@ struct AppSanitizerTests {
         )
         expect(copied.contains("/Users/example/Documents/project/builds/app-image.zip"), "copied details should include useful path")
         expect(!copied.contains("cleanroom documents"), "copied details should hide command text")
+
+        let totalLabel = AppState.visibleReviewTotalLabelForTesting([
+            ReviewItem(
+                title: "app-image.zip",
+                detail: "File in Documents. Review before deleting or moving.",
+                size: "1.5GB",
+                badge: "Review",
+                path: "/Users/example/Documents/project/builds/app-image.zip",
+                sizeKB: 1572864
+            ),
+            ReviewItem(
+                title: "cache.bin",
+                detail: "File in Documents. Review before deleting or moving.",
+                size: "512MB",
+                badge: "Review",
+                path: "/Users/example/Documents/project/builds/cache.bin",
+                sizeKB: 524288
+            )
+        ])
+        expect(totalLabel == "2 items · 2.0GB listed", "visible review total should summarize listed file size")
     }
 
     private static func expect(_ condition: Bool, _ message: String) {
