@@ -1249,7 +1249,9 @@ final class AppState: ObservableObject {
 
     nonisolated private static func shouldHideAppValue(_ text: String) -> Bool {
         let lower = text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let isMultiline = text.contains("\n")
         return lower.hasPrefix("cleanroom ") ||
+            (!isMultiline && lower.contains("cleanroom ")) ||
             lower.hasPrefix("open -r") ||
             lower.hasPrefix("--") ||
             lower.contains(" --apply") ||
@@ -1261,8 +1263,15 @@ final class AppState: ObservableObject {
     }
 
     nonisolated private static func normalizeAppText(_ text: String) -> String {
-        Self.friendlyLabelIfBackendToken(
-            text.replacingOccurrences(of: "dry-run", with: "review", options: .caseInsensitive)
+        let cleanupNote = Self.friendlyCleanupNote(text)
+        if cleanupNote != text {
+            return cleanupNote
+        }
+        let sanitized = Self.sanitizeForApp(text)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let appText = sanitized.isEmpty ? text : sanitized
+        return Self.friendlyLabelIfBackendToken(
+            appText.replacingOccurrences(of: "dry-run", with: "review", options: .caseInsensitive)
                 .replacingOccurrences(of: "opt-in", with: "optional", options: .caseInsensitive)
                 .replacingOccurrences(of: "--apply", with: "Clean Now", options: .caseInsensitive)
                 .replacingOccurrences(of: "--trash", with: "Trash recovery", options: .caseInsensitive)

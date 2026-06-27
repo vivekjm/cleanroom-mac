@@ -33,8 +33,16 @@ struct AppSanitizerTests {
             "status": "review-only"
         ]]
         let backendSanitized = AppState.appFacingItemsForTesting(backendInput)
-        expect(backendSanitized.first?["summary"] as? String == "review mode. Nothing changed.", "backend cleanup wording should be normalized")
+        expect(backendSanitized.first?["summary"] as? String == "This is only a review until you choose Clean Now.", "backend cleanup wording should be normalized")
         expect(backendSanitized.first?["status"] as? String == "Review only", "backend status tokens should be friendly")
+        let commandHintItems = AppState.reviewItemsForTesting([[
+            "name": "Old cache",
+            "summary": "Cache files can be rebuilt.\nPreview with:\ncleanroom caches --json\nApply command: cleanroom clean --apply --trash --yes",
+            "size": "800MB"
+        ]])
+        expect(commandHintItems.first?.detail.isEmpty == false, "desktop row details should keep useful human guidance")
+        expect(commandHintItems.first?.detail.contains("cleanroom") == false, "desktop row details should not expose command text")
+        expect(commandHintItems.first?.detail.contains("--json") == false, "desktop row details should not expose flags")
 
         let copied = AppState.appFacingSummaryTextForTesting(
             title: "Documents",
