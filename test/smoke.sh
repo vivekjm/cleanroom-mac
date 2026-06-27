@@ -353,6 +353,11 @@ if [[ "${1:-}" == "-onlyin" ]]; then
     [[ -f "$root/nested-large-files/project-a/builds/app-image.zip" ]] && printf '%s\n' "$root/nested-large-files/project-a/builds/app-image.zip"
     [[ -f "$root/Documents/duplicates/copy-a.bin" ]] && printf '%s\n' "$root/Documents/duplicates/copy-a.bin"
     [[ -f "$root/Documents/duplicates/copy-b.bin" ]] && printf '%s\n' "$root/Documents/duplicates/copy-b.bin"
+    if [[ "$root" == "$HOME/Documents/spotlight-cap" ]]; then
+      for i in $(seq 1 120); do
+        printf '%s\n' "$root/item-$i.bin"
+      done
+    fi
   fi
   exit 0
 fi
@@ -721,6 +726,18 @@ grep 'nested-large-files/project-a/builds/app-image.zip' "$documents_fast_json" 
 grep '"name":"media-project"' "$documents_fast_json" >/dev/null
 grep '"size":"Open folder"' "$documents_fast_json" >/dev/null
 rm -f "$documents_fast_json"
+mkdir -p "$HOME/Documents/spotlight-cap"
+for i in $(seq 1 120); do
+  printf 'cap\n' >"$HOME/Documents/spotlight-cap/item-$i.bin"
+done
+documents_fast_cap_json="$(mktemp)"
+"$BIN" documents-fast --json "$HOME/Documents/spotlight-cap" --limit 1 --min-mb 1 > "$documents_fast_cap_json"
+python3 -m json.tool "$documents_fast_cap_json" >/dev/null
+if grep '"name":"item-81.bin"' "$documents_fast_cap_json" >/dev/null; then
+  echo "documents-fast should bound Spotlight candidates for responsiveness" >&2
+  exit 1
+fi
+rm -f "$documents_fast_cap_json"
 "$BIN" brokenlinks "$HOME/Documents" --limit 10 | grep 'broken-link' >/dev/null
 brokenlinks_json="$(mktemp)"
 "$BIN" brokenlinks --json "$HOME/Documents" --limit 10 > "$brokenlinks_json"

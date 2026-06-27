@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.127.0"
+VERSION="1.128.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -3985,7 +3985,11 @@ documents_fast_rows() {
   {
     if command -v mdfind >/dev/null 2>&1; then
       local min_bytes=$((MIN_MB * 1024 * 1024))
+      local spotlight_cap=$((LIMIT * 8))
+      [[ "$spotlight_cap" -lt 80 ]] && spotlight_cap=80
+      [[ "$spotlight_cap" -gt 500 ]] && spotlight_cap=500
       mdfind -onlyin "$root" "kMDItemFSSize > $min_bytes" 2>/dev/null |
+        head -n "$spotlight_cap" |
         while IFS= read -r path; do
           [[ -f "$path" ]] || continue
           printf '%012d\tlarge file\t%s\t%s\n' "$(file_size_kb "$path")" "$(document_guard_status "$path")" "$path"
