@@ -60,6 +60,15 @@ struct AppSanitizerTests {
         )
         expect(copied.contains("/Users/example/Documents/project/builds/app-image.zip"), "copied details should include useful path")
         expect(!copied.contains("cleanroom documents"), "copied details should hide command text")
+        let copiedEmpty = AppState.appFacingSummaryTextForTesting(
+            title: "Caches",
+            activityMessage: "Dry-run mode. Pass --apply --yes to run npm cache clean --force.",
+            status: "Preview command: cleanroom caches --json",
+            items: []
+        )
+        expect(copiedEmpty.contains("This is only a review until you choose Clean Now."), "empty copied details should use app language")
+        expect(!copiedEmpty.contains("cleanroom"), "empty copied details should hide backend commands")
+        expect(!copiedEmpty.contains("--apply"), "empty copied details should hide backend flags")
 
         let totalLabel = AppState.visibleReviewTotalLabelForTesting([
             ReviewItem(

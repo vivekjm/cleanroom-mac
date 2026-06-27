@@ -751,8 +751,8 @@ final class AppState: ObservableObject {
         guard !reviewItems.isEmpty else {
             return [
                 reviewTitle == "Review" ? "Cleanroom" : reviewTitle,
-                activityMessage,
-                status
+                Self.appFacingSingleLine(activityMessage),
+                Self.appFacingSingleLine(status)
             ]
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
@@ -765,10 +765,25 @@ final class AppState: ObservableObject {
                 lines.append("  \(Self.shortPath(path))")
             }
             if !item.detail.isEmpty && !Self.shouldHideAppValue(item.detail) {
-                lines.append("  \(item.detail)")
+                let detail = Self.appFacingSingleLine(item.detail)
+                if !detail.isEmpty {
+                    lines.append("  \(detail)")
+                }
             }
         }
         return lines.joined(separator: "\n") + "\n"
+    }
+
+    nonisolated private static func appFacingSingleLine(_ text: String) -> String {
+        let cleanupNote = Self.friendlyCleanupNote(text)
+        let cleaned = Self.sanitizeForApp(cleanupNote)
+            .split(separator: "\n", omittingEmptySubsequences: false)
+            .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
+            .first { !$0.isEmpty } ?? ""
+        let candidate = cleaned.isEmpty ? cleanupNote : cleaned
+        if Self.shouldHideAppValue(candidate) { return "" }
+        return Self.normalizeAppText(candidate)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private func resolvedCommand(_ args: [String]) -> (executable: String, arguments: [String]) {
