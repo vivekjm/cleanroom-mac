@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.135.0"
+VERSION="1.136.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -4792,9 +4792,30 @@ node_rows() {
 }
 
 node_fast_rows() {
-  command -v mdfind >/dev/null 2>&1 || return 2
-  local now root path epoch age_days kb
+  local now root path epoch age_days kb fs_candidates fs_count
   now="$(date '+%s')"
+  fs_candidates="$(
+    while IFS= read -r root; do
+      [[ -d "$root" ]] || continue
+      find "$root" -maxdepth 5 -type d -name node_modules -mtime +"$DAYS" -prune -print0 2>/dev/null |
+        while IFS= read -r -d '' path; do
+          epoch="$(path_mtime_epoch "$path")"
+          if [[ "$epoch" -gt 0 && "$now" -ge "$epoch" ]]; then
+            age_days=$(((now - epoch) / 86400))
+          else
+            age_days=0
+          fi
+          printf '%s\t%s\t%s\n' "$epoch" "$age_days" "$path"
+        done
+    done < <(node_roots)
+  )"
+  fs_count="$(printf '%s\n' "$fs_candidates" | awk 'NF {count++} END {print count + 0}')"
+  if [[ "$fs_count" -eq 0 ]] && ! command -v mdfind >/dev/null 2>&1; then
+    return 2
+  fi
+  {
+  [[ -n "$fs_candidates" ]] && printf '%s\n' "$fs_candidates"
+  if [[ "$fs_count" -lt "$LIMIT" ]] && command -v mdfind >/dev/null 2>&1; then
   while IFS= read -r root; do
     [[ -d "$root" ]] || continue
     mdfind -onlyin "$root" 'kMDItemFSName == "node_modules"' 2>/dev/null || true
@@ -4809,8 +4830,12 @@ node_fast_rows() {
         age_days=0
       fi
       [[ "$age_days" -gt "$DAYS" ]] || continue
-      printf '%012d\t%s\t%s\n' "$epoch" "$age_days" "$path"
+      printf '%s\t%s\t%s\n' "$epoch" "$age_days" "$path"
     done |
+      sort -rn
+  fi
+  } |
+    awk -F '\t' '!seen[$3]++' |
     sort -rn |
     head -n "$LIMIT" |
     while IFS=$'\t' read -r epoch age_days path; do
@@ -4889,7 +4914,7 @@ nodes_fast() {
   fi
 
   printf '%s\n' "${BOLD}cleanroom quick stale node_modules${RESET}"
-  printf 'Preview from Spotlight metadata. No files are deleted.\n'
+  printf 'Fast read-only review. No files are deleted.\n'
   if [[ "${#PATH_ARGS[@]}" -gt 0 ]]; then
     printf 'Path: %s\n' "$(expand_path "${PATH_ARGS[0]}")"
   else
@@ -4897,11 +4922,11 @@ nodes_fast() {
   fi
   printf 'Older than: %s days  Limit: %s\n\n' "$DAYS" "$LIMIT"
   if [[ "$available" -eq 0 ]]; then
-    printf 'Spotlight search is not available. Use the deeper Node Modules scan when you want an exhaustive review.\n'
+    printf 'No quick index is available. Use the deeper Node Modules scan when you want an exhaustive review.\n'
     return 0
   fi
   if [[ -z "$rows" ]]; then
-    printf 'No stale node_modules folders found in the Spotlight index.\n'
+    printf 'No stale node_modules folders found in the quick review.\n'
     return 0
   fi
   printf '%-10s %-9s %s\n' "size" "age" "path"

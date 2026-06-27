@@ -1091,6 +1091,17 @@ nodes_fast_json="$(mktemp)"
 python3 -m json.tool "$nodes_fast_json" >/dev/null
 grep '"available":' "$nodes_fast_json" >/dev/null
 rm -f "$nodes_fast_json"
+nodes_fast_shallow_json="$(mktemp)"
+nodes_mdfind_log="$(mktemp)"
+CLEANROOM_MDFIND_LOG="$nodes_mdfind_log" "$BIN" nodes-fast --json "$HOME/Documents" --days 30 --limit 1 > "$nodes_fast_shallow_json"
+python3 -m json.tool "$nodes_fast_shallow_json" >/dev/null
+grep '"available":true' "$nodes_fast_shallow_json" >/dev/null
+grep 'node_modules' "$nodes_fast_shallow_json" >/dev/null
+if [[ -s "$nodes_mdfind_log" ]]; then
+  echo "nodes-fast should skip Spotlight when filesystem candidates fill the requested limit" >&2
+  exit 1
+fi
+rm -f "$nodes_fast_shallow_json" "$nodes_mdfind_log"
 "$BIN" venvs "$HOME/Documents" --days 30 --limit 5 | grep '.venv' >/dev/null
 venvs_json="$(mktemp)"
 "$BIN" venvs --json "$HOME/Documents" --days 30 --limit 5 > "$venvs_json"
