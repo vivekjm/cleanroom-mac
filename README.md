@@ -1,60 +1,56 @@
 # Cleanroom
 
-Cleanroom is a safe macOS storage cleaner for people who want disk space back without digging through hidden folders.
+Cleanroom is a safe macOS storage cleaner. It helps you find what is filling your Mac, review the files clearly, and move safe cleanup items to Trash.
 
-It focuses on the places that usually make a Mac feel full or slow: Documents, Downloads, developer caches, app leftovers, AI tool data, browser caches, logs, old archives, screenshots, and rebuildable system clutter.
+It is built for normal Mac users first: fast reviews, visible file lists, plain language, and no command-line details in the desktop workflow.
 
-## What It Does
+## Highlights
 
-- Shows large files and folders with clear names, sizes, and locations.
-- Finds rebuildable junk such as caches, logs, Quick Look thumbnails, metadata files, update caches, project caches, stale package folders, and old generated data.
-- Reviews app leftovers after uninstalling apps.
-- Helps trim developer storage such as stale `node_modules`, virtual environments, package caches, simulators, and toolchain clutter.
-- Helps review AI tool storage such as downloaded models, generated state, and temporary workspace data.
-- Moves recoverable cleanup items to Trash when requested.
-- Keeps cleanup history so Trash-mode runs can be inspected and restored.
+- Fast reviews for Documents, Downloads, Desktop, archives, screenshots, apps, caches, developer files, AI tool data, and large files.
+- Clear file rows with names, sizes, locations, Finder reveal, folder drill-down, Show more, and guarded Move to Trash.
+- Conservative cleanup for rebuildable clutter such as logs, Quick Look thumbnails, metadata files, update caches, package caches, and project caches.
+- App leftover review after uninstalling software.
+- Developer storage review for stale `node_modules`, Python virtual environments, toolchains, simulators, and package stores.
+- AI storage review for downloaded local models, generated workspace state, temporary data, and rebuildable backends.
 
-## What It Protects
+## Protected By Default
 
-Cleanroom is review-first and conservative by default. It does not clean these automatically:
+Cleanroom does not automatically clean:
 
-- browser profiles, saved passwords, cookies, bookmarks, sessions, and Keychains
-- Photos, Music, TV, iMovie, GarageBand, and Logic libraries
-- Mail, Messages, Contacts, Calendars, Notes, Reminders, Voice Memos, and call history
-- iCloud Drive and cloud-sync roots such as Dropbox, Google Drive, OneDrive, Box, and Syncthing
-- arbitrary personal files in Documents, Desktop, and Downloads
+- browser profiles, saved passwords, cookies, bookmarks, sessions, extensions, or Keychains
+- Photos, Music, TV, iMovie, GarageBand, or Logic libraries
+- Mail, Messages, Contacts, Calendars, Notes, Reminders, Voice Memos, or call history
+- iCloud Drive or cloud-sync roots such as Dropbox, Google Drive, OneDrive, Box, or Syncthing
+- whole app profiles, broad Library folders, or arbitrary personal folders
 
 ## Desktop App
 
-Build and open the local macOS app:
+Build and open the app:
 
 ```sh
 make macos-app
 open dist/Cleanroom.app
 ```
 
-The app is designed for normal Mac users: review first, clear file lists, plain language, and no command-line details in the main workflow.
+Use the app to:
 
-## Install
+1. Pick an area such as Documents, Downloads, Caches, Apps, or AI Tools.
+2. Review the visible list of files and folders.
+3. Open folders, show items in Finder, show more results, or move eligible files to Trash.
+4. Run Safe Cleanup only after reviewing the plan.
 
-From this repo:
+## Install The CLI
+
+The command-line tool is useful for automation and advanced users.
 
 ```sh
 ./install.sh
 ```
 
-Install somewhere else:
+Install to a custom prefix:
 
 ```sh
 PREFIX="$HOME/.local" ./install.sh
-```
-
-From a release archive:
-
-```sh
-tar -xzf cleanroom-*.tar.gz
-cd cleanroom-*
-./install.sh
 ```
 
 Uninstall:
@@ -63,44 +59,15 @@ Uninstall:
 ./uninstall.sh
 ```
 
-## Common Tasks
-
-List what is making Documents large:
+## Useful Commands
 
 ```sh
 cleanroom documents-fast
-```
-
-Review safe cleanup areas:
-
-```sh
-cleanroom clean --preflight
-```
-
-Clean safe rebuildable clutter and move recoverable items to Trash:
-
-```sh
-cleanroom clean --apply --trash --yes
-```
-
-Find stale project packages:
-
-```sh
-cleanroom nodes-fast
-cleanroom venvs-fast
-```
-
-Review app leftovers after uninstalling an app:
-
-```sh
-cleanroom appreview "App Name"
-cleanroom leftovers "App Name"
-```
-
-Review AI tool storage:
-
-```sh
+cleanroom downloads-fast
 cleanroom aitools-fast
+cleanroom appreview "App Name"
+cleanroom clean --preflight
+cleanroom clean --apply --trash --yes
 ```
 
 ## Development
