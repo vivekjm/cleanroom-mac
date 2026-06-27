@@ -37,6 +37,8 @@ lint:
 	bash -n scripts/build-macos-app.sh
 	./scripts/check-version.sh
 	./scripts/check-rules.sh
+	swiftc test/AppSanitizerTests.swift macos/CleanroomApp/CleanroomViews.swift macos/CleanroomApp/DesignSystem.swift -o /tmp/cleanroom-app-sanitizer-tests
+	/tmp/cleanroom-app-sanitizer-tests
 
 smoke test: lint
 	./test/smoke.sh

@@ -1031,7 +1031,9 @@ final class AppState: ObservableObject {
             }
             for key in Array(cleaned.keys) {
                 guard let text = Self.stringValue(cleaned[key]) else { continue }
-                if Self.shouldHideAppValue(text) {
+                if Self.shouldPreserveAppPathField(key) {
+                    continue
+                } else if Self.shouldHideAppValue(text) {
                     cleaned.removeValue(forKey: key)
                 } else if Self.shouldNormalizeAppTextField(key) {
                     cleaned[key] = Self.normalizeAppText(text)
@@ -1039,6 +1041,15 @@ final class AppState: ObservableObject {
             }
             return cleaned
         }
+    }
+
+    nonisolated static func appFacingItemsForTesting(_ items: [[String: Any]]) -> [[String: Any]] {
+        Self.appFacingItems(items)
+    }
+
+    nonisolated private static func shouldPreserveAppPathField(_ key: String) -> Bool {
+        let lower = key.lowercased()
+        return lower == "path" || lower == "paths"
     }
 
     nonisolated private static func shouldHideAppField(_ key: String) -> Bool {
