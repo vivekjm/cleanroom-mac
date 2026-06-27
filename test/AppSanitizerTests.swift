@@ -25,6 +25,23 @@ struct AppSanitizerTests {
         expect(item["apply_command"] == nil, "apply_command should be hidden")
         expect(item["mode"] == nil, "mode should be hidden")
         expect(item["location"] as? String == "In Documents", "location should be derived from path")
+
+        let copied = AppState.appFacingSummaryTextForTesting(
+            title: "Documents",
+            activityMessage: "Documents found 1 item.",
+            status: "Documents complete",
+            items: [
+                ReviewItem(
+                    title: "app-image.zip",
+                    detail: "cleanroom documents /Users/example/Documents/project/builds --limit 10",
+                    size: "1.5GB",
+                    badge: "Review",
+                    path: "/Users/example/Documents/project/builds/app-image.zip"
+                )
+            ]
+        )
+        expect(copied.contains("/Users/example/Documents/project/builds/app-image.zip"), "copied details should include useful path")
+        expect(!copied.contains("cleanroom documents"), "copied details should hide command text")
     }
 
     private static func expect(_ condition: Bool, _ message: String) {

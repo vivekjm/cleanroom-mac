@@ -628,6 +628,15 @@ final class AppState: ObservableObject {
     }
 
     private func appFacingSummaryText() -> String {
+        Self.appFacingSummaryTextForTesting(
+            title: reviewTitle,
+            activityMessage: activityMessage,
+            status: status,
+            items: reviewItems
+        )
+    }
+
+    nonisolated static func appFacingSummaryTextForTesting(title reviewTitle: String, activityMessage: String, status: String, items reviewItems: [ReviewItem]) -> String {
         guard !reviewItems.isEmpty else {
             return [
                 reviewTitle == "Review" ? "Cleanroom" : reviewTitle,
@@ -644,7 +653,7 @@ final class AppState: ObservableObject {
             if let path = item.path, !path.isEmpty {
                 lines.append("  \(Self.shortPath(path))")
             }
-            if !item.detail.isEmpty {
+            if !item.detail.isEmpty && !Self.shouldHideAppValue(item.detail) {
                 lines.append("  \(item.detail)")
             }
         }
