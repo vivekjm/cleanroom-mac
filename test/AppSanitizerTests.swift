@@ -93,6 +93,8 @@ struct AppSanitizerTests {
         expect(AppState.shouldOpenReviewDetailsForTesting(itemCount: 2, status: 0), "successful reviews with rows should open the file list")
         expect(!AppState.shouldOpenReviewDetailsForTesting(itemCount: 0, status: 0), "successful empty reviews should not force-open details")
         expect(AppState.shouldOpenReviewDetailsForTesting(itemCount: 0, status: 1), "failed reviews should open details")
+        expect(AppAction.storageRecord.title == "Storage Record", "desktop storage history label should be plain language")
+        expect(AppAction.safetyPolicy.title == "Protection Guide", "desktop safety label should be plain language")
 
         let home = "/Users/example"
         let documentFile = ReviewItem(

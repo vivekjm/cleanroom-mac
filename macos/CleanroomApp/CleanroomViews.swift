@@ -140,13 +140,13 @@ struct AppAction: Hashable {
     static let developerTools = AppAction(title: "Developer Caches", args: ["toolchains-fast"])
     static let loginItems = AppAction(title: "Login Items", args: ["loginitems-fast"])
     static let startup = AppAction(title: "Startup Items", args: ["startup-fast"])
-    static let storageRecord = AppAction(title: "Storage Snapshot", args: ["snapshot-fast"])
+    static let storageRecord = AppAction(title: "Storage Record", args: ["snapshot-fast"])
     static let restoreHistory = AppAction(title: "Restore History", args: ["state-fast"])
     static let safetyCheck = AppAction(title: "Cleanup Plan", args: ["clean", "--preflight"])
     static let privacyReport = AppAction(title: "Privacy Summary", args: ["report-fast", "--redact"])
     static let pastCleanups = AppAction(title: "Recent Cleanups", args: ["history-fast"])
     static let protectedItems = AppAction(title: "Protected Data", args: ["protect-fast"])
-    static let safetyPolicy = AppAction(title: "Safety Rules", args: ["rules-fast"])
+    static let safetyPolicy = AppAction(title: "Protection Guide", args: ["rules-fast"])
     static let safetyPlan = AppAction(title: "Cleaning Plan", args: ["clean", "--preflight"])
     static let safeCleanup = AppAction(title: "Safe Cleanup", args: ["clean", "--apply", "--trash", "--yes"])
 
@@ -1940,13 +1940,13 @@ struct SidebarView: View {
                             NavRow("bolt.fill",               "Startup Items", .run(.startup), state)
                         }
                         SidebarSection("SAFETY") {
-                            NavRow("camera.fill",             "Storage Snapshot", .run(.storageRecord), state)
+                            NavRow("camera.fill",             "Storage Record", .run(.storageRecord), state)
                             NavRow("clock.badge.checkmark.fill", "Restore History", .run(.restoreHistory), state)
                             NavRow("checkmark.shield.fill",   "Cleanup Plan", .run(.safetyCheck), state)
                             NavRow("doc.text.fill",           "Privacy Summary", .run(.privacyReport), state)
                             NavRow("clock.fill",              "Recent Cleanups", .run(.pastCleanups), state)
                             NavRow("shield.fill",             "Protected Data", .run(.protectedItems), state)
-                            NavRow("flag.fill",               "Safety Rules", .run(.safetyPolicy), state)
+                            NavRow("flag.fill",               "Protection Guide", .run(.safetyPolicy), state)
                         }
                     }
                     .padding(.bottom, DS.Sp.xxl)
