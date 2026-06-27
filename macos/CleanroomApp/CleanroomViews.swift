@@ -140,7 +140,7 @@ struct AppAction: Hashable {
     static let startup = AppAction(title: "Startup Items", args: ["startup-fast"])
     static let storageRecord = AppAction(title: "Storage Snapshot", args: ["snapshot-fast"])
     static let restoreHistory = AppAction(title: "Restore History", args: ["state-fast"])
-    static let safetyCheck = AppAction(title: "Cleanup Plan", args: ["clean", "--preset", "dev", "--preflight"])
+    static let safetyCheck = AppAction(title: "Cleanup Plan", args: ["clean", "--preflight"])
     static let privacyReport = AppAction(title: "Privacy Summary", args: ["report-fast", "--redact"])
     static let pastCleanups = AppAction(title: "Recent Cleanups", args: ["history-fast"])
     static let protectedItems = AppAction(title: "Protected Data", args: ["protect-fast"])
@@ -649,6 +649,9 @@ final class AppState: ObservableObject {
         var lines = ["\(reviewTitle) — \(reviewItems.count) \(reviewItems.count == 1 ? "item" : "items")"]
         for item in reviewItems {
             lines.append("\(item.size)  \(item.title)  \(item.badge)")
+            if let path = item.path, !path.isEmpty {
+                lines.append("  \(Self.shortPath(path))")
+            }
             if !item.detail.isEmpty {
                 lines.append("  \(item.detail)")
             }
