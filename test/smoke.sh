@@ -1114,6 +1114,17 @@ venvs_fast_json="$(mktemp)"
 python3 -m json.tool "$venvs_fast_json" >/dev/null
 grep '"available":' "$venvs_fast_json" >/dev/null
 rm -f "$venvs_fast_json"
+venvs_fast_shallow_json="$(mktemp)"
+venvs_mdfind_log="$(mktemp)"
+CLEANROOM_MDFIND_LOG="$venvs_mdfind_log" "$BIN" venvs-fast --json "$HOME/Documents" --days 30 --limit 1 > "$venvs_fast_shallow_json"
+python3 -m json.tool "$venvs_fast_shallow_json" >/dev/null
+grep '"available":true' "$venvs_fast_shallow_json" >/dev/null
+grep 'pyvenv.cfg' "$venvs_fast_shallow_json" >/dev/null
+if [[ -s "$venvs_mdfind_log" ]]; then
+  echo "venvs-fast should skip Spotlight when filesystem candidates fill the requested limit" >&2
+  exit 1
+fi
+rm -f "$venvs_fast_shallow_json" "$venvs_mdfind_log"
 developer_fast_json="$(mktemp)"
 "$BIN" developer-fast --json "$HOME/Documents" --days 30 --limit 5 > "$developer_fast_json"
 python3 -m json.tool "$developer_fast_json" >/dev/null
