@@ -27,6 +27,14 @@ struct AppSanitizerTests {
         expect(item["apply_command"] == nil, "apply_command should be hidden")
         expect(item["mode"] == nil, "mode should be hidden")
         expect(item["location"] as? String == "In Documents", "location should be derived from path")
+        let backendInput: [[String: Any]] = [[
+            "title": "Review mode",
+            "summary": "Dry-run mode. Nothing changed.",
+            "status": "review-only"
+        ]]
+        let backendSanitized = AppState.appFacingItemsForTesting(backendInput)
+        expect(backendSanitized.first?["summary"] as? String == "review mode. Nothing changed.", "backend cleanup wording should be normalized")
+        expect(backendSanitized.first?["status"] as? String == "Review only", "backend status tokens should be friendly")
 
         let copied = AppState.appFacingSummaryTextForTesting(
             title: "Documents",
