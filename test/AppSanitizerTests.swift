@@ -64,6 +64,20 @@ struct AppSanitizerTests {
             )
         ])
         expect(totalLabel == "2 items · 2.0GB listed", "visible review total should summarize listed file size")
+
+        let folderItems = AppState.reviewItemsForTesting([[
+            "name": "media-project",
+            "kind": "directory",
+            "path": "/Users/example/Documents/media-project",
+            "size": "Open folder",
+            "summary": "Folder size is checked only when you open a deeper review.",
+            "review_command": "cleanroom documents /Users/example/Documents/media-project --limit 40"
+        ]])
+        expect(folderItems.first?.isFolder == true, "folder rows should be marked for in-app drill down")
+        expect(folderItems.first?.path == "/Users/example/Documents/media-project", "folder drill down should preserve folder path")
+        let folderAction = AppAction.folderReview(path: "/Users/example/Documents/media-project")
+        expect(folderAction.title == "media-project", "folder review action should use the folder name")
+        expect(folderAction.args == ["documents-fast", "/Users/example/Documents/media-project", "--limit", "40"], "folder review action should run a focused fast folder review")
     }
 
     private static func expect(_ condition: Bool, _ message: String) {

@@ -63,6 +63,7 @@ struct ReviewItem: Identifiable {
     var badge: String
     var path: String?
     var sizeKB: Int? = nil
+    var isFolder: Bool = false
 }
 
 struct CleanupPlanItem: Identifiable {
@@ -151,6 +152,11 @@ struct AppAction: Hashable {
 
     static func appReview(query: String) -> AppAction {
         AppAction(title: "App Review: \(query)", args: ["appreview-fast", query, "--limit", "40"])
+    }
+
+    static func folderReview(path: String) -> AppAction {
+        let name = URL(fileURLWithPath: path).lastPathComponent
+        return AppAction(title: name.isEmpty ? "Folder Review" : name, args: ["documents-fast", path, "--limit", "40"])
     }
 }
 
@@ -1056,6 +1062,10 @@ final class AppState: ObservableObject {
         return "\(countLabel) · \(Self.formatKBString(String(totalKB))) listed"
     }
 
+    nonisolated static func reviewItemsForTesting(_ items: [[String: Any]]) -> [ReviewItem] {
+        Self.appFacingItems(items).map { Self.reviewItem(from: $0) }
+    }
+
     nonisolated private static func shouldPreserveAppPathField(_ key: String) -> Bool {
         let lower = key.lowercased()
         return lower == "path" || lower == "paths"
@@ -1137,7 +1147,9 @@ final class AppState: ObservableObject {
             Self.friendlyLocationHint(from: item) ??
             "Review before cleaning."
         let sizeKB = Self.numberValue(item["size_kb"]).flatMap { Int(exactly: $0) }
-        return ReviewItem(title: title, detail: detail, size: size, badge: badge, path: path, sizeKB: sizeKB)
+        let kind = Self.stringValue(item["kind"])?.lowercased() ?? ""
+        let isFolder = kind == "folder" || kind == "directory"
+        return ReviewItem(title: title, detail: detail, size: size, badge: badge, path: path, sizeKB: sizeKB, isFolder: isFolder)
     }
 
     nonisolated private static func friendlyTitle(from item: [String: Any]) -> String {
@@ -2299,7 +2311,7 @@ struct ReviewSummaryPanel: View {
                                     .foregroundColor(DS.C.textOnDark.opacity(0.52))
                             }
                             ForEach(state.reviewItems) { item in
-                                ReviewResultRow(item: item)
+                                ReviewResultRow(state: state, item: item)
                             }
                         }
                     }
@@ -2390,6 +2402,7 @@ struct EmptyReportPanel: View {
 }
 
 struct ReviewResultRow: View {
+    @ObservedObject var state: AppState
     let item: ReviewItem
 
     private var visiblePath: String? {
@@ -2443,18 +2456,36 @@ struct ReviewResultRow: View {
             }
             Spacer(minLength: 0)
             if item.path != nil {
-                Button(action: revealItemInFinder) {
-                    Image(systemName: "folder")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(DS.C.textOnDark.opacity(0.78))
-                        .frame(width: 30, height: 30)
-                        .background(
-                            Circle()
-                                .fill(Color.white.opacity(0.07))
-                        )
+                HStack(spacing: 8) {
+                    if item.isFolder {
+                        Button(action: reviewFolder) {
+                            Image(systemName: "list.bullet.rectangle")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(DS.C.textOnDark.opacity(0.78))
+                                .frame(width: 30, height: 30)
+                                .background(
+                                    Circle()
+                                        .fill(Color.white.opacity(0.07))
+                                )
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(state.running)
+                        .help("Review folder")
+                    }
+
+                    Button(action: revealItemInFinder) {
+                        Image(systemName: "folder")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(DS.C.textOnDark.opacity(0.78))
+                            .frame(width: 30, height: 30)
+                            .background(
+                                Circle()
+                                    .fill(Color.white.opacity(0.07))
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .help("Show in Finder")
                 }
-                .buttonStyle(.plain)
-                .help("Show in Finder")
             }
         }
         .padding(DS.Sp.md)
@@ -2480,6 +2511,13 @@ struct ReviewResultRow: View {
         let parent = url.deletingLastPathComponent()
         if fileManager.fileExists(atPath: parent.path) {
             NSWorkspace.shared.open(parent)
+        }
+    }
+
+    private func reviewFolder() {
+        guard item.isFolder, let path = item.path else { return }
+        withAnimation(DS.Ani.snap) {
+            state.openReview(.folderReview(path: expandingHome(in: path)))
         }
     }
 
