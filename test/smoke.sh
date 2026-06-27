@@ -131,6 +131,7 @@ mkdir -p \
   "$TEST_HOME/Downloads" \
   "$TEST_HOME/Documents/duplicates" \
   "$TEST_HOME/Documents/media-project" \
+  "$TEST_HOME/Documents/nested-large-files/project-a/builds" \
   "$TEST_HOME/Documents/example/node_modules" \
   "$TEST_HOME/Documents/python-cache-project/pkg/__pycache__" \
   "$TEST_HOME/Documents/python-cache-project/.pytest_cache" \
@@ -263,6 +264,7 @@ printf 'finder metadata\n' >"$TEST_HOME/Documents/.DS_Store"
 printf 'appledouble metadata\n' >"$TEST_HOME/Downloads/._old-installer.dmg"
 printf 'windows metadata\n' >"$TEST_HOME/Desktop/Thumbs.db"
 dd if=/dev/zero of="$TEST_HOME/Documents/media-project/clip.mov" bs=1024 count=64 >/dev/null 2>&1
+dd if=/dev/zero of="$TEST_HOME/Documents/nested-large-files/project-a/builds/app-image.zip" bs=1024 count=1536 >/dev/null 2>&1
 printf 'old dependency\n' >"$TEST_HOME/Documents/example/node_modules/package.txt"
 printf 'bytecode\n' >"$TEST_HOME/Documents/python-cache-project/pkg/__pycache__/module.cpython-312.pyc"
 printf 'pytest cache\n' >"$TEST_HOME/Documents/python-cache-project/.pytest_cache/CACHEDIR.TAG"
@@ -347,6 +349,8 @@ if [[ "${1:-}" == "-onlyin" ]]; then
   else
     [[ -f "$root/Downloads/big-test.bin" ]] && printf '%s\n' "$root/Downloads/big-test.bin"
     [[ -f "$root/Downloads/old-installer.dmg" ]] && printf '%s\n' "$root/Downloads/old-installer.dmg"
+    [[ -f "$root/Documents/nested-large-files/project-a/builds/app-image.zip" ]] && printf '%s\n' "$root/Documents/nested-large-files/project-a/builds/app-image.zip"
+    [[ -f "$root/nested-large-files/project-a/builds/app-image.zip" ]] && printf '%s\n' "$root/nested-large-files/project-a/builds/app-image.zip"
     [[ -f "$root/Documents/duplicates/copy-a.bin" ]] && printf '%s\n' "$root/Documents/duplicates/copy-a.bin"
     [[ -f "$root/Documents/duplicates/copy-b.bin" ]] && printf '%s\n' "$root/Documents/duplicates/copy-b.bin"
   fi
@@ -710,6 +714,10 @@ documents_fast_json="$(mktemp)"
 "$BIN" documents-fast --json "$HOME/Documents" --limit 10 > "$documents_fast_json"
 python3 -m json.tool "$documents_fast_json" >/dev/null
 grep '"mode":"fast"' "$documents_fast_json" >/dev/null
+grep '"name":"app-image.zip"' "$documents_fast_json" >/dev/null
+grep '"kind":"large file"' "$documents_fast_json" >/dev/null
+grep '"path":' "$documents_fast_json" >/dev/null
+grep 'nested-large-files/project-a/builds/app-image.zip' "$documents_fast_json" >/dev/null
 grep '"name":"media-project"' "$documents_fast_json" >/dev/null
 grep '"size":"Open folder"' "$documents_fast_json" >/dev/null
 rm -f "$documents_fast_json"
