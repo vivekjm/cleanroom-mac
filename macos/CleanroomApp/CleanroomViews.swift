@@ -182,12 +182,14 @@ final class AppState: ObservableObject {
     @Published var summaryOpen:      Bool    = false
     @Published var showLeftovers:    Bool    = false
     @Published var showApplyConfirm: Bool    = false
+    @Published var showTrashConfirm: Bool    = false
     @Published var cardOffset:       Int     = 0
     @Published var reviewTitle:      String  = "Review"
     @Published var reviewItems:      [ReviewItem] = []
     @Published var cleanupPlanItems: [CleanupPlanItem] = []
     @Published var cleanupPlanNotes: [String] = []
     @Published var cleanupPlanLoading: Bool = false
+    @Published var pendingTrashItem: ReviewItem? = nil
 
     @Published var stats: [StorageStat] = [
         StorageStat(label: "Disk Used",   value: "—"),
@@ -622,6 +624,50 @@ final class AppState: ObservableObject {
         NSPasteboard.general.setString(appFacingSummaryText(), forType: .string)
         status = "Review copied"
         activityMessage = "Review details copied."
+    }
+
+    func requestMoveToTrash(_ item: ReviewItem) {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        guard Self.canMoveReviewItemToTrashForTesting(item, homePath: home) else { return }
+        pendingTrashItem = item
+        showTrashConfirm = true
+    }
+
+    func movePendingItemToTrash() {
+        guard let item = pendingTrashItem,
+              let rawPath = item.path else {
+            showTrashConfirm = false
+            return
+        }
+
+        let path = Self.expandedPath(rawPath, homePath: FileManager.default.homeDirectoryForCurrentUser.path)
+        let url = URL(fileURLWithPath: path)
+        var isDirectory: ObjCBool = false
+        let fileManager = FileManager.default
+        guard fileManager.fileExists(atPath: url.path, isDirectory: &isDirectory), !isDirectory.boolValue else {
+            status = "File not found"
+            activityMessage = "\(item.title) is no longer available."
+            pendingTrashItem = nil
+            showTrashConfirm = false
+            return
+        }
+
+        do {
+            _ = try fileManager.trashItem(at: url, resultingItemURL: nil)
+            reviewItems.removeAll { $0.id == item.id }
+            clearReviewCache()
+            status = "Moved to Trash"
+            activityMessage = "\(item.title) moved to Trash."
+            reviewSummary = reviewItems.isEmpty
+                ? "\(reviewTitle) has no remaining listed files.\n"
+                : "\(reviewTitle) now has \(reviewItems.count) listed \(reviewItems.count == 1 ? "item" : "items").\n"
+        } catch {
+            status = "Move failed"
+            activityMessage = "Could not move \(item.title) to Trash."
+        }
+
+        pendingTrashItem = nil
+        showTrashConfirm = false
     }
 
     func clearSummary() {
@@ -1064,6 +1110,38 @@ final class AppState: ObservableObject {
 
     nonisolated static func reviewItemsForTesting(_ items: [[String: Any]]) -> [ReviewItem] {
         Self.appFacingItems(items).map { Self.reviewItem(from: $0) }
+    }
+
+    nonisolated static func canMoveReviewItemToTrashForTesting(_ item: ReviewItem, homePath: String) -> Bool {
+        guard !item.isFolder,
+              let rawPath = item.path,
+              !rawPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              !item.badge.localizedCaseInsensitiveContains("protected") else {
+            return false
+        }
+        let path = Self.expandedPath(rawPath, homePath: homePath)
+        let lower = path.lowercased()
+        let allowedRoots = [
+            homePath + "/Desktop",
+            homePath + "/Documents",
+            homePath + "/Downloads"
+        ].map { $0.lowercased() }
+        guard allowedRoots.contains(where: { lower == $0 || lower.hasPrefix($0 + "/") }) else {
+            return false
+        }
+        return !lower.contains("/library/") &&
+            !lower.contains("/.trash/") &&
+            !lower.contains("/node_modules/") &&
+            !lower.contains("/.git/") &&
+            !lower.hasSuffix("/.git")
+    }
+
+    nonisolated private static func expandedPath(_ path: String, homePath: String) -> String {
+        if path == "~" { return homePath }
+        if path.hasPrefix("~/") {
+            return homePath + String(path.dropFirst())
+        }
+        return path
     }
 
     nonisolated private static func shouldPreserveAppPathField(_ key: String) -> Bool {
@@ -1724,6 +1802,9 @@ struct RootView: View {
         }
         .sheet(isPresented: $state.showApplyConfirm) {
             ApplyConfirmSheet(state: state)
+        }
+        .sheet(isPresented: $state.showTrashConfirm) {
+            MoveToTrashSheet(state: state)
         }
         .onAppear {
             state.prepareForUse()
@@ -2405,6 +2486,13 @@ struct ReviewResultRow: View {
     @ObservedObject var state: AppState
     let item: ReviewItem
 
+    private var canMoveToTrash: Bool {
+        AppState.canMoveReviewItemToTrashForTesting(
+            item,
+            homePath: FileManager.default.homeDirectoryForCurrentUser.path
+        )
+    }
+
     private var visiblePath: String? {
         guard let path = item.path else { return nil }
         let shortened = shortPath(path)
@@ -2471,6 +2559,22 @@ struct ReviewResultRow: View {
                         .buttonStyle(.plain)
                         .disabled(state.running)
                         .help("Review folder")
+                    }
+
+                    if canMoveToTrash {
+                        Button(action: { state.requestMoveToTrash(item) }) {
+                            Image(systemName: "trash")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(DS.C.ctaOrangeSoft.opacity(0.9))
+                                .frame(width: 30, height: 30)
+                                .background(
+                                    Circle()
+                                        .fill(DS.C.ctaOrange.opacity(0.12))
+                                )
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(state.running)
+                        .help("Move to Trash")
                     }
 
                     Button(action: revealItemInFinder) {
@@ -2655,6 +2759,88 @@ struct LeftoversSheet: View {
 // ═══════════════════════════════════════════════════════════════
 // MARK: – Apply Confirm Sheet
 // ═══════════════════════════════════════════════════════════════
+
+struct MoveToTrashSheet: View {
+    @ObservedObject var state: AppState
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        let item = state.pendingTrashItem
+        VStack(alignment: .leading, spacing: DS.Sp.xl) {
+            HStack(spacing: DS.Sp.md) {
+                ZStack {
+                    Circle().fill(DS.C.ctaOrangeSoft).frame(width: 48, height: 48)
+                    Image(systemName: "trash.fill")
+                        .font(.system(size: 21))
+                        .foregroundColor(DS.C.ctaOrange)
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Move to Trash?")
+                        .font(DS.T.h2)
+                        .foregroundColor(DS.C.textPrimary)
+                    Text("The file goes to macOS Trash so you can restore it before emptying Trash.")
+                        .font(DS.T.bodySm)
+                        .foregroundColor(DS.C.textSecondary)
+                }
+            }
+
+            Rectangle().fill(DS.C.divider).frame(height: 1)
+
+            VStack(alignment: .leading, spacing: DS.Sp.sm) {
+                Text(item?.title ?? "Selected file")
+                    .font(DS.T.body.weight(.semibold))
+                    .foregroundColor(DS.C.textPrimary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                if let path = item?.path {
+                    Text(shortPath(path))
+                        .font(DS.T.bodySm.monospaced())
+                        .foregroundColor(DS.C.textSecondary)
+                        .lineLimit(2)
+                        .truncationMode(.middle)
+                        .textSelection(.enabled)
+                }
+            }
+            .padding(DS.Sp.lg)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: DS.R.sm)
+                    .fill(DS.C.surfaceRaised)
+            )
+
+            Spacer()
+
+            HStack(spacing: DS.Sp.sm) {
+                Button("Cancel") {
+                    state.pendingTrashItem = nil
+                    state.showTrashConfirm = false
+                    dismiss()
+                }
+                .buttonStyle(.plain)
+                .foregroundColor(DS.C.textSecondary)
+                Spacer()
+                PillBtn("Move to Trash", style: .primary) {
+                    state.movePendingItemToTrash()
+                    dismiss()
+                }
+                .disabled(item == nil)
+                .opacity(item == nil ? 0.42 : 1)
+            }
+        }
+        .padding(DS.Sp.xxl)
+        .frame(width: 520, height: 320)
+        .background(DS.C.canvas)
+    }
+
+    private func shortPath(_ path: String) -> String {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        if path == home { return "~" }
+        if path.hasPrefix(home + "/") {
+            return "~" + path.dropFirst(home.count)
+        }
+        return path
+    }
+}
 
 struct ApplyConfirmSheet: View {
     @ObservedObject var state: AppState

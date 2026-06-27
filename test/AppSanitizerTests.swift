@@ -78,6 +78,35 @@ struct AppSanitizerTests {
         let folderAction = AppAction.folderReview(path: "/Users/example/Documents/media-project")
         expect(folderAction.title == "media-project", "folder review action should use the folder name")
         expect(folderAction.args == ["documents-fast", "/Users/example/Documents/media-project", "--limit", "40"], "folder review action should run a focused fast folder review")
+
+        let home = "/Users/example"
+        let documentFile = ReviewItem(
+            title: "old-installer.zip",
+            detail: "File in Documents. Review before deleting or moving.",
+            size: "2.0GB",
+            badge: "Review",
+            path: "/Users/example/Documents/downloads/old-installer.zip",
+            sizeKB: 2097152
+        )
+        expect(AppState.canMoveReviewItemToTrashForTesting(documentFile, homePath: home), "regular Documents files should be eligible for app-side Trash")
+        let libraryFile = ReviewItem(
+            title: "Login Data",
+            detail: "Protected profile data.",
+            size: "10MB",
+            badge: "Protected",
+            path: "/Users/example/Library/Application Support/Google/Chrome/Default/Login Data",
+            sizeKB: 10240
+        )
+        expect(!AppState.canMoveReviewItemToTrashForTesting(libraryFile, homePath: home), "protected Library profile data should not be eligible for app-side Trash")
+        let folderRow = ReviewItem(
+            title: "media-project",
+            detail: "Folder size is checked only when you open a deeper review.",
+            size: "Open folder",
+            badge: "Review",
+            path: "/Users/example/Documents/media-project",
+            isFolder: true
+        )
+        expect(!AppState.canMoveReviewItemToTrashForTesting(folderRow, homePath: home), "folders should use drill down instead of direct Trash")
     }
 
     private static func expect(_ condition: Bool, _ message: String) {
