@@ -262,14 +262,6 @@ final class AppState: ObservableObject {
         resolveEngine()
         status = "Ready"
         activityMessage = "Choose an area to review, or analyze storage when you want updated numbers."
-        Task.detached(priority: .background) {
-            try? await Task.sleep(nanoseconds: 1_500_000_000)
-            await MainActor.run {
-                if !self.running && !self.cleanupPlanLoading && self.cleanupPlanCache == nil {
-                    self.refreshCleanupPlan()
-                }
-            }
-        }
     }
 
     // Expensive storage measurement; run only when the user asks or after cleanup.
