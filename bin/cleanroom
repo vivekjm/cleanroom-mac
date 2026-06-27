@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.132.0"
+VERSION="1.133.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -3982,19 +3982,8 @@ documents() {
 
 documents_fast_rows() {
   local root="$1"
-  {
-    if command -v mdfind >/dev/null 2>&1; then
-      local min_bytes=$((MIN_MB * 1024 * 1024))
-      local spotlight_cap=$((LIMIT * 8))
-      [[ "$spotlight_cap" -lt 80 ]] && spotlight_cap=80
-      [[ "$spotlight_cap" -gt 500 ]] && spotlight_cap=500
-      mdfind -onlyin "$root" "kMDItemFSSize > $min_bytes" 2>/dev/null |
-        head -n "$spotlight_cap" |
-        while IFS= read -r path; do
-          [[ -f "$path" ]] || continue
-          printf '%012d\tlarge file\t%s\t%s\n' "$(file_size_kb "$path")" "$(document_guard_status "$path")" "$path"
-        done
-    fi
+  local shallow_rows shallow_count
+  shallow_rows="$(
     find "$root" -xdev -mindepth 1 -maxdepth 1 ! -name '.*' -print0 2>/dev/null |
       while IFS= read -r -d '' path; do
         if [[ -f "$path" ]]; then
@@ -4003,6 +3992,24 @@ documents_fast_rows() {
           printf '%012d\t%s\t%s\t%s\n' 0 "$(document_item_kind "$path")" "$(document_guard_status "$path")" "$path"
         fi
       done
+  )"
+  shallow_count="$(printf '%s\n' "$shallow_rows" | awk 'NF {count++} END {print count + 0}')"
+  {
+    [[ -n "$shallow_rows" ]] && printf '%s\n' "$shallow_rows"
+    if command -v mdfind >/dev/null 2>&1; then
+      local min_bytes=$((MIN_MB * 1024 * 1024))
+      local spotlight_cap=$((LIMIT * 8))
+      [[ "$spotlight_cap" -lt 80 ]] && spotlight_cap=80
+      [[ "$spotlight_cap" -gt 500 ]] && spotlight_cap=500
+      if [[ "$shallow_count" -lt "$LIMIT" ]]; then
+        mdfind -onlyin "$root" "kMDItemFSSize > $min_bytes" 2>/dev/null |
+          head -n "$spotlight_cap" |
+          while IFS= read -r path; do
+            [[ -f "$path" ]] || continue
+            printf '%012d\tlarge file\t%s\t%s\n' "$(file_size_kb "$path")" "$(document_guard_status "$path")" "$path"
+          done
+      fi
+    fi
   } |
     awk -F '\t' '!seen[$4]++' |
     sort -rn |

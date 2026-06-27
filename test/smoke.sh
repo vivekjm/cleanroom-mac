@@ -342,6 +342,7 @@ cat >"$TEST_HOME/bin/mdfind" <<'SH'
 if [[ "${1:-}" == "-onlyin" ]]; then
   root="${2:-}"
   query="${3:-}"
+  [[ -n "${CLEANROOM_MDFIND_LOG:-}" ]] && printf '%s\n' "$root" >>"$CLEANROOM_MDFIND_LOG"
   if [[ "$query" == *"kMDItemFSName"* ]]; then
     [[ -f "$root/Documents/.DS_Store" ]] && printf '%s\n' "$root/Documents/.DS_Store"
     [[ -f "$root/Downloads/._old-installer.dmg" ]] && printf '%s\n' "$root/Downloads/._old-installer.dmg"
@@ -726,6 +727,18 @@ grep 'nested-large-files/project-a/builds/app-image.zip' "$documents_fast_json" 
 grep '"name":"media-project"' "$documents_fast_json" >/dev/null
 grep '"size":"Open folder"' "$documents_fast_json" >/dev/null
 rm -f "$documents_fast_json"
+mkdir -p "$HOME/Documents/shallow-full"
+printf 'one\n' >"$HOME/Documents/shallow-full/one.txt"
+printf 'two\n' >"$HOME/Documents/shallow-full/two.txt"
+mdfind_log="$(mktemp)"
+shallow_full_json="$(mktemp)"
+CLEANROOM_MDFIND_LOG="$mdfind_log" "$BIN" documents-fast --json "$HOME/Documents/shallow-full" --limit 2 > "$shallow_full_json"
+python3 -m json.tool "$shallow_full_json" >/dev/null
+if [[ -s "$mdfind_log" ]]; then
+  echo "documents-fast should skip Spotlight when shallow rows fill the requested limit" >&2
+  exit 1
+fi
+rm -f "$mdfind_log" "$shallow_full_json"
 mkdir -p "$HOME/Documents/spotlight-cap"
 for i in $(seq 1 120); do
   printf 'cap\n' >"$HOME/Documents/spotlight-cap/item-$i.bin"
