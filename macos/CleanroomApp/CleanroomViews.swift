@@ -869,9 +869,10 @@ final class AppState: ObservableObject {
         for item in items.prefix(40) {
             lines.append(Self.summaryLine(for: item))
         }
+        let visibleLimit = Self.visibleReviewItemLimit(for: action)
         return PresentableReview(
             summary: lines.joined(separator: "\n") + "\n",
-            items: items.prefix(80).map { Self.reviewItem(from: $0) }
+            items: items.prefix(visibleLimit).map { Self.reviewItem(from: $0) }
         )
     }
 
@@ -1183,6 +1184,15 @@ final class AppState: ObservableObject {
 
     nonisolated static func reviewItemsForTesting(_ items: [[String: Any]]) -> [ReviewItem] {
         Self.appFacingItems(items).map { Self.reviewItem(from: $0) }
+    }
+
+    nonisolated private static func visibleReviewItemLimit(for action: AppAction) -> Int {
+        guard let requested = action.reviewLimitForTesting() else { return 80 }
+        return min(max(requested, 1), 500)
+    }
+
+    nonisolated static func visibleReviewItemLimitForTesting(_ action: AppAction) -> Int {
+        Self.visibleReviewItemLimit(for: action)
     }
 
     nonisolated static func shouldOpenReviewDetailsForTesting(itemCount: Int, status: Int32) -> Bool {
