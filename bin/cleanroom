@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="1.138.0"
+VERSION="1.139.0"
 APPLY=0
 VERBOSE=0
 ASSUME_YES=0
@@ -4368,8 +4368,12 @@ archive_rows() {
 }
 
 archive_fast_rows() {
-  local now root path name kind kb epoch age_days count=0
+  local now root path name kind kb epoch age_days count=0 candidate_cap
   now="$(date '+%s')"
+  candidate_cap=$((LIMIT * 8))
+  [[ "$candidate_cap" -lt 40 ]] && candidate_cap=40
+  [[ "$candidate_cap" -gt 300 ]] && candidate_cap=300
+  {
   while IFS= read -r root; do
     [[ -d "$root" ]] || continue
     while IFS= read -r -d '' path; do
@@ -4385,9 +4389,12 @@ archive_fast_rows() {
       fi
       printf '%012d\t%s\t%s\t%s\t%s\n' "$kb" "$epoch" "$age_days" "$kind" "$path"
       count=$((count + 1))
-      [[ "$count" -ge "$LIMIT" ]] && return 0
+      [[ "$count" -ge "$candidate_cap" ]] && break
     done < <(find "$root" -xdev -maxdepth 1 -type f -mtime +"$DAYS" -print0 2>/dev/null)
   done < <(archive_fast_roots)
+  } |
+    sort -rn |
+    head -n "$LIMIT"
   return 0
 }
 

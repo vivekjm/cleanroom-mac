@@ -1055,6 +1055,18 @@ grep '"mode":"fast"' "$archives_fast_json" >/dev/null
 grep '"name":"old-archive.zip"' "$archives_fast_json" >/dev/null
 grep '"kind":"archive"' "$archives_fast_json" >/dev/null
 rm -f "$archives_fast_json"
+printf 'small\n' >"$HOME/Downloads/old-small-archive.zip"
+dd if=/dev/zero of="$HOME/Downloads/old-large-archive.zip" bs=1024 count=2048 >/dev/null 2>&1
+touch -t 202001010000 "$HOME/Downloads/old-small-archive.zip" "$HOME/Downloads/old-large-archive.zip"
+archives_fast_top_json="$(mktemp)"
+"$BIN" archives-fast --json "$HOME/Downloads" --days 7 --limit 1 > "$archives_fast_top_json"
+python3 -m json.tool "$archives_fast_top_json" >/dev/null
+grep 'old-large-archive.zip' "$archives_fast_top_json" >/dev/null
+if grep 'old-small-archive.zip' "$archives_fast_top_json" >/dev/null; then
+  echo "archives-fast should prefer larger old archives within its quick candidate set" >&2
+  exit 1
+fi
+rm -f "$archives_fast_top_json"
 "$BIN" downloads --days 30 --limit 5 | grep 'old-installer.dmg' >/dev/null
 downloads_json="$(mktemp)"
 "$BIN" downloads --json --days 30 --limit 5 > "$downloads_json"
